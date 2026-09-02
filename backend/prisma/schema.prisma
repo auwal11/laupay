@@ -1,0 +1,359 @@
+// LAUPAY database schema
+// PostgreSQL via Prisma ORM
+// See docs/architecture/database-design.md for rationale behind each model.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  CUSTOMER
+  AGENT
+  ADMIN
+  SUPPORT
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum WalletOwnerType {
+  USER
+  AGENT
+  SYSTEM // e.g. a house/settlement wallet, used for reconciliation & fees
+}
+
+enum WalletStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+enum LedgerDirection {
+  CREDIT
+  DEBIT
+}
+
+enum LedgerReason {
+  WALLET_FUNDING
+  AGENT_CASH_COLLECTION
+  ORDER_PAYMENT
+  ORDER_REFUND
+  REVERSAL
+  ADMIN_ADJUSTMENT
+  FEE
+}
+
+enum OrderType {
+  AIRTIME
+  DATA
+  BILL
+}
+
+enum OrderStatus {
+  CREATED
+  PRICED
+  PAID
+  FULFILLING
+  FULFILLED
+  FULFILLMENT_FAILED
+  FULFILLMENT_UNKNOWN
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  WALLET
+  PROVIDER_CARD
+  PROVIDER_TRANSFER
+  AGENT_CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  UNKNOWN
+}
+
+enum VtuProviderName {
+  MOCK
+  VTPASS_SANDBOX
+  VTPASS_LIVE
+}
+
+enum VtuTransactionStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  UNKNOWN
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGIN_FAILED
+  ADMIN_ACTION
+  WALLET_ADJUSTMENT
+}
+
+// ============================================================
+// USERS & AUTH
+// ============================================================
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  phone         String?    @unique
+  passwordHash  String
+  fullName      String
+  role          UserRole   @default(CUSTOMER)
+  status        UserStatus @default(PENDING_VERIFICATION)
+
+  // Agent-specific profile fields live in AgentProfile (1:1, optional)
+  agentProfile  AgentProfile?
+
+  walletAccount WalletAccount?
+  orders        Order[]
+  payments      Payment[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]     @relation("AuditActor")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([status])
+}
+
+model AgentProfile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  businessName   String?
+  outletAddress  String?
+  isVerified     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ============================================================
+// WALLET & LEDGER  (see docs/architecture/wallet-ledger-model.md)
+// ============================================================
+
+model WalletAccount {
+  id        String          @id @default(uuid())
+  ownerId   String          @unique // User.id (for USER/AGENT) or a fixed system key
+  ownerType WalletOwnerType
+  user      User?           @relation(fields: [ownerId], references: [id], map: "wallet_owner_user_fk")
+
+  balance  Decimal      @default(0) @db.Decimal(18, 2) // cached projection — see model doc
+  currency String       @default("NGN")
+  status   WalletStatus @default(ACTIVE)
+  version  Int          @default(0) // optimistic lock, bumped on every balance change
+
+  ledgerEntries LedgerEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerType])
+  @@check(balance >= 0, name: "wallet_balance_non_negative")
+}
+
+model LedgerEntry {
+  id              String          @id @default(uuid())
+  walletAccountId String
+  walletAccount   WalletAccount   @relation(fields: [walletAccountId], references: [id])
+
+  direction     LedgerDirection
+  amount        Decimal         @db.Decimal(18, 2) // always positive; direction gives sign
+  balanceAfter  Decimal         @db.Decimal(18, 2) // snapshot for fast audit/reconciliation
+  reason        LedgerReason
+
+  referenceType String? // e.g. "Order", "Payment"
+  referenceId   String? // polymorphic FK, validated at application layer
+
+  idempotencyKey String @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([walletAccountId, createdAt])
+  @@index([referenceType, referenceId])
+  @@check(amount > 0, name: "ledger_amount_positive")
+}
+
+// ============================================================
+// CATALOG
+// ============================================================
+
+model Network {
+  id       String     @id @default(uuid())
+  code     String     @unique // "MTN", "AIRTEL", "GLO", "9MOBILE"
+  name     String
+  dataPlans DataPlan[]
+  createdAt DateTime  @default(now())
+}
+
+model DataPlan {
+  id            String   @id @default(uuid())
+  networkId     String
+  network       Network  @relation(fields: [networkId], references: [id])
+  externalCode  String   // provider's plan code, opaque to us
+  label         String   // "1GB - 30 Days"
+  priceNaira    Decimal  @db.Decimal(18, 2) // what we charge the customer
+  costNaira     Decimal  @db.Decimal(18, 2) // what the provider charges us (for margin/reporting)
+  validityDays  Int?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([networkId, isActive])
+}
+
+// ============================================================
+// ORDERS
+// ============================================================
+
+model Order {
+  id     String    @id @default(uuid())
+  userId String
+  user   User      @relation(fields: [userId], references: [id])
+
+  // If this order was placed by an agent on behalf of a walk-in customer,
+  // agentId identifies who placed it; userId may then be a "walk-in" placeholder
+  // customer or the agent themself, depending on the finalized POS model
+  // (see docs/decisions/0002-agent-settlement-model.md).
+  agentId String?
+
+  type   OrderType
+  status OrderStatus @default(CREATED)
+
+  // Snapshot fields — never re-derive price from live catalog after creation,
+  // always trust what was charged at order time.
+  network      String?
+  phoneNumber  String?
+  dataPlanId   String?
+  dataPlan     DataPlan? @relation(fields: [dataPlanId], references: [id])
+  amount       Decimal   @db.Decimal(18, 2)
+
+  payments        Payment[]
+  vtuTransactions VtuTransaction[]
+
+  idempotencyKey String @unique // supplied by client or derived from a client request ID
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([agentId])
+}
+
+// ============================================================
+// PAYMENTS  (see docs/architecture/payment-flow.md)
+// ============================================================
+
+model Payment {
+  id      String @id @default(uuid())
+  orderId String?
+  order   Order? @relation(fields: [orderId], references: [id])
+  userId  String
+  user    User   @relation(fields: [userId], references: [id])
+
+  method PaymentMethod
+  status PaymentStatus @default(PENDING)
+  amount Decimal       @db.Decimal(18, 2)
+
+  providerName       String? // "paystack", "mock", etc — free text, provider-defined
+  providerReference  String? @unique
+  idempotencyKey     String  @unique
+
+  events PaymentEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status, updatedAt]) // used by the reconciliation job to find stale PROCESSING/UNKNOWN rows
+}
+
+model PaymentEvent {
+  id                String   @id @default(uuid())
+  paymentId         String
+  payment           Payment  @relation(fields: [paymentId], references: [id])
+  provider          String
+  providerEventId   String
+  rawPayload         Json
+  receivedAt        DateTime @default(now())
+
+  @@unique([provider, providerEventId]) // webhook dedup key
+}
+
+// ============================================================
+// VTU
+// ============================================================
+
+model VtuTransaction {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  provider          VtuProviderName
+  status            VtuTransactionStatus @default(PENDING)
+  providerReference String?              @unique
+  idempotencyKey    String               @unique
+  rawResponse        Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, updatedAt]) // reconciliation job
+}
+
+// ============================================================
+// AUDIT
+// ============================================================
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  actorId    String?
+  actor      User?       @relation("AuditActor", fields: [actorId], references: [id])
+  action     AuditAction
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime    @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}
