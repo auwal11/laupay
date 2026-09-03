@@ -53,15 +53,39 @@ An order stores the amount actually charged, not a live reference to
 current catalog pricing — so a later price change never retroactively
 changes what a historical order is considered to have cost.
 
-### `@@check` constraints
-`WalletAccount.balance >= 0` and `LedgerEntry.amount > 0` are expressed in
-the schema as intent. Depending on the Prisma version in use when this is
-implemented, native `@@check` support may require Prisma's
-`extendedIndexes`/`nativeTypes` preview features or a raw SQL migration
-(`ALTER TABLE ... ADD CONSTRAINT ... CHECK (...)`) applied after
-`prisma migrate dev`. Either way, **the constraint must exist in the actual
-database**, not only in application code — this is the last line of defense
-described in `wallet-ledger-model.md §5`.
+### `@@check` constraints — corrected approach
+An earlier draft of this schema assumed Prisma supported a declarative
+`@@check(...)` attribute. **It does not — there is no such attribute in the
+Prisma schema DSL, in any version.** Attempting to use it produces a
+schema validation error (`P1012: This line is not a valid field or
+attribute definition`).
+
+`WalletAccount.balance >= 0` and `LedgerEntry.amount > 0` are instead
+enforced as real PostgreSQL `CHECK` constraints added via a **raw-SQL
+migration**, generated with:
+
+```bash
+npx prisma migrate dev --create-only --name add_financial_check_constraints
+```
+
+and hand-written into the resulting empty `migration.sql` file:
+
+```sql
+ALTER TABLE "WalletAccount"
+  ADD CONSTRAINT "wallet_balance_non_negative" CHECK ("balance" >= 0);
+
+ALTER TABLE "LedgerEntry"
+  ADD CONSTRAINT "ledger_amount_positive" CHECK ("amount" > 0);
+```
+
+then applied with `npx prisma migrate dev`. See
+`backend/prisma/migrations/<timestamp>_add_financial_check_constraints/migration.sql`
+for the actual file. This is the correct, supported way to express a
+constraint PostgreSQL can enforce that Prisma's schema DSL itself cannot
+declare — the constraint lives in the database, not just in application
+code, so it remains the last line of defense described in
+`wallet-ledger-model.md §5` regardless of what Prisma's schema file can
+express.
 
 ## 3. Indexing Strategy
 

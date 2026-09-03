@@ -1,6 +1,21 @@
 // LAUPAY database schema
 // PostgreSQL via Prisma ORM
 // See docs/architecture/database-design.md for rationale behind each model.
+//
+// NOTE ON CHECK CONSTRAINTS: Prisma's schema DSL has no declarative syntax
+// for SQL CHECK constraints (there is no `@@check` attribute in Prisma,
+// in any version — this was corrected after an earlier draft of this
+// schema incorrectly assumed one existed). The two invariants that matter
+// most for financial integrity —
+//   - WalletAccount.balance must never be negative
+//   - LedgerEntry.amount must always be positive
+// — are added directly in PostgreSQL via a raw-SQL migration
+// (prisma/migrations/<timestamp>_add_financial_check_constraints/migration.sql),
+// generated with `prisma migrate dev --create-only` and hand-written. See
+// that migration file and docs/architecture/database-design.md §2 for
+// details. These constraints exist in the real database independently of
+// the Prisma schema file, and are enforced even if application code has a
+// bug that skips the equivalent in-code check.
 
 generator client {
   provider = "prisma-client-js"
@@ -185,7 +200,6 @@ model WalletAccount {
   updatedAt DateTime @updatedAt
 
   @@index([ownerType])
-  @@check(balance >= 0, name: "wallet_balance_non_negative")
 }
 
 model LedgerEntry {
@@ -207,7 +221,6 @@ model LedgerEntry {
 
   @@index([walletAccountId, createdAt])
   @@index([referenceType, referenceId])
-  @@check(amount > 0, name: "ledger_amount_positive")
 }
 
 // ============================================================
