@@ -45,6 +45,36 @@ export class VtuService {
     });
   }
 
+  async fulfillDataOrder(orderId: string, network: string, phoneNumber: string, planCode: string) {
+    const idempotencyKey = `vtu:${orderId}`;
+    const existing = await this.prisma.vtuTransaction.findUnique({ where: { idempotencyKey } });
+    if (existing) return existing;
+
+    const txn = await this.prisma.vtuTransaction.create({
+      data: {
+        orderId,
+        provider: VtuProviderName.MOCK,
+        status: VtuTransactionStatus.PROCESSING,
+        idempotencyKey,
+      },
+    });
+
+    const result = await this.provider.purchaseData({
+      network,
+      phoneNumber,
+      planCode,
+      idempotencyKey,
+    });
+
+    return this.prisma.vtuTransaction.update({
+      where: { id: txn.id },
+      data: {
+        status: this.mapStatus(result.status),
+        providerReference: result.providerReference,
+      },
+    });
+  }
+
   async requeryTransaction(vtuTransactionId: string) {
     const txn = await this.prisma.vtuTransaction.findUniqueOrThrow({
       where: { id: vtuTransactionId },
