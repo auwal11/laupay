@@ -28,21 +28,19 @@ exist as first-class fields rather than being inferred.
 5. `Order` proceeds through the normal VTU fulfillment flow
    (`vtu-flow.md`) exactly as a self-service customer order would.
 
-## 3. Open Decision: Float-Down vs. Commission-Up
+## 3. Settlement Model: Float (Decided — ADR 0002)
 
-Step 4 above assumes a **prepaid float model** (agent tops up their own
-wallet in advance; each sale draws it down). An alternative is a
-**commission model** (agent sells at the customer's expense via a provider
-charge, and the agent's wallet is *credited* a commission after the fact).
+**Decided**: LAUPAY uses the **prepaid float model** (agent tops up their
+own wallet in advance; each sale draws it down) — see
+`docs/decisions/0002-agent-settlement-model.md` for the full decision
+record, confirmed flow, and the pricing-configurability requirement that
+comes with it. The commission model (agent credited after the fact) is
+explicitly not implemented.
 
-This is a real product decision with different ledger implications and is
-tracked as an open item: `docs/decisions/0002-agent-settlement-model.md`.
-The current schema and `LedgerService` primitives support either model
-without further schema changes - only the specific service-layer flow that
-orchestrates *which* ledger calls happen in what order needs to be finalized
-once the business decision is made. **This must be resolved before Phase 2
-agent features are built**, and is listed as such in
-`docs/decisions/00-project-status.md`.
+`LedgerEntry`/`WalletAccount` primitives are model-agnostic by
+construction, so this decision required no changes to `LedgerService`
+itself — only `PaymentsService.confirmAgentCash()`'s specific sequencing of
+ledger calls needed to match the float-down flow, which it already does.
 
 ## 4. Receipts
 

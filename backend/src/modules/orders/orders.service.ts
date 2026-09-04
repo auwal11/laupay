@@ -87,6 +87,87 @@ export class OrdersService {
     return updatedOrder;
   }
 
+  /**
+   * Data purchase, paid from the customer's wallet. Mirrors
+   * createAirtimeOrder's flow (debit -> fulfill -> reverse-on-failure) but
+   * prices from a DataPlan snapshot rather than a client-supplied amount —
+   * the customer cannot set their own price for a fixed data bundle.
+   */
+  async createDataOrder(
+    userId: string,
+    network: string,
+    phoneNumber: string,
+    dataPlanId: string,
+    idempotencyKey: string,
+  ) {
+    const existing = await this.prisma.order.findUnique({ where: { idempotencyKey } });
+    if (existing) return existing;
+
+    const plan = await this.prisma.dataPlan.findUniqueOrThrow({ where: { id: dataPlanId } });
+    if (!plan.isActive) {
+      throw new ForbiddenException('This data plan is no longer available');
+    }
+    // Price is taken from the server-side catalog record, never from the
+    // client — see docs/security/security-model.md §3.
+    const amount = Number(plan.priceNaira);
+
+    const order = await this.prisma.order.create({
+      data: {
+        userId,
+        type: OrderType.DATA,
+        status: OrderStatus.CREATED,
+        network,
+        phoneNumber,
+        dataPlanId,
+        amount,
+        idempotencyKey,
+      },
+    });
+
+    const wallet = await this.prisma.walletAccount.findUniqueOrThrow({
+      where: { ownerId: userId },
+    });
+
+    try {
+      await this.ledger.debit({
+        walletAccountId: wallet.id,
+        amount,
+        reason: LedgerReason.ORDER_PAYMENT,
+        referenceType: 'Order',
+        referenceId: order.id,
+        idempotencyKey: `ledger:order:${order.id}`,
+      });
+    } catch (err) {
+      if (err instanceof InsufficientBalanceError) {
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { status: OrderStatus.CANCELLED },
+        });
+      }
+      throw err;
+    }
+
+    await this.prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.PAID } });
+
+    const vtuResult = await this.vtu.fulfillDataOrder(order.id, network, phoneNumber, plan.externalCode);
+
+    const finalStatus = this.mapVtuStatusToOrderStatus(vtuResult.status);
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: order.id },
+      data: { status: finalStatus },
+    });
+
+    if (finalStatus === OrderStatus.FULFILLMENT_FAILED) {
+      const originalEntry = await this.prisma.ledgerEntry.findUniqueOrThrow({
+        where: { idempotencyKey: `ledger:order:${order.id}` },
+      });
+      await this.ledger.reverse(originalEntry.id, `ledger:order:${order.id}:reversal`);
+      return this.prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.REFUNDED } });
+    }
+
+    return updatedOrder;
+  }
+
   async getOrder(orderId: string, requesterId: string, requesterRole: string) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found');

@@ -54,19 +54,46 @@ Last updated: Phase 1, initial build.
 These are architected (the docs describe how they should work) but have
 **no corresponding code yet**:
 
-- [ ] Admin module API endpoints (dashboard stats, reconciliation views,
-      audit log browsing) — schema and security model support it; routes
-      not yet written
-- [ ] Reconciliation job (the scheduled requery routine described in
-      `payment-flow.md §3` / `vtu-flow.md §3`) — `verifyTransaction()`
-      exists on both mock providers, but nothing calls it on a schedule yet
-- [ ] Full API surface from the brief (some listed endpoints — e.g.
-      `GET /orders/:id`, full bills flow — are stubbed or missing; see
-      `docs/api/` for exact current coverage)
-- [ ] Rate limiting tuned per-route (global default only; auth/webhook
-      routes need the stricter limits described in `security-model.md §4`)
-- [ ] Full BOLA/IDOR test suite (`security.e2e-spec.ts` — only a starting
-      set of cases exists)
+- [ ] Full admin CRUD (user management, order management, audit log
+      browsing) — only `GET /admin/dashboard` (stats) and
+      `POST /admin/reconciliation/run` (manual trigger) exist
+- [ ] `VtuTransactionEvent`-style dedup table for the VTU webhook (it
+      currently relies on `requeryTransaction`'s natural idempotency
+      instead of an explicit event log like the payment webhook has —
+      see `docs/decisions/0003-phase1-hardening-review.md` Remaining Risk #1)
+- [ ] Automatic wallet reversal when a VTU transaction resolves to FAILED
+      *asynchronously* (via webhook/reconciliation) after already returning
+      something other than FAILED on the initial synchronous attempt — see
+      `docs/decisions/0003-phase1-hardening-review.md` Remaining Risk #2.
+      **This is the most important open item — read it before Phase 2.**
+- [ ] Full bills-payment flow (mentioned in the original brief, not yet
+      modeled beyond airtime/data)
+- [ ] Per-route rate limiting beyond auth/webhooks (orders/payments use the
+      global default only)
+- [ ] Separate, configurable agent price vs. customer price (see ADR 0002 —
+      intentionally deferred pending the project owner's margin decision)
+
+## 2a. Implemented in the Phase 1 Hardening Pass
+
+Added after the items above were first identified as gaps — see
+`docs/decisions/0003-phase1-hardening-review.md` for full detail on each:
+
+- [x] `ReconciliationService` — scheduled job (every minute) requerying
+      stale PROCESSING/UNKNOWN payments and VTU transactions, plus a manual
+      `POST /admin/reconciliation/run` trigger
+- [x] `test/security.e2e-spec.ts` — real-HTTP IDOR/BOLA suite (order
+      ownership, role gating, DTO-tampering rejection, unauthenticated
+      access rejection)
+- [x] `test/payments-webhooks.e2e-spec.ts` — webhook signature verification,
+      replay/duplicate-event protection, full state-machine coverage
+      (SUCCESS/FAILED/UNKNOWN paths), timeout-is-not-failure regression
+      test, reconciliation-resolves-UNKNOWN test, payment-amount-tampering
+      test
+- [x] `POST /orders/data` — was missing; data purchases now price strictly
+      from the server-side `DataPlan` catalog record
+- [x] `POST /webhooks/vtu` — was missing (with the dedup caveat noted above)
+- [x] ADR 0002 (agent settlement model) — decided: Float Model; recorded
+      with the full confirmed flow and a pricing-configurability note
 
 ## 3. Not Started At All
 
@@ -127,10 +154,20 @@ Test 2: 20 concurrent debits of 100, all sharing one idempotency key
 
 `backend/src/modules/ledger/ledger.e2e-spec.ts` runs the equivalent
 scenario through the actual `LedgerService` TypeScript code (not a
-reimplementation) — it is written and ready, but requires a generated
-Prisma Client to execute, so it could not be run in this session. Running
-it (`npm run test:e2e`) on a machine with normal internet access is the
-next step to close this gap.
+reimplementation) — **this has now been run successfully** against a real
+PostgreSQL 16 instance (executed by the project owner after generating
+Prisma Client and running migrations):
+
+```
+PASS  src/modules/ledger/ledger.e2e-spec.ts
+  LedgerService (e2e, real Postgres)
+    ✓ never allows balance to go negative under 50 concurrent debits against a 1000 balance (134 ms)
+    ✓ applies a debit exactly once when the same idempotency key is submitted 20 times concurrently (63 ms)
+```
+
+This closes the gap noted in the original version of this section — the
+actual application code (not just a raw-SQL stand-in) is now confirmed safe
+under real concurrent load.
 
 ## 5. Sandbox Limitation: Prisma Client Generation
 
