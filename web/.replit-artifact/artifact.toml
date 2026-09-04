@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "LAUPAY Landing Page"
+description = "A production-quality responsive landing page for LAUPAY, a Nigerian digital services platform connecting airtime, data, payments, wallet services, POS and future services through one simple flow."
+version = "1.0.0"
+id = "artifacts/laupay-landing"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24738
+
+[services.development]
+run = "pnpm --filter @workspace/laupay-landing run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/laupay-landing", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/laupay-landing/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24738"
+BASE_PATH = "/"
