@@ -15,8 +15,9 @@ designed so far. Read it before assuming anything works.
 - [`docs/architecture/vtu-flow.md`](docs/architecture/vtu-flow.md)
 - [`docs/architecture/pos-agent-model.md`](docs/architecture/pos-agent-model.md)
 - [`docs/security/security-model.md`](docs/security/security-model.md)
-- [`docs/decisions/`](docs/decisions/) — ADRs, including one open decision
-  (agent settlement model) that needs a product decision before Phase 2
+- [`docs/decisions/`](docs/decisions/) — ADRs; see `0002` (agent settlement,
+  decided) and `0004` (customer-web integration audit — read before wiring
+  `apps/customer-web` to the real backend)
 
 ## Repository Layout
 
@@ -25,6 +26,9 @@ laupay/
   apps/
     mobile/        # Flutter app — not started (Phase 2+)
     admin/          # Admin web dashboard — not started (Phase 3+)
+    customer-web/    # Authenticated web app (customer + agent), Vite/React —
+                      # see docs/decisions/0004-customer-web-integration-audit.md
+  web/                # Marketing landing page (separate stack — React 19/Tailwind 4/wouter)
   backend/          # NestJS API — Phase 1, built and documented here
   packages/shared/    # Shared types/DTOs — not started
   brand/               # Brand asset placeholder structure (see brand/README.md)
@@ -43,6 +47,24 @@ npm install
 npx prisma generate && npx prisma migrate dev --name init && npx prisma db seed
 npm run start:dev
 ```
+
+## Quick Start (Customer/Agent Web App)
+
+Runs entirely on mock data by default — no backend required to try it.
+
+```bash
+cd apps/customer-web
+npm install
+npm run dev
+```
+
+**Before setting `VITE_USE_MOCK_API=false`** to point it at the real
+backend, read
+[`docs/decisions/0004-customer-web-integration-audit.md`](docs/decisions/0004-customer-web-integration-audit.md)
+— several endpoints it expects (PIN, device management, security
+notifications, a unified risk-decision flow) don't exist on the backend
+yet, and a few response shapes (auth, wallet balance) need reconciling
+first.
 
 ## Development Cost
 

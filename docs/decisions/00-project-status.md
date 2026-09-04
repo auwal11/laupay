@@ -101,11 +101,36 @@ Added after the items above were first identified as gaps — see
 - [ ] **Admin web dashboard** (`apps/admin/`) — empty placeholder only
 - [ ] Real provider integrations (Paystack, VTPass) — only mocks exist, by
       design, per the ₦0-development-cost requirement
-- [ ] CI pipeline content (`.github/workflows/` — folder exists, no workflow
-      file yet)
-- [ ] Phone OTP / PIN / biometric auth, device/session management
+- [x] CI pipeline content — `.github/workflows/backend-ci.yml` now exists
+      (lint/unit/e2e/build on push, spins up its own Postgres)
+- [ ] Phone OTP / PIN / biometric auth, device/session management — **now
+      also blocking `apps/customer-web`'s security pages**, see
+      `docs/decisions/0004-customer-web-integration-audit.md §3.3`
 - [ ] KYC/BVN/NIN verification
 - [ ] Settlement/payout tables at the company-vs-provider level
+- [ ] Risk-decision engine (ALLOW/VERIFY/HOLD/REJECT) — assumed by
+      `apps/customer-web`'s purchase flow but not built; see
+      `docs/decisions/0004-customer-web-integration-audit.md §3.3`
+- [ ] Unified transaction-history endpoint (joining Order+Payment status,
+      as opposed to raw ledger entries) — needed by `apps/customer-web`'s
+      wallet/transactions UI; see
+      `docs/decisions/0004-customer-web-integration-audit.md §3.2`
+
+## 3a. `apps/customer-web` — Added, Runs on Mock Data Only
+
+A Vite/React/TypeScript authenticated web app (customer + agent) was
+contributed as a separate frontend (kept isolated from the `web/` marketing
+site due to incompatible major dependency versions — see
+`docs/decisions/0004-customer-web-integration-audit.md §1`). It compiles
+and builds clean (`npm install && npm run typecheck && npm run build` all
+pass) and runs fully against an in-memory mock layer
+(`VITE_USE_MOCK_API=true`, the shipped default) with no backend required.
+
+**It is not yet wired to the real backend** — `VITE_USE_MOCK_API=false`
+should not be turned on until the gaps in
+`docs/decisions/0004-customer-web-integration-audit.md` are addressed,
+particularly §3.3 (no risk-engine/PIN/device/notification backend exists
+at all yet).
 
 ## 4. Financial Integrity Checklist — Current Status
 

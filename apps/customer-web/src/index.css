@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  NOTE FOR INTEGRATION: this file is scoped to the authenticated app shell.
+  If the real repo's web/src/index.css already defines the LAUPAY tokens for
+  the landing page, merge these @layer base rules in rather than replacing
+  the file wholesale — see INTEGRATION.md.
+*/
+
+@layer base {
+  body {
+    @apply bg-laupay-surface-muted font-body text-laupay-ink antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+
+  /* Respect the OS-level motion preference globally, as a floor under the
+     per-component checks that already gate Framer Motion animations. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
