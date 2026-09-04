@@ -123,6 +123,7 @@ button { font: inherit; }
 .reveal-delay-2 { animation-delay: .18s; }
 .reveal-delay-3 { animation-delay: .27s; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes laupay-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes bridge-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 @keyframes bridge-pulse { 0%, 100% { opacity: .35; } 50% { opacity: .9; } }
 .bridge-drift { animation: bridge-drift 5s ease-in-out infinite; }
