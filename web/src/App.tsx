@@ -122,7 +122,6 @@ const faqs = [
 type DemoStage = 'dashboard' | 'select' | 'process' | 'confirm';
 type Audience = 'customer' | 'agent';
 
-const heroServiceNames = ['Airtime', 'Data', 'Payments', 'Wallet', 'POS', 'Bills'];
 
 function FlowMark({ inverse = false }: { inverse?: boolean }) {
   return (
@@ -184,64 +183,155 @@ function ThemeSwitcher({
   );
 }
 
+const HERO_R = 138;
+const HERO_CX = 240;
+const HERO_CY = 280;
+
+const heroNodes = [
+  { label: 'AIRTIME', angle: 152 },
+  { label: 'DATA', angle: 180 },
+  { label: 'PAYMENTS', angle: 208 },
+  { label: 'BILLS', angle: 332 },
+  { label: 'POS', angle: 0 },
+  { label: 'WALLET', angle: 28 },
+];
+
+// rotation order: AIRTIME -> DATA -> PAYMENTS -> WALLET -> POS -> BILLS
+const heroOrder = [0, 1, 2, 5, 4, 3];
+
+function heroPos(angle: number, radius = HERO_R) {
+  const rad = (angle * Math.PI) / 180;
+  return { x: HERO_CX + radius * Math.cos(rad), y: HERO_CY - radius * Math.sin(rad) };
+}
+
 function BridgeArtwork({ compact = false, activeService }: { compact?: boolean; activeService?: ServiceKey }) {
-  const featuredService = services.find((item) => item.key === activeService) ?? services[0];
-  const FeaturedIcon = featuredService.icon;
+  const [step, setStep] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const sync = () => setReducedMotion(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    if (compact || paused || reducedMotion) return;
+    const id = window.setInterval(() => setStep((s) => (s + 1) % heroOrder.length), 2200);
+    return () => window.clearInterval(id);
+  }, [compact, paused, reducedMotion]);
+
+  useEffect(() => {
+    if (!activeService) return;
+    const index = heroNodes.findIndex((node) => node.label.toLowerCase() === activeService);
+    if (index >= 0) setStep(heroOrder.indexOf(index));
+  }, [activeService]);
+
+  if (compact) {
+    return (
+      <div className="pointer-events-none relative h-28" aria-hidden="true">
+        <div className="absolute inset-x-[8%] top-1/2 h-px bg-white/18" />
+        <div className="absolute left-[8%] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#F4B33F]" />
+        <div className="absolute right-[8%] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-white/70" />
+        <svg viewBox="0 0 760 120" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
+          <path d="M60 60 C 240 60, 240 22, 380 22 C 520 22, 520 60, 700 60" fill="none" stroke="rgba(244,179,63,.22)" strokeWidth="1.4" />
+          <path d="M60 60 C 240 60, 240 98, 380 98 C 520 98, 520 60, 700 60" fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="1.4" />
+        </svg>
+      </div>
+    );
+  }
+
+  const active = heroOrder[step];
+  const activeNode = heroNodes[active];
+
   return (
-    <div className={`pointer-events-none relative ${compact ? 'h-28' : 'h-[300px] sm:h-[390px]'}`} aria-hidden="true">
-      <div className="absolute inset-x-[8%] top-[54%] h-px bg-white/20" />
-      <div className="absolute left-[8%] top-[54%] h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-[#F4B33F] shadow-[0_0_0_7px_rgba(244,179,63,.12)]" />
-      <div className="absolute right-[8%] top-[54%] h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0_7px_rgba(255,255,255,.11)]" />
-      <svg viewBox="0 0 760 360" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
-        <path d="M60 194H244C290 194 287 94 334 94H426C473 94 470 194 516 194H700" fill="none" stroke="rgba(244,179,63,.25)" strokeWidth="1.5" />
-        <path d="M60 194H210C264 194 257 286 314 286H446C503 286 496 194 550 194H700" fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="1.5" />
-        <path d="M60 194H700" fill="none" stroke="rgba(255,255,255,.18)" strokeWidth="1" strokeDasharray="3 8" />
-        <path d="M380 112V194" fill="none" stroke="rgba(244,179,63,.42)" strokeWidth="1.5" />
-        <circle cx="380" cy="94" r="4" fill="#F4B33F" className="bridge-pulse" />
-        <circle cx="380" cy="286" r="4" fill="#FFFFFF" opacity=".7" className="bridge-pulse" />
+    <div
+      className="relative mx-auto aspect-[480/560] w-full max-w-[28rem]"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={() => setPaused(true)}
+      onTouchEnd={() => setPaused(false)}
+    >
+      <svg viewBox="0 0 480 560" className="absolute inset-0 h-full w-full" aria-hidden="true">
+        <circle cx={HERO_CX} cy={HERO_CY} r={HERO_R} fill="none" stroke="rgba(255,255,255,.28)" strokeWidth="1" opacity="0.45" />
+
+        <g fill="none" strokeLinecap="round">
+          {heroNodes.map((node, i) => {
+            const outer = heroPos(node.angle, HERO_R - 12);
+            const inner = heroPos(node.angle, 46);
+            const midR = (HERO_R + 46) / 2;
+            const bend = heroPos(node.angle + (node.angle > 90 && node.angle < 270 ? 9 : -9), midR);
+            const isActive = i === active;
+            return (
+              <path
+                key={node.label}
+                d={`M${outer.x} ${outer.y} Q ${bend.x} ${bend.y} ${inner.x} ${inner.y}`}
+                stroke={isActive ? '#F4B33F' : 'rgba(255,255,255,.55)'}
+                strokeWidth={isActive ? 1.4 : 1}
+                opacity={isActive ? 0.6 : 0.22}
+                style={{ transition: 'opacity 600ms ease, stroke 600ms ease' }}
+              />
+            );
+          })}
+        </g>
+
+        <g fill="none" strokeLinecap="round">
+          <path d={`M${HERO_CX} 62 C ${HERO_CX} 130, ${HERO_CX} 170, ${HERO_CX} ${HERO_CY - 46}`} stroke="rgba(255,255,255,.45)" strokeWidth="1.25" />
+          <path d={`M${HERO_CX} ${HERO_CY + 46} C ${HERO_CX} 380, ${HERO_CX} 420, ${HERO_CX} 498`} stroke="rgba(255,255,255,.45)" strokeWidth="1.25" />
+          <path d={`M${HERO_CX} 62 C ${HERO_CX} 130, ${HERO_CX} 170, ${HERO_CX} ${HERO_CY - 46}`} stroke="#F4B33F" strokeWidth="1.25" opacity="0.32" strokeDasharray="4 10">
+            {!reducedMotion && <animate attributeName="stroke-dashoffset" from="28" to="0" dur="2.2s" repeatCount="indefinite" />}
+          </path>
+          <path d={`M${HERO_CX} ${HERO_CY + 46} C ${HERO_CX} 380, ${HERO_CX} 420, ${HERO_CX} 498`} stroke="#F4B33F" strokeWidth="1.25" opacity="0.32" strokeDasharray="4 10">
+            {!reducedMotion && <animate attributeName="stroke-dashoffset" from="28" to="0" dur="2.2s" repeatCount="indefinite" />}
+          </path>
+        </g>
+
+        <line x1={HERO_CX - 26} y1="62" x2={HERO_CX + 26} y2="62" stroke="rgba(255,255,255,.5)" strokeWidth="1" />
+        <line x1={HERO_CX - 26} y1="498" x2={HERO_CX + 26} y2="498" stroke="rgba(255,255,255,.5)" strokeWidth="1" />
       </svg>
-      {!compact && (
-        <div className="absolute left-1/2 top-[11%] z-10 w-[min(54%,220px)] -translate-x-1/2 rounded-[1.35rem] border border-white/15 bg-[#F7F8FC] p-2 text-[#171A4A] shadow-[0_22px_48px_rgba(8,10,24,.32)] transition-all duration-700">
-          <div className="rounded-[.95rem] bg-white p-3">
-            <div className="flex items-center justify-between text-[7px] font-extrabold uppercase tracking-[.14em] text-[#85899A]">
-              <span>LAUPAY</span>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${featuredService.accent}50` }}>
-                <FeaturedIcon size={13} />
-              </span>
-              <div>
-                <p className="text-[7px] font-semibold text-[#85899A]">Next service</p>
-                <p className="mt-0.5 text-[10px] font-extrabold">{featuredService.label}</p>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-1.5">
-              <span className="h-1.5 flex-1 rounded-full bg-[#F4B33F]" />
-              <span className="h-1.5 flex-1 rounded-full bg-[#D9DCE7]" />
-              <span className="h-1.5 flex-1 rounded-full bg-[#D9DCE7]" />
-            </div>
-            <p className="mt-2 text-[7px] font-semibold text-[#85899A]">Choose · connect · confirm</p>
-          </div>
-        </div>
-      )}
-      {!compact && (
-        <>
-          <span className="absolute left-[3%] top-[48%] text-[10px] font-bold uppercase tracking-[.15em] text-white/55">Customer</span>
-          <span className="absolute right-[1%] top-[48%] text-[10px] font-bold uppercase tracking-[.15em] text-white/55">Service</span>
-          <span className="absolute left-[33%] top-[78%] text-[10px] font-bold uppercase tracking-[.15em] text-white/35">Agent</span>
-          <div className="absolute bottom-0 left-1/2 flex w-[min(100%,450px)] -translate-x-1/2 flex-wrap justify-center gap-2">
-            {heroServiceNames.map((name) => {
-              const key = name.toLowerCase() as ServiceKey;
-              const selected = key === activeService;
-              return (
-                <span key={name} className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.12em] transition-all duration-700 ${selected ? 'scale-105 border-[#F4B33F]/70 bg-[#F4B33F]/15 text-[#F4B33F]' : 'border-white/10 bg-white/[.03] text-white/35'}`}>
-                  {name}
-                </span>
-              );
-            })}
-          </div>
-        </>
-      )}
+
+      <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-[.22em] text-white/85" style={{ top: `${(34 / 560) * 100}%` }}>
+        Customer
+      </span>
+      <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-[.22em] text-white/85" style={{ top: `${(526 / 560) * 100}%` }}>
+        Agent
+      </span>
+
+      <div className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: '50%', top: `${(HERO_CY / 560) * 100}%` }}>
+        <span className="block text-[9px] font-bold uppercase tracking-[.28em] text-white/45">Service</span>
+        <span
+          key={activeNode.label}
+          className="mt-1 block font-display text-xl font-extrabold tracking-[-.03em] text-[#F4B33F] sm:text-2xl"
+          style={{ animation: 'laupay-fade 600ms ease' }}
+        >
+          {activeNode.label}
+        </span>
+      </div>
+
+      {heroNodes.map((node, i) => {
+        const p = heroPos(node.angle);
+        const isActive = i === active;
+        return (
+          <button
+            key={node.label}
+            type="button"
+            onFocus={() => setPaused(true)}
+            onBlur={() => setPaused(false)}
+            onClick={() => setStep(heroOrder.indexOf(i))}
+            aria-pressed={isActive}
+            className={`absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-[.14em] transition-all duration-500 sm:text-[10px] ${
+              isActive
+                ? 'bg-[#F4B33F]/10 text-[#F4B33F] shadow-[inset_0_0_0_1px_rgba(244,179,63,.38)]'
+                : 'text-white/40 shadow-[inset_0_0_0_1px_rgba(255,255,255,.12)]'
+            }`}
+            style={{ left: `${(p.x / 480) * 100}%`, top: `${(p.y / 560) * 100}%` }}
+          >
+            {node.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
