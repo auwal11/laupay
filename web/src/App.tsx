@@ -3,13 +3,11 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownRight,
   ArrowRight,
-  BatteryMedium,
   Check,
   ChevronDown,
   CircleUserRound,
   CreditCard,
   Database,
-  Ellipsis,
   Globe2,
   LockKeyhole,
   Menu,
@@ -28,6 +26,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import { LookInsideShowcase } from './components/laupay/LookInsideShowcase';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 type ServiceKey = 'airtime' | 'data' | 'payments' | 'wallet' | 'pos';
@@ -120,7 +119,6 @@ const faqs = [
 ];
 
 type DemoStage = 'dashboard' | 'select' | 'process' | 'confirm';
-type Audience = 'customer' | 'agent';
 
 
 function FlowMark({ inverse = false }: { inverse?: boolean }) {
@@ -336,220 +334,11 @@ function BridgeArtwork({ compact = false, activeService }: { compact?: boolean; 
   );
 }
 
-function AudienceToggle({ audience, onChange }: { audience: Audience; onChange: (next: Audience) => void }) {
-  return (
-    <div className="inline-flex rounded-lg bg-[#EDEEF4] p-0.5" aria-label="Choose pricing view">
-      {(['customer', 'agent'] as const).map((item) => (
-        <button
-          type="button"
-          key={item}
-          onClick={() => onChange(item)}
-          aria-pressed={audience === item}
-          className={`rounded-md px-2 py-1 text-[8px] font-extrabold capitalize transition-colors ${audience === item ? 'bg-[#171A4A] text-white' : 'text-[#73788A]'}`}
-        >
-          {item}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function DashboardScreen({ audience, onAudienceChange }: { audience: Audience; onAudienceChange: (next: Audience) => void }) {
-  const quickActions = [
-    { label: 'Airtime', icon: Smartphone },
-    { label: 'Data', icon: Wifi },
-    { label: 'Pay', icon: Receipt },
-    { label: 'Wallet', icon: WalletCards },
-    { label: 'POS', icon: ScanLine },
-  ];
-  return (
-    <div className="space-y-3 px-5 py-4">
-      <div className="rounded-2xl bg-[#171A4A] p-4 text-white">
-        <div className="flex items-center justify-between">
-          <p className="text-[9px] font-semibold text-white/55">Available balance</p>
-          <WalletCards size={15} className="text-[#F4B33F]" />
-        </div>
-        <p className="mt-2 font-display text-2xl font-extrabold tracking-[-.06em]">₦24,850.00</p>
-        <p className="mt-1 text-[8px] font-semibold text-white/45">Illustrative account view</p>
-      </div>
-      <div>
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] font-extrabold text-[#171A4A]">Quick services</p>
-          <span className="text-[8px] font-semibold text-[#85899A]">View all</span>
-        </div>
-        <div className="mt-2 grid grid-cols-5 gap-1.5">
-          {quickActions.map(({ label, icon: Icon }) => (
-            <div key={label} className="flex flex-col items-center gap-1 rounded-xl bg-[#F0F1F7] px-1 py-2 text-center">
-              <Icon size={13} className="text-[#171A4A]" />
-              <span className="text-[7px] font-bold text-[#73788A]">{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div>
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] font-extrabold text-[#171A4A]">Recent activity</p>
-          <span className="text-[8px] font-semibold text-[#85899A]">See all</span>
-        </div>
-        <div className="mt-2 divide-y divide-[#E9EAF0] rounded-xl border border-[#E4E6ED] bg-white px-3">
-          {[
-            { label: 'Data Purchase', detail: 'MTN 10GB', amount: '-₦3,500', icon: Wifi, color: '#91B7FF' },
-            { label: 'Airtime', detail: 'MTN', amount: '-₦1,000', icon: Smartphone, color: '#F4B33F' },
-            { label: 'Wallet Deposit', detail: 'Balance added', amount: '+₦10,000', icon: WalletCards, color: '#A7C997' },
-          ].map(({ label, detail, amount, icon: Icon, color }) => (
-            <div key={label} className="flex items-center gap-2 py-2.5">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${color}40` }}><Icon size={13} className="text-[#171A4A]" /></span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[9px] font-extrabold text-[#171A4A]">{label}</p>
-                <p className="mt-0.5 text-[8px] font-semibold text-[#85899A]">{detail}</p>
-              </div>
-              <span className={`text-[9px] font-extrabold ${amount.startsWith('+') ? 'text-[#2E9B68]' : 'text-[#171A4A]'}`}>{amount}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="rounded-xl border border-[#E4E6ED] bg-white p-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[9px] font-extrabold text-[#171A4A]">Service pricing view</p>
-            <p className="mt-0.5 text-[8px] font-semibold text-[#85899A]">Illustrative only</p>
-          </div>
-          <AudienceToggle audience={audience} onChange={onAudienceChange} />
-        </div>
-        <div className="mt-2 flex items-center justify-between rounded-lg bg-[#F0F1F7] px-2.5 py-2">
-          <span className="text-[8px] font-bold text-[#73788A]">MTN 10GB data</span>
-          <span className="text-[10px] font-extrabold text-[#171A4A]">{audience === 'agent' ? '₦3,300' : '₦3,500'}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ProductPhone({
-  service,
-  onAction,
-  actionMessage,
-  stage,
-  audience,
-  onAudienceChange,
-}: {
-  service: Service;
-  onAction: () => void;
-  actionMessage: string;
-  stage: DemoStage;
-  audience: Audience;
-  onAudienceChange: (next: Audience) => void;
-}) {
-  const Icon = service.icon;
-  const stages: { key: DemoStage; label: string }[] = [
-    { key: 'select', label: 'Select' },
-    { key: 'process', label: 'Process' },
-    { key: 'confirm', label: 'Confirm' },
-  ];
-  return (
-    <div className="relative mx-auto w-[min(100%,350px)]">
-      <div className="absolute -inset-4 rounded-[3rem] bg-[#F4B33F]/10 blur-2xl" />
-      <div className="relative rounded-[2.6rem] border-[7px] border-[#252844] bg-[#080A18] p-2 shadow-[0_30px_80px_rgba(8,10,24,.32)]">
-        <div className="overflow-hidden rounded-[2rem] bg-[#F7F8FC]">
-          <div className="flex items-center justify-between bg-[#171A4A] px-5 pb-3 pt-4 text-[10px] font-semibold text-white/70">
-            <span>9:41</span>
-            <div className="flex items-center gap-1.5">
-              <Wifi size={12} />
-              <BatteryMedium size={13} />
-            </div>
-          </div>
-          <div className="bg-[#171A4A] px-5 pb-5 text-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FlowMark inverse />
-                <span className="font-display text-sm font-extrabold tracking-[-.04em]">LAUPAY</span>
-              </div>
-              <CircleUserRound size={21} className="text-white/70" />
-            </div>
-            <div className="mt-7 flex items-end justify-between">
-              <div>
-                <p className="text-[10px] text-white/55">Good afternoon, Ada</p>
-                <p className="mt-1 font-display text-2xl font-extrabold tracking-[-.06em]">{stage === 'dashboard' ? 'Your dashboard' : 'What’s next?'}</p>
-              </div>
-            </div>
-          </div>
-          {stage === 'dashboard' ? (
-            <DashboardScreen audience={audience} onAudienceChange={onAudienceChange} />
-          ) : (
-          <div className="space-y-4 px-5 py-5">
-            <div className="flex items-center justify-between" aria-label={`Flow stage: ${stage}`}>
-              {stages.map(({ key, label }, index) => (
-                <div key={key} className="flex flex-1 items-center">
-                  <div className={`flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[.12em] transition-colors duration-500 ${stage === key ? 'text-[#B17819]' : stages.findIndex((item) => item.key === stage) > index ? 'text-[#2E9B68]' : 'text-[#A0A4B2]'}`}>
-                    <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] transition-all duration-500 ${stage === key ? 'bg-[#F4B33F] text-[#171A4A] shadow-[0_0_0_4px_rgba(244,179,63,.14)]' : stages.findIndex((item) => item.key === stage) > index ? 'bg-[#DDF2E7] text-[#2E9B68]' : 'bg-[#EDEEF4] text-[#A0A4B2]'}`}>
-                      {stages.findIndex((item) => item.key === stage) > index ? <Check size={11} strokeWidth={3} /> : index + 1}
-                    </span>
-                    {label}
-                  </div>
-                  {index < stages.length - 1 && <span className={`mx-2 h-px flex-1 transition-colors duration-500 ${stages.findIndex((item) => item.key === stage) > index ? 'bg-[#79BD98]' : 'bg-[#E2E4EB]'}`} />}
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-semibold text-[#6C7188]">Selected service</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: `${service.accent}35`, color: '#171A4A' }}>
-                    <Icon size={16} />
-                  </span>
-                  <span className="font-display text-sm font-extrabold text-[#171A4A]">{service.label}</span>
-                </div>
-              </div>
-              <Ellipsis size={19} className="text-[#9A9EAF]" />
-            </div>
-            <div className="rounded-2xl border border-[#E4E6ED] bg-white p-4">
-              <p className="text-[10px] font-semibold text-[#73788A]">{service.meta}</p>
-              <p className="mt-1.5 font-display text-xl font-extrabold tracking-[-.05em] text-[#171A4A]">{service.amount}</p>
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#EDEEF4]">
-                <div className="h-full w-[68%] rounded-full" style={{ backgroundColor: service.accent }} />
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onAction}
-              className="flex w-full items-center justify-between rounded-xl bg-[#171A4A] px-4 py-3.5 text-left text-xs font-extrabold text-white transition-transform hover:-translate-y-0.5 active:translate-y-0"
-            >
-              {service.action}
-              <ArrowRight size={15} className="text-[#F4B33F]" />
-            </button>
-            <div className="min-h-9 text-center" role="status" aria-live="polite">
-              {stage === 'confirm' ? (
-                <>
-                  <p className="text-[11px] font-extrabold text-[#2E9B68]">Transaction confirmed</p>
-                  <p className="mt-1 text-[10px] font-semibold text-[#6C7188]">Your service is ready.</p>
-                </>
-              ) : stage === 'process' ? (
-                <p className="text-[10px] font-semibold text-[#B17819]">Processing...</p>
-              ) : (
-                <p className="text-[10px] font-semibold text-[#6C7188]">{actionMessage || 'Ready for your next step.'}</p>
-              )}
-            </div>
-          </div>
-          )}
-          <div className="flex justify-around border-t border-[#E9EAF0] bg-white py-3 text-[9px] font-bold text-[#9397A7]">
-            <span className="text-[#171A4A]">Home</span><span>Activity</span><span>Help</span>
-          </div>
-        </div>
-      </div>
-      <div className="absolute -right-5 top-[38%] hidden items-center gap-2 rounded-xl border border-[#E2E4EB] bg-white px-3 py-2 text-[10px] font-bold text-[#171A4A] shadow-[0_14px_30px_rgba(23,26,74,.1)] sm:flex">
-        <span className="h-2 w-2 rounded-full bg-[#F4B33F]" /> One clear next step
-      </div>
-    </div>
-  );
-}
-
 function Home() {
   const [theme, setTheme] = useState<ThemeMode>('system');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeService, setActiveService] = useState<ServiceKey>('airtime');
-  const [actionMessage, setActionMessage] = useState('');
   const [demoStage, setDemoStage] = useState<DemoStage>('dashboard');
-  const [audience, setAudience] = useState<Audience>('customer');
   const [rotationPaused, setRotationPaused] = useState(false);
   const [modal, setModal] = useState<'login' | 'get-started' | null>(null);
   const [openFaq, setOpenFaq] = useState(0);
@@ -601,13 +390,6 @@ function Home() {
     setMobileOpen(false);
   };
 
-  const runDemoAction = () => {
-    pauseForInteraction();
-    setActionMessage(`${active.label} preview selected.`);
-    setDemoStage('process');
-    window.setTimeout(() => setDemoStage('confirm'), 1100);
-    window.setTimeout(() => setActionMessage(''), 3800);
-  };
 
   const pauseForInteraction = () => {
     setRotationPaused(true);
@@ -777,7 +559,7 @@ function Home() {
                       <button
                         type="button"
                         key={item.key}
-                        onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage('select'); setActionMessage(''); }}
+onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage('select'); }}
                         aria-pressed={selected}
                         className={`group flex min-h-[92px] flex-col items-start justify-between rounded-xl border p-3 text-left transition-all duration-500 hover:-translate-y-1 ${selected ? 'border-[#F4B33F] bg-[#171A4A] text-white shadow-[0_12px_24px_rgba(23,26,74,.16)] dark:bg-[#F4B33F] dark:text-[#171A4A]' : 'border-border bg-card text-foreground opacity-65 hover:opacity-100'}`}
                       >
@@ -799,7 +581,7 @@ function Home() {
                     </div>
                   </div>
                   <div className="mt-8 grid gap-3 text-xs sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                    <div className="rounded-xl bg-secondary p-3 font-bold"><span className="block text-[10px] font-semibold text-muted-foreground">{demoStage === 'dashboard' ? 'Balance' : 'Select'}</span><span className="mt-1 block">{demoStage === 'dashboard' ? '₦24,850.00' : `Choose ${active.label}`}</span></div>
+                    <div className="rounded-xl bg-secondary p-3 font-bold"><span className="block text-[10px] font-semibold text-muted-foreground">{demoStage === 'dashboard' ? 'Balance' : 'Select'}</span><span className="mt-1 block">{demoStage === 'dashboard' ? '₦125,450.00' : `Choose ${active.label}`}</span></div>
                     <MoveRight className="hidden text-[#B17819] sm:block dark:text-[#F4B33F]" size={18} />
                     <div className="rounded-xl bg-secondary p-3 font-bold"><span className="block text-[10px] font-semibold text-muted-foreground">{demoStage === 'confirm' ? 'Confirm' : demoStage === 'process' ? 'Process' : 'Next'}</span><span className="mt-1 block">{demoStage === 'confirm' ? 'Service ready' : demoStage === 'process' ? 'Processing...' : active.action}</span></div>
                   </div>
@@ -809,7 +591,7 @@ function Home() {
                 </div>
               </div>
               <div className="order-1 lg:order-2">
-                <ProductPhone service={active} onAction={runDemoAction} actionMessage={actionMessage} stage={demoStage} audience={audience} onAudienceChange={setAudience} />
+                <LookInsideShowcase active={active} stage={demoStage} />
               </div>
             </div>
           </div>
