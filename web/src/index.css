@@ -143,3 +143,9 @@ button { font: inherit; }
 @media (max-width: 640px) {
   .section-shell { width: min(100% - 28px, 1180px); }
 }
+/* A look inside — showcase entrance */
+.showcase-item { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.22,1,.36,1); }
+.showcase.is-visible .showcase-item { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .showcase-item { opacity: 1; transform: none; transition: none; animation: none; }
+}
