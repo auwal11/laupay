@@ -173,21 +173,16 @@ Every issue found during this pass has a corresponding test:
    `VtuTransactionEvent` table mirroring `PaymentEvent`'s
    `@@unique([provider, providerEventId])` pattern before connecting a real
    VTU provider.
-2. **No reversal is triggered if a VTU transaction's status changes to
-   FAILED asynchronously (via webhook or reconciliation) after the initial
-   synchronous fulfillment attempt already returned something other than
-   FAILED.** Today, the debit-then-reverse-on-failure logic in
-   `OrdersService.createAirtimeOrder`/`createDataOrder` only reacts to the
-   *immediate* result of `vtu.fulfillAirtimeOrder`/`fulfillDataOrder`
-   within that same request. If that initial call returns
-   `FULFILLMENT_UNKNOWN` and a later reconciliation pass or webhook
-   resolves it to FAILED, nothing currently re-triggers the wallet
-   reversal — the order would be stuck showing `FULFILLMENT_UNKNOWN`
-   forever with money already debited from the customer/agent. **This is a
-   real, not-yet-closed gap** and should be the first fix in the next
-   hardening pass: reconciliation/webhook resolution needs to call back
-   into an order-aware reversal path, not just update the raw
-   `VtuTransaction` row.
+2. ~~**No reversal is triggered if a VTU transaction's status changes to
+   FAILED asynchronously...**~~ **CLOSED** (see follow-up pass below,
+   `OrdersService.reconcileVtuTransaction` + `applyVtuOutcome`). Both the
+   VTU webhook and the reconciliation job now route through the same
+   order-aware resolution path used by the original synchronous flow, so a
+   transaction that resolves to FAILED after initially returning UNKNOWN
+   now correctly reverses the wallet debit and marks the order REFUNDED.
+   Regression-tested in `test/vtu-reconciliation.e2e-spec.ts` (stale-order
+   reconciliation, webhook delivery, SUCCESS-after-UNKNOWN, and a guard
+   test confirming already-terminal orders are never re-touched).
 3. **Agent price vs. customer price is not yet a distinct, configurable
    value** (see ADR 0002) — today an agent's float is debited the same
    amount as the customer-facing price. Deliberately scoped out of this
