@@ -4,7 +4,7 @@ import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MockWebhookVerifier } from './verifiers/webhook-verifier.interface';
 import { PaymentsService } from '../payments/payments.service';
-import { VtuService } from '../vtu/vtu.service';
+import { OrdersService } from '../orders/orders.service';
 
 /**
  * See docs/architecture/payment-flow.md §4. Every inbound provider event:
@@ -23,7 +23,7 @@ export class WebhooksController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentsService: PaymentsService,
-    private readonly vtuService: VtuService,
+    private readonly ordersService: OrdersService,
   ) {}
 
   @Post('payment')
@@ -64,15 +64,19 @@ export class WebhooksController {
 
   /**
    * VTU provider webhook (delivery confirmation for airtime/data
-   * fulfillment). Unlike the payment webhook, there is no dedicated
-   * VtuTransactionEvent table yet (see
-   * docs/decisions/00-project-status.md — tracked as a known gap), so
-   * duplicate-delivery safety here relies on VtuService.requeryTransaction()
-   * being idempotent by construction (it only writes a new status if the
-   * provider's answer actually differs from what's already stored) rather
-   * than on an explicit event log. This is weaker than the payment path's
-   * belt-and-braces (event-log + idempotent-write) protection and should be
-   * upgraded to match before this endpoint is exposed to a real provider.
+   * fulfillment). Delegates to OrdersService.reconcileVtuTransaction, which
+   * is the single place (shared with the reconciliation job and the
+   * original synchronous fulfillment call) that translates a VTU outcome
+   * into an Order status update and reverses the wallet debit on FAILED —
+   * see docs/decisions/0003-phase1-hardening-review.md Remaining Risk #2
+   * (now closed) and OrdersService.applyVtuOutcome.
+   *
+   * Known gap (unchanged from the hardening pass): there is no
+   * VtuTransactionEvent table for duplicate-delivery dedup the way
+   * PaymentEvent provides for the payment webhook — this relies on
+   * VtuService.requeryTransaction / OrdersService.reconcileVtuTransaction
+   * being idempotent by construction instead. See
+   * docs/decisions/0003-phase1-hardening-review.md Remaining Risk #1.
    */
   @Post('vtu')
   async handleVtuWebhook(
@@ -89,7 +93,7 @@ export class WebhooksController {
     });
     if (!txn) throw new BadRequestException('Unknown VTU transaction reference');
 
-    await this.vtuService.requeryTransaction(txn.id);
+    await this.ordersService.reconcileVtuTransaction(txn.id);
     return { status: 'processed' };
   }
 
