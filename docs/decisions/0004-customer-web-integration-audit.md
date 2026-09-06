@@ -143,6 +143,30 @@ required backend addition.
 
 ### 3.3 There is no risk engine, PIN, device, or notification backend at all
 
+**Update — partially closed.** A minimum PIN backend now exists
+(`backend/src/modules/security/`): `GET /security/pin/status`,
+`POST /security/pin`, `POST /security/pin/change`,
+`POST /security/pin/verify` — with a real lockout mechanism (5 failed
+attempts locks verification for 15 minutes) and argon2id hashing via the
+same `PasswordHasher` used for login. `POST /security/pin/forgot` is
+deliberately still not implemented (would need a secure identity
+verification step, e.g. phone OTP, that doesn't exist yet — building it
+without one would itself be a security hole). Device management and
+security notifications remain unbuilt (lower priority, per the original
+note below).
+
+Order creation (`POST /orders/airtime` / `POST /orders/data`) now also
+returns a `riskDecision` field, currently **always `"allow"`** — this is
+an explicit placeholder, not a real risk engine (see the docblock on
+`SecurityService.assessOrderRisk`). It exists only to give
+`apps/customer-web`'s purchase flow a real response shape to render
+against. **Do not treat this as an actual fraud/security control** — no
+real risk analysis of the order, user, device, or amount happens yet. The
+`verify`/`auth_required`/`held` states described below are still not
+implemented; only `"allow"` is ever returned today.
+
+Original finding (context, below):
+
 This is the largest gap, and it's the one the shell's own `INTEGRATION.md`
 was most explicit about not building. The entire purchase flow's `verify`
 step (`auth_required` status → `riskDecision: "verify"` →

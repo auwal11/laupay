@@ -58,20 +58,26 @@ Price. No example prices are hardcoded in application code.**
   server-side, database-backed catalog fields — `OrdersService.createDataOrder`
   reads `plan.priceNaira` from the database and never accepts a
   client-supplied price (see `docs/security/security-model.md §3`).
-- **Not yet modeled**: a distinct *agent* price separate from the customer
-  price (i.e., what an agent's float is actually debited, if LAUPAY chooses
-  to sell to agents at a discount off the customer-facing price as their
-  margin/incentive, rather than 1:1 face value). Today, `confirmAgentCash`
-  debits the agent's float for the same `amount` as the order's customer
-  price — there is no separate `agentPriceNaira` field yet.
-- This is flagged as a concrete, scoped follow-up rather than silently
-  assumed: adding an `agentPriceNaira` column to `DataPlan` (and an
-  equivalent configurable rate for open-amount airtime, e.g. a per-network
-  discount percentage table) is a small, additive schema change that does
-  not affect anything built in this hardening pass. It should be done
-  as the first task of Phase 2 (agent features), once the exact margin
-  structure is specified by the project owner — deliberately not guessed
-  at or hardcoded here.
+- **Implemented**: `Network.agentDiscountPercent` (default `0`) and
+  `DataPlan.agentPriceNaira` (nullable) now exist in the schema.
+  `PaymentsService.computeAgentDebitAmount` resolves, in order: (1) the
+  DataPlan's explicit `agentPriceNaira` if set, (2) the Network's
+  `agentDiscountPercent` applied to the order's face value if non-zero, (3)
+  otherwise the unchanged default — agent debited at the same face value as
+  the customer. No specific discount/margin number is hardcoded anywhere in
+  application code; every value comes from the database, and the default
+  (0% / not configured) is the deliberate no-op, not a guessed business
+  number.
+- **Security fix made alongside this**: `confirmAgentCash` previously
+  accepted a client-supplied `amount` and debited the agent's wallet for
+  exactly that value with no cross-check against the order — a direct
+  balance-manipulation vulnerability (a malicious or buggy agent client
+  could debit an arbitrary, attacker-chosen amount). Fixed: `amount` was
+  removed from `ConfirmCashDto` entirely (the field is now rejected
+  outright by DTO whitelisting if present, not silently ignored), and the
+  debited amount is always computed server-side via
+  `computeAgentDebitAmount`. Regression-tested in
+  `backend/test/agent-pricing.e2e-spec.ts`.
 
 ## Why Commission Model Was Not Implemented
 Per explicit instruction: the commission model (agent sells against a

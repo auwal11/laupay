@@ -15,6 +15,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
+import { SecurityModule } from './modules/security/security.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 @Module({
@@ -36,6 +37,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     WebhooksModule,
     AdminModule,
     ReconciliationModule,
+    SecurityModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

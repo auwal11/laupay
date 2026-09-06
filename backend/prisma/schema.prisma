@@ -148,6 +148,7 @@ model User {
   payments      Payment[]
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]     @relation("AuditActor")
+  security      UserSecurity?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -165,6 +166,24 @@ model AgentProfile {
   isVerified     Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+/// PIN authentication for step-up verification (e.g. confirming a purchase).
+/// Minimum scope to unblock apps/customer-web's security pages — see
+/// docs/decisions/0004-customer-web-integration-audit.md §3.3. Deliberately
+/// separate from User (rather than columns on User) so this sensitive
+/// authentication data has its own table boundary, and so device/session
+/// fields can be added here later without touching the core User model.
+model UserSecurity {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id])
+  pinHash           String?
+  pinSetAt          DateTime?
+  failedPinAttempts Int       @default(0)
+  pinLockedUntil    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 model RefreshToken {
@@ -233,6 +252,14 @@ model Network {
   name     String
   dataPlans DataPlan[]
   createdAt DateTime  @default(now())
+
+  /// Agent-price discount for open-amount purchases (airtime) on this
+  /// network, as a percentage off the customer-facing face value. Defaults
+  /// to 0 (agent debited at the same face value as the customer, i.e. no
+  /// discount configured yet) — never an assumed/hardcoded margin. See
+  /// docs/decisions/0002-agent-settlement-model.md "Pricing: Configurable,
+  /// Never Hardcoded" and PaymentsService.computeAgentDebitAmount.
+  agentDiscountPercent Decimal @default(0) @db.Decimal(5, 2)
 }
 
 model DataPlan {
@@ -243,6 +270,10 @@ model DataPlan {
   label         String   // "1GB - 30 Days"
   priceNaira    Decimal  @db.Decimal(18, 2) // what we charge the customer
   costNaira     Decimal  @db.Decimal(18, 2) // what the provider charges us (for margin/reporting)
+  /// What an agent's float is debited for this plan, if different from
+  /// priceNaira (the agent's margin/incentive). Null means "not configured
+  /// yet" — falls back to priceNaira (face value), never a guessed number.
+  agentPriceNaira Decimal? @db.Decimal(18, 2)
   validityDays  Int?
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
