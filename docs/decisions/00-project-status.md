@@ -63,15 +63,13 @@ These are architected (the docs describe how they should work) but have
       see `docs/decisions/0003-phase1-hardening-review.md` Remaining Risk #1)
 - [ ] Automatic wallet reversal when a VTU transaction resolves to FAILED
       *asynchronously* (via webhook/reconciliation) after already returning
-      something other than FAILED on the initial synchronous attempt — see
-      `docs/decisions/0003-phase1-hardening-review.md` Remaining Risk #2.
-      **This is the most important open item — read it before Phase 2.**
+      something other than FAILED on the initial synchronous attempt —
+      **CLOSED**, see `docs/decisions/0003-phase1-hardening-review.md`
+      Remaining Risk #2 and §2b below.
 - [ ] Full bills-payment flow (mentioned in the original brief, not yet
       modeled beyond airtime/data)
-- [ ] Per-route rate limiting beyond auth/webhooks (orders/payments use the
-      global default only)
-- [ ] Separate, configurable agent price vs. customer price (see ADR 0002 —
-      intentionally deferred pending the project owner's margin decision)
+- [ ] Per-route rate limiting beyond auth/webhooks/security (orders/payments
+      use the global default only)
 
 ## 2a. Implemented in the Phase 1 Hardening Pass
 
@@ -95,26 +93,67 @@ Added after the items above were first identified as gaps — see
 - [x] ADR 0002 (agent settlement model) — decided: Float Model; recorded
       with the full confirmed flow and a pricing-configurability note
 
+## 2b. Implemented After `apps/customer-web` Integration Audit
+
+Follow-up work closing gaps identified while auditing the second agent's
+frontend shell (`docs/decisions/0004-customer-web-integration-audit.md`):
+
+- [x] **Closed Remaining Risk #2** (VTU async-failure reversal) —
+      `OrdersService.reconcileVtuTransaction`/`applyVtuOutcome` is now the
+      single shared path used by the synchronous fulfillment call, the VTU
+      webhook, and the reconciliation job, so an order that resolves to
+      FAILED *after* an initial UNKNOWN result now correctly reverses the
+      wallet debit. Regression-tested in
+      `backend/test/vtu-reconciliation.e2e-spec.ts`.
+- [x] Minimum PIN backend (`backend/src/modules/security/`) —
+      `GET /security/pin/status`, `POST /security/pin`,
+      `POST /security/pin/change`, `POST /security/pin/verify`, with real
+      lockout (5 failed attempts → 15 minute lock) and argon2id hashing.
+      `POST /security/pin/forgot` intentionally not implemented (needs OTP
+      infrastructure that doesn't exist yet). Tested in
+      `backend/test/security-pin.e2e-spec.ts`.
+- [x] Placeholder risk-decision shape — order creation responses now
+      include `riskDecision: "allow"` (always — not a real risk engine, see
+      `SecurityService.assessOrderRisk`'s docblock) so the frontend has a
+      real shape to render against.
+- [x] Agent price vs. customer price configurability (ADR 0002) —
+      `Network.agentDiscountPercent` and `DataPlan.agentPriceNaira` added;
+      `PaymentsService.computeAgentDebitAmount` resolves the actual agent
+      debit from these, falling back to face-value (0% discount) when
+      unconfigured. No margin numbers hardcoded anywhere.
+- [x] **Security fix**: `POST /payments/confirm-cash` no longer accepts a
+      client-supplied `amount` — it was previously trusted directly for a
+      wallet debit with no cross-check against the order (a real
+      balance-manipulation vulnerability). The amount is now always
+      computed server-side. Regression-tested in
+      `backend/test/agent-pricing.e2e-spec.ts`, including a test that
+      confirms sending `amount` in the request body is now rejected
+      outright (400) rather than silently ignored.
+
 ## 3. Not Started At All
 
 - [ ] **Flutter mobile app** (`apps/mobile/`) — empty placeholder only
 - [ ] **Admin web dashboard** (`apps/admin/`) — empty placeholder only
 - [ ] Real provider integrations (Paystack, VTPass) — only mocks exist, by
       design, per the ₦0-development-cost requirement
-- [x] CI pipeline content — `.github/workflows/backend-ci.yml` now exists
-      (lint/unit/e2e/build on push, spins up its own Postgres)
-- [ ] Phone OTP / PIN / biometric auth, device/session management — **now
-      also blocking `apps/customer-web`'s security pages**, see
-      `docs/decisions/0004-customer-web-integration-audit.md §3.3`
+- [x] CI pipeline content — `.github/workflows/backend-ci.yml` exists
+      (lint/unit/e2e/build on push, spins up its own Postgres) and
+      automatically picks up every new `*.e2e-spec.ts` file added since
+      (jest-e2e.json globs by pattern, not an explicit file list) — no CI
+      config change was needed for the new test files in §2b
+- [x] Minimum PIN backend — see §2b (device/session management and
+      biometric auth remain unbuilt)
 - [ ] KYC/BVN/NIN verification
 - [ ] Settlement/payout tables at the company-vs-provider level
-- [ ] Risk-decision engine (ALLOW/VERIFY/HOLD/REJECT) — assumed by
-      `apps/customer-web`'s purchase flow but not built; see
+- [ ] Real risk-decision engine (ALLOW/VERIFY/HOLD/REJECT) — only an
+      always-"allow" placeholder exists so far, see §2b and
       `docs/decisions/0004-customer-web-integration-audit.md §3.3`
 - [ ] Unified transaction-history endpoint (joining Order+Payment status,
       as opposed to raw ledger entries) — needed by `apps/customer-web`'s
       wallet/transactions UI; see
       `docs/decisions/0004-customer-web-integration-audit.md §3.2`
+- [ ] Device management, security notifications — see
+      `docs/decisions/0004-customer-web-integration-audit.md §3.3`
 
 ## 3a. `apps/customer-web` — Added, Runs on Mock Data Only
 

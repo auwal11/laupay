@@ -3,6 +3,7 @@ import { LedgerReason, OrderStatus, OrderType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { VtuService } from '../vtu/vtu.service';
+import { SecurityService } from '../security/security.service';
 import { InsufficientBalanceError } from '../ledger/ledger.errors';
 
 /** Orders that have already reached a terminal state — never re-touched by
@@ -21,6 +22,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly vtu: VtuService,
+    private readonly security: SecurityService,
   ) {}
 
   /**
@@ -57,7 +59,11 @@ export class OrdersService {
     await this.prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.PAID } });
 
     const vtuResult = await this.vtu.fulfillAirtimeOrder(order.id, network, phoneNumber, amount);
-    return this.applyVtuOutcome(order.id, vtuResult.status);
+    const finalOrder = await this.applyVtuOutcome(order.id, vtuResult.status);
+    // Placeholder risk decision — see SecurityService.assessOrderRisk docblock.
+    // Not a real fraud engine; gives apps/customer-web a real response
+    // shape to render instead of only mock data.
+    return { ...finalOrder, riskDecision: this.security.assessOrderRisk().decision };
   }
 
   /**
@@ -103,7 +109,11 @@ export class OrdersService {
     await this.prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.PAID } });
 
     const vtuResult = await this.vtu.fulfillDataOrder(order.id, network, phoneNumber, plan.externalCode);
-    return this.applyVtuOutcome(order.id, vtuResult.status);
+    const finalOrder = await this.applyVtuOutcome(order.id, vtuResult.status);
+    // Placeholder risk decision — see SecurityService.assessOrderRisk docblock.
+    // Not a real fraud engine; gives apps/customer-web a real response
+    // shape to render instead of only mock data.
+    return { ...finalOrder, riskDecision: this.security.assessOrderRisk().decision };
   }
 
   /**

@@ -20,6 +20,6 @@ export class PaymentsController {
   @Roles(UserRole.AGENT)
   @Post('confirm-cash')
   confirmCash(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConfirmCashDto) {
-    return this.paymentsService.confirmAgentCash(user.userId, dto.orderId, dto.amount);
+    return this.paymentsService.confirmAgentCash(user.userId, dto.orderId);
   }
 }

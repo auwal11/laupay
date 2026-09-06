@@ -58,11 +58,17 @@ export class PaymentsService {
 
   /**
    * Agent confirms cash physically received from a walk-in customer.
-   * Debits the AGENT's own wallet (float model — see
-   * docs/architecture/pos-agent-model.md §3, currently the default until
-   * ADR 0002 is resolved).
+   * Debits the AGENT's own wallet (float model — ADR 0002, decided).
+   *
+   * SECURITY: the amount debited from the agent's float is always computed
+   * server-side from the Order + configured agent pricing
+   * (computeAgentDebitAmount) — never trusted from the request body. An
+   * earlier version of this method accepted a client-supplied `amount`
+   * parameter, which would have let a malicious or buggy client debit an
+   * arbitrary amount from the agent's own wallet. Fixed as part of the
+   * ADR 0002 pricing-configurability follow-up.
    */
-  async confirmAgentCash(agentUserId: string, orderId: string, amount: number) {
+  async confirmAgentCash(agentUserId: string, orderId: string) {
     const idempotencyKey = `agent-cash:${orderId}`;
     const existingPayment = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
     if (existingPayment) return existingPayment;
@@ -70,13 +76,20 @@ export class PaymentsService {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found');
 
+    const agentDebitAmount = await this.computeAgentDebitAmount(order);
+
     const payment = await this.prisma.payment.create({
       data: {
         orderId,
         userId: order.userId,
         method: PaymentMethod.AGENT_CASH,
+        // The Payment records the cash actually collected from the
+        // customer (the order's face-value price) — this can legitimately
+        // differ from what's debited from the agent's float below, if an
+        // agent discount is configured (that difference is the agent's
+        // margin/incentive).
+        amount: order.amount,
         status: PaymentStatus.SUCCESS,
-        amount,
         idempotencyKey,
       },
     });
@@ -87,7 +100,7 @@ export class PaymentsService {
 
     await this.ledger.debit({
       walletAccountId: agentWallet.id,
-      amount,
+      amount: agentDebitAmount,
       reason: LedgerReason.AGENT_CASH_COLLECTION,
       referenceType: 'Payment',
       referenceId: payment.id,
@@ -95,6 +108,44 @@ export class PaymentsService {
     });
 
     return payment;
+  }
+
+  /**
+   * Computes what an agent's float should actually be debited for a given
+   * order — see docs/decisions/0002-agent-settlement-model.md "Pricing:
+   * Configurable, Never Hardcoded".
+   *
+   * Resolution order:
+   *   1. If the order is a DATA purchase and its DataPlan has an explicit
+   *      agentPriceNaira configured, use that.
+   *   2. Else if the order's Network has a non-zero agentDiscountPercent
+   *      configured, apply it to the order's face-value amount.
+   *   3. Else (nothing configured — the default, unchanged behavior),
+   *      debit the agent at the same face value the customer was charged.
+   *
+   * No specific discount/price is hardcoded here — every number involved
+   * comes from the database (Network/DataPlan rows), or the deliberate
+   * zero-discount default when nothing has been configured yet.
+   */
+  private async computeAgentDebitAmount(order: { type: string; amount: any; network: string | null; dataPlanId: string | null }): Promise<number> {
+    const faceValue = Number(order.amount);
+
+    if (order.type === 'DATA' && order.dataPlanId) {
+      const plan = await this.prisma.dataPlan.findUnique({ where: { id: order.dataPlanId } });
+      if (plan?.agentPriceNaira != null) {
+        return Number(plan.agentPriceNaira);
+      }
+    }
+
+    if (order.network) {
+      const network = await this.prisma.network.findUnique({ where: { code: order.network } });
+      const discountPercent = network ? Number(network.agentDiscountPercent) : 0;
+      if (discountPercent > 0) {
+        return faceValue * (1 - discountPercent / 100);
+      }
+    }
+
+    return faceValue;
   }
 
   /** Requery a stuck PROCESSING/UNKNOWN payment. Used by the (not-yet-scheduled) reconciliation job. */
