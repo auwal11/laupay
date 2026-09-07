@@ -149,3 +149,34 @@ button { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .showcase-item { opacity: 1; transform: none; transition: none; animation: none; }
 }
+
+/* LAUPAY app shell tokens (authenticated app) — mirrors the landing brand palette */
+@theme {
+  --color-laupay-indigo: #171A4A;
+  --color-laupay-indigo-deep: #101233;
+  --color-laupay-indigo-soft: #2A2E6B;
+  --color-laupay-amber: #F4B33F;
+  --color-laupay-amber-soft: #FCE4B2;
+  --color-laupay-surface: #FFFFFF;
+  --color-laupay-surface-muted: #F6F7FB;
+  --color-laupay-border: #E4E6F1;
+  --color-laupay-ink: #12142E;
+  --color-laupay-ink-muted: #5B5E80;
+  --color-laupay-success: #1E8E5A;
+  --color-laupay-danger: #C4453A;
+  --color-laupay-pending: #B8862E;
+  --shadow-card: 0 1px 2px rgba(18, 20, 46, 0.06), 0 1px 1px rgba(18, 20, 46, 0.04);
+  --shadow-raised: 0 8px 24px rgba(23, 26, 74, 0.12);
+}
+
+/* LAUPAY logo-based loading system */
+.laupay-loader-mark { animation: laupay-loader-pulse 1.4s ease-in-out infinite; }
+@keyframes laupay-loader-pulse {
+  0%, 100% { opacity: .45; transform: scale(.96); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.laupay-loader-ring { animation: laupay-loader-spin 1s linear infinite; }
+@keyframes laupay-loader-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .laupay-loader-mark, .laupay-loader-ring { animation: none !important; }
+}
