@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownRight,
@@ -27,6 +28,9 @@ import {
   Zap,
 } from 'lucide-react';
 import { LookInsideShowcase } from './components/laupay/LookInsideShowcase';
+import { AuthProvider } from '@app/context/AuthContext';
+import { appRoutes } from './app/AppRoutes';
+import NotFound from './pages/not-found';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 type ServiceKey = 'airtime' | 'data' | 'payments' | 'wallet' | 'pos';
@@ -340,7 +344,6 @@ function Home() {
   const [activeService, setActiveService] = useState<ServiceKey>('airtime');
   const [demoStage, setDemoStage] = useState<DemoStage>('dashboard');
   const [rotationPaused, setRotationPaused] = useState(false);
-  const [modal, setModal] = useState<'login' | 'get-started' | null>(null);
   const [openFaq, setOpenFaq] = useState(0);
   const [story, setStory] = useState<'today' | 'tomorrow'>('today');
   const resumeTimer = useRef<number | null>(null);
@@ -423,12 +426,12 @@ function Home() {
           </nav>
           <div className="hidden items-center gap-3 lg:flex">
             <ThemeSwitcher theme={theme} onChange={setTheme} />
-            <button type="button" onClick={() => setModal('login')} className="rounded-full border border-white/20 px-4 py-2.5 text-[11px] font-extrabold text-white transition-colors hover:bg-white/10">
+            <Link to="/login" className="rounded-full border border-white/20 px-4 py-2.5 text-[11px] font-extrabold text-white transition-colors hover:bg-white/10">
               Login
-            </button>
-            <button type="button" onClick={() => setModal('get-started')} className="rounded-full bg-[#F4B33F] px-4 py-2.5 text-[11px] font-extrabold text-[#171A4A] transition-transform hover:-translate-y-0.5">
+            </Link>
+            <Link to="/register" className="rounded-full bg-[#F4B33F] px-4 py-2.5 text-[11px] font-extrabold text-[#171A4A] transition-transform hover:-translate-y-0.5">
               Get Started
-            </button>
+            </Link>
           </div>
           <button type="button" onClick={() => setMobileOpen((value) => !value)} className="rounded-full border border-white/20 p-2.5 text-white lg:hidden" aria-label={mobileOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileOpen}>
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
@@ -444,8 +447,8 @@ function Home() {
             <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
               <ThemeSwitcher theme={theme} onChange={setTheme} />
               <div className="flex gap-2">
-                <button type="button" onClick={() => setModal('login')} className="rounded-full border border-white/20 px-4 py-2 text-xs font-bold text-white">Login</button>
-                <button type="button" onClick={() => setModal('get-started')} className="rounded-full bg-[#F4B33F] px-4 py-2 text-xs font-bold text-[#171A4A]">Get Started</button>
+                <Link to="/login" className="rounded-full border border-white/20 px-4 py-2 text-xs font-bold text-white">Login</Link>
+                <Link to="/register" className="rounded-full bg-[#F4B33F] px-4 py-2 text-xs font-bold text-[#171A4A]">Get Started</Link>
               </div>
             </div>
           </div>
@@ -469,12 +472,12 @@ function Home() {
                   Airtime, data, payments, wallet services, and more — brought together so your next transaction feels clear from the start.
                 </p>
                 <div className="reveal reveal-delay-3 mt-9 flex flex-wrap items-center gap-3">
-                  <button type="button" onClick={() => scrollTo('demo')} className="group inline-flex items-center gap-3 rounded-full bg-[#F4B33F] px-5 py-3.5 text-xs font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1">
+                  <Link to="/register" className="group inline-flex items-center gap-3 rounded-full bg-[#F4B33F] px-5 py-3.5 text-xs font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1">
                     Get Started <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
-                  </button>
-                  <button type="button" onClick={() => setModal('login')} className="inline-flex items-center gap-3 rounded-full border border-white/20 px-5 py-3.5 text-xs font-extrabold text-white transition-colors hover:bg-white/10">
+                  </Link>
+                  <Link to="/login" className="inline-flex items-center gap-3 rounded-full border border-white/20 px-5 py-3.5 text-xs font-extrabold text-white transition-colors hover:bg-white/10">
                     Login
-                  </button>
+                  </Link>
                 </div>
               </div>
               <div className="reveal reveal-delay-2 lg:pl-8">
@@ -752,21 +755,11 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
       <footer className="bg-[#11142A] py-10 text-white">
         <div className="section-shell flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5"><FlowMark inverse /><span className="font-display text-[17px] font-extrabold tracking-[-.06em]">LAUPAY</span></div>
-          <div className="flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-bold text-white/45"><a className="hover:text-white" href="#services">Services</a><a className="hover:text-white" href="#security">Security</a><a className="hover:text-white" href="#future">Our horizon</a><button type="button" onClick={() => setModal('login')} className="hover:text-white">Login</button></div>
+          <div className="flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-bold text-white/45"><a className="hover:text-white" href="#services">Services</a><a className="hover:text-white" href="#security">Security</a><a className="hover:text-white" href="#future">Our horizon</a><Link to="/login" className="hover:text-white">Login</Link></div>
            <p className="text-[10px] font-semibold text-white/30">© 2026 LAUPAY. Digital services, simply connected.</p>
         </div>
       </footer>
 
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#080A18]/70 px-5 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={() => setModal(null)}>
-          <div className="w-full max-w-[430px] rounded-3xl bg-card p-7 text-card-foreground shadow-[0_30px_90px_rgba(8,10,24,.3)] sm:p-9" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between"><div className="rounded-xl bg-secondary p-2.5"><FlowMark /></div><button type="button" onClick={() => setModal(null)} className="rounded-full p-2 text-muted-foreground hover:bg-secondary" aria-label="Close dialog"><X size={18} /></button></div>
-            <h2 id="modal-title" className="mt-7 font-display text-2xl font-extrabold tracking-[-.05em]">{modal === 'login' ? 'Login is part of the next step.' : 'You are in the right place.'}</h2>
-             <p className="mt-3 text-sm leading-6 text-muted-foreground">{modal === 'login' ? 'Explore the service flows while the full account experience is being prepared.' : 'Choose a service in the product preview and follow each step from selection to confirmation.'}</p>
-             <button type="button" onClick={() => { setModal(null); scrollTo('demo'); }} className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-[#171A4A] px-4 py-3.5 text-xs font-extrabold text-white dark:bg-[#F4B33F] dark:text-[#171A4A]">{modal === 'login' ? 'Explore the flow' : 'Open the preview'} <ArrowRight size={14} /></button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -775,4 +768,19 @@ function ArrowUpRightIcon() {
   return <ArrowDownRight size={17} className="-rotate-90 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />;
 }
 
-export default Home;
+function LaupayApp() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          {appRoutes}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
+
+export { Home };
+export default LaupayApp;
