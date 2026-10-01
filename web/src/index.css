@@ -170,13 +170,16 @@ button { font: inherit; }
 }
 
 /* LAUPAY logo-based loading system */
-.laupay-loader-mark { animation: laupay-loader-pulse 1.4s ease-in-out infinite; }
-@keyframes laupay-loader-pulse {
-  0%, 100% { opacity: .45; transform: scale(.96); }
-  50% { opacity: 1; transform: scale(1); }
+.laupay-loader-mark { animation: laupay-loader-breathe 1.6s cubic-bezier(.45,0,.55,1) infinite; will-change: transform, opacity; }
+@keyframes laupay-loader-breathe {
+  0%, 100% { opacity: .55; transform: translateY(0) scale(.94); }
+  50% { opacity: 1; transform: translateY(-2px) scale(1.04); }
 }
+@keyframes laupay-loader-fade { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+[role="status"] { animation: laupay-fade 260ms ease-out; }
 .laupay-loader-ring { animation: laupay-loader-spin 1s linear infinite; }
 @keyframes laupay-loader-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .laupay-loader-mark, .laupay-loader-ring { animation: none !important; }
+  .laupay-loader-mark { animation: laupay-loader-fade 1.8s ease-in-out infinite !important; transform: none !important; }
+  .laupay-loader-ring { animation: none !important; }
 }
