@@ -68,7 +68,7 @@ export function LoginPage() {
             {error}
           </p>
         )}
-        <Button type="submit" fullWidth disabled={submitting}>
+        <Button type="submit" fullWidth loading={submitting}>
           {submitting ? "Logging in…" : "Log in"}
         </Button>
       </form>
