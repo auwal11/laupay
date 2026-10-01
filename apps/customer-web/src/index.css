@@ -33,3 +33,26 @@
     }
   }
 }
+
+/* Match the approved, subtle LAUPAY mark animation used on the landing site. */
+.laupay-loader-mark {
+  animation: laupay-loader-breathe 1.6s cubic-bezier(.45, 0, .55, 1) infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes laupay-loader-breathe {
+  0%, 100% { opacity: .55; transform: translateY(0) scale(.94); }
+  50% { opacity: 1; transform: translateY(-2px) scale(1.04); }
+}
+
+@keyframes laupay-loader-fade {
+  0%, 100% { opacity: .5; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .laupay-loader-mark {
+    animation: laupay-loader-fade 1.8s ease-in-out infinite !important;
+    transform: none !important;
+  }
+}

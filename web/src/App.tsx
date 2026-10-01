@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownRight,
@@ -123,6 +123,8 @@ const faqs = [
 ];
 
 type DemoStage = 'dashboard' | 'select' | 'process' | 'confirm';
+
+const CUSTOMER_APP_ORIGIN = 'https://laupay.vercel.app';
 
 
 function FlowMark({ inverse = false }: { inverse?: boolean }) {
@@ -426,12 +428,12 @@ function Home() {
           </nav>
           <div className="hidden items-center gap-3 lg:flex">
             <ThemeSwitcher theme={theme} onChange={setTheme} />
-            <Link to="/login" className="rounded-full border border-white/20 px-4 py-2.5 text-[11px] font-extrabold text-white transition-colors hover:bg-white/10">
+            <a href={`${CUSTOMER_APP_ORIGIN}/login`} className="rounded-full border border-white/20 px-4 py-2.5 text-[11px] font-extrabold text-white transition-colors hover:bg-white/10">
               Login
-            </Link>
-            <Link to="/register" className="rounded-full bg-[#F4B33F] px-4 py-2.5 text-[11px] font-extrabold text-[#171A4A] transition-transform hover:-translate-y-0.5">
+            </a>
+            <a href={`${CUSTOMER_APP_ORIGIN}/register`} className="rounded-full bg-[#F4B33F] px-4 py-2.5 text-[11px] font-extrabold text-[#171A4A] transition-transform hover:-translate-y-0.5">
               Get Started
-            </Link>
+            </a>
           </div>
           <button type="button" onClick={() => setMobileOpen((value) => !value)} className="rounded-full border border-white/20 p-2.5 text-white lg:hidden" aria-label={mobileOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileOpen}>
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
@@ -447,8 +449,8 @@ function Home() {
             <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
               <ThemeSwitcher theme={theme} onChange={setTheme} />
               <div className="flex gap-2">
-                <Link to="/login" className="rounded-full border border-white/20 px-4 py-2 text-xs font-bold text-white">Login</Link>
-                <Link to="/register" className="rounded-full bg-[#F4B33F] px-4 py-2 text-xs font-bold text-[#171A4A]">Get Started</Link>
+                <a href={`${CUSTOMER_APP_ORIGIN}/login`} className="rounded-full border border-white/20 px-4 py-2 text-xs font-bold text-white">Login</a>
+                <a href={`${CUSTOMER_APP_ORIGIN}/register`} className="rounded-full bg-[#F4B33F] px-4 py-2 text-xs font-bold text-[#171A4A]">Get Started</a>
               </div>
             </div>
           </div>
@@ -472,12 +474,12 @@ function Home() {
                   Airtime, data, payments, wallet services, and more — brought together so your next transaction feels clear from the start.
                 </p>
                 <div className="reveal reveal-delay-3 mt-9 flex flex-wrap items-center gap-3">
-                  <Link to="/register" className="group inline-flex items-center gap-3 rounded-full bg-[#F4B33F] px-5 py-3.5 text-xs font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1">
+                  <a href={`${CUSTOMER_APP_ORIGIN}/register`} className="group inline-flex items-center gap-3 rounded-full bg-[#F4B33F] px-5 py-3.5 text-xs font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1">
                     Get Started <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
-                  </Link>
-                  <Link to="/login" className="inline-flex items-center gap-3 rounded-full border border-white/20 px-5 py-3.5 text-xs font-extrabold text-white transition-colors hover:bg-white/10">
+                  </a>
+                  <a href={`${CUSTOMER_APP_ORIGIN}/login`} className="inline-flex items-center gap-3 rounded-full border border-white/20 px-5 py-3.5 text-xs font-extrabold text-white transition-colors hover:bg-white/10">
                     Login
-                  </Link>
+                  </a>
                 </div>
               </div>
               <div className="reveal reveal-delay-2 lg:pl-8">
@@ -755,7 +757,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
       <footer className="bg-[#11142A] py-10 text-white">
         <div className="section-shell flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5"><FlowMark inverse /><span className="font-display text-[17px] font-extrabold tracking-[-.06em]">LAUPAY</span></div>
-          <div className="flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-bold text-white/45"><a className="hover:text-white" href="#services">Services</a><a className="hover:text-white" href="#security">Security</a><a className="hover:text-white" href="#future">Our horizon</a><Link to="/login" className="hover:text-white">Login</Link></div>
+          <div className="flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-bold text-white/45"><a className="hover:text-white" href="#services">Services</a><a className="hover:text-white" href="#security">Security</a><a className="hover:text-white" href="#future">Our horizon</a><a href={`${CUSTOMER_APP_ORIGIN}/login`} className="hover:text-white">Login</a></div>
            <p className="text-[10px] font-semibold text-white/30">© 2026 LAUPAY. Digital services, simply connected.</p>
         </div>
       </footer>
