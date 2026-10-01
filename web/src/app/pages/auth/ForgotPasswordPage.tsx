@@ -63,7 +63,7 @@ export function ForgotPasswordPage() {
             {error}
           </p>
         )}
-        <Button type="submit" fullWidth disabled={submitting}>
+        <Button type="submit" fullWidth loading={submitting}>
           {submitting ? "Sending…" : "Send reset link"}
         </Button>
       </form>
