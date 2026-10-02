@@ -311,7 +311,7 @@ model Order {
   amount       Decimal   @db.Decimal(18, 2)
 
   payments        Payment[]
-  vtuTransactions VtuTransaction[]
+  vtuTransaction  VtuTransaction?
 
   idempotencyKey String @unique // supplied by client or derived from a client request ID
 
@@ -368,7 +368,7 @@ model PaymentEvent {
 
 model VtuTransaction {
   id      String @id @default(uuid())
-  orderId String
+  orderId String @unique // exactly one VtuTransaction per Order by construction
   order   Order  @relation(fields: [orderId], references: [id])
 
   provider          VtuProviderName
