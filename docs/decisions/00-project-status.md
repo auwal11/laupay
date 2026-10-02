@@ -268,3 +268,10 @@ Before any real-money claim: build the reconciliation job, finish the IDOR/
 security test suite, complete the admin module, integrate at least one real
 provider in sandbox mode, and run a dedicated financial/security review pass
 per the brief's final requirement.
+
+## Update 2026-10-02 — fix-vtu-async-reversal stabilised
+- `VtuTransaction.orderId` is now `@unique` (one VtuTransaction per Order; `Order.vtuTransaction` is now a 1:1 relation).
+- Added migration `20261002000000_add_security_agent_pricing_and_vtu_orderid_unique`. The branch previously had schema changes for `UserSecurity` (PIN) and agent pricing (`DataPlan.agentPriceNaira`, `Network.agentDiscountPercent`) with **no migration file**; this migration now covers them too.
+- `test/agent-pricing.e2e-spec.ts` re-logs in after promoting the user to AGENT (JWT roles are fixed at issuance — test bug, not an app bug).
+- Result: unit 6/6, e2e 42/42 (local Postgres 17). One e2e run on a freshly reset DB showed 1 failure that did not reproduce in 4 subsequent runs — treat as a possible flaky test to investigate.
+- Not production-ready for real money; still requires a dedicated financial/security review.

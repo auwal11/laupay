@@ -39,6 +39,12 @@ describe('Agent pricing & confirm-cash security (e2e)', () => {
     // docs/decisions/0004-customer-web-integration-audit.md §3.1). Promote
     // directly here the same way a real admin action would.
     await prisma.user.update({ where: { id: agentUserId }, data: { role: 'AGENT' } });
+    // JWTs encode the role at issuance time, so the registration token still
+    // says CUSTOMER. Log in again to get a token that reflects the promotion.
+    const agentLogin = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: agent.email, password: agent.password });
+    agentToken = agentLogin.body.accessToken;
     // Give the agent float enough balance for these tests.
     const agentWallet = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: agentUserId } });
     await prisma.walletAccount.update({ where: { id: agentWallet.id }, data: { balance: 100000 } });
