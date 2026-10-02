@@ -1,9 +1,12 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { FlowMark } from "@/components/laupay/FlowMark";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "danger";
   fullWidth?: boolean;
+  /** Shows the animated LAUPAY mark and blocks repeat submissions. */
+  loading?: boolean;
   children: ReactNode;
 }
 
@@ -19,6 +22,7 @@ export function Button({
   fullWidth,
   className,
   disabled,
+  loading = false,
   children,
   ...rest
 }: ButtonProps) {
@@ -33,9 +37,17 @@ export function Button({
         fullWidth && "w-full",
         className,
       )}
-      disabled={disabled}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...rest}
     >
+      {loading && (
+        <FlowMark
+          size={16}
+          inverse={variant === "primary" || variant === "danger"}
+          className="laupay-loader-mark"
+        />
+      )}
       {children}
     </button>
   );
