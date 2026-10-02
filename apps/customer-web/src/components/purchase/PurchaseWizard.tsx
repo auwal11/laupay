@@ -1,3 +1,4 @@
+import { FlowMark } from "@/components/laupay/FlowMark";
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -133,11 +134,9 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
           {state.step === "processing" && (
             <StepCard title={STEP_LABELS.processing}>
               <div className="flex flex-col items-center gap-3 py-6 text-center">
-                <div
-                  className="h-8 w-8 animate-spin rounded-full border-2 border-laupay-border border-t-laupay-indigo motion-reduce:animate-none"
-                  role="status"
-                  aria-label="Processing your purchase"
-                />
+                <span role="status" aria-label="Processing your purchase">
+                  <FlowMark size={40} className="laupay-loader-mark" />
+                </span>
                 <p className="text-sm text-laupay-ink-muted">Sending this to LAUPAY for confirmation…</p>
               </div>
             </StepCard>
