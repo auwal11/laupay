@@ -73,7 +73,7 @@ function FundWalletForm({ onDone }: { onDone: () => void }) {
         <Button variant="ghost" onClick={onDone}>
           Cancel
         </Button>
-        <Button onClick={handleFund} disabled={submitting || !amount}>
+        <Button onClick={handleFund} loading={submitting} disabled={!amount}>
           {submitting ? "Submitting…" : "Submit"}
         </Button>
       </div>
