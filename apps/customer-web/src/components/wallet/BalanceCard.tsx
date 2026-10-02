@@ -23,7 +23,7 @@ export function BalanceCard() {
   if (state.status !== "success") return null;
 
   return (
-    <Card className="bg-laupay-indigo text-white">
+    <Card className="!border-laupay-indigo !bg-laupay-indigo text-white">
       <p className="text-sm text-white/70">Wallet balance</p>
       <p className="mt-2 font-display text-3xl font-semibold tabular-nums">
         {formatNaira(state.data.ngnBalance)}
