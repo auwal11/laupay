@@ -85,7 +85,7 @@ export function RegisterPage() {
             {error}
           </p>
         )}
-        <Button type="submit" fullWidth disabled={submitting}>
+        <Button type="submit" fullWidth loading={submitting}>
           {submitting ? "Creating account…" : "Create account"}
         </Button>
       </form>
