@@ -124,7 +124,7 @@ const faqs = [
 
 type DemoStage = 'dashboard' | 'select' | 'process' | 'confirm';
 
-const CUSTOMER_APP_ORIGIN = 'https://laupay.vercel.app';
+const CUSTOMER_APP_ORIGIN = ''; // same origin — landing and customer app share laupay.vercel.app
 
 
 function FlowMark({ inverse = false }: { inverse?: boolean }) {
