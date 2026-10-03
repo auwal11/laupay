@@ -1,10 +1,30 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
+import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PaymentsService } from '../src/modules/payments/payments.service';
 import { ReconciliationService } from '../src/modules/reconciliation/reconciliation.service';
+import { MockMailProvider } from '../src/common/mail/mock-mail.provider';
+
+/**
+ * Registers + verifies via the real OTP flow (requirements 3 + 4) and returns
+ * an access token. Tests must not obtain a session by skipping verification.
+ */
+export async function registerVerified(
+  server: App,
+  user: { email: string; password: string; fullName: string; phone?: string },
+): Promise<string> {
+  await request(server).post('/api/auth/register').send(user).expect(201);
+  const code = MockMailProvider.lastCodeFor(user.email);
+  if (!code) throw new Error('No verification code captured for ' + user.email);
+  const res = await request(server)
+    .post('/api/auth/verify-otp')
+    .send({ email: user.email, code })
+    .expect(201);
+  return res.body.accessToken as string;
+}
 
 /**
  * Covers docs/architecture/payment-flow.md end to end:
@@ -41,8 +61,7 @@ describe('Payments & Webhooks flow (e2e)', () => {
     paymentsService = moduleRef.get(PaymentsService);
     reconciliationService = moduleRef.get(ReconciliationService);
 
-    const res = await request(app.getHttpServer()).post('/api/auth/register').send(user);
-    token = res.body.accessToken;
+    token = await registerVerified(app.getHttpServer(), user);
   });
 
   afterAll(async () => {

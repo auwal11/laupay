@@ -1,9 +1,26 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
+import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { MockMailProvider } from '../src/common/mail/mock-mail.provider';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReconciliationService } from '../src/modules/reconciliation/reconciliation.service';
+
+/** Registers + verifies via the real OTP flow (requirements 3 + 4). */
+async function registerVerified(
+  server: App,
+  user: { email: string; password: string; fullName: string; phone?: string },
+): Promise<string> {
+  await request(server).post('/api/auth/register').send(user).expect(201);
+  const code = MockMailProvider.lastCodeFor(user.email);
+  if (!code) throw new Error('No verification code captured for ' + user.email);
+  const res = await request(server)
+    .post('/api/auth/verify-otp')
+    .send({ email: user.email, code })
+    .expect(201);
+  return res.body.accessToken as string;
+}
 
 /**
  * Regression test for docs/decisions/0003-phase1-hardening-review.md
@@ -36,8 +53,7 @@ describe('VTU async failure reversal (e2e)', () => {
     prisma = moduleRef.get(PrismaService);
     reconciliationService = moduleRef.get(ReconciliationService);
 
-    const res = await request(app.getHttpServer()).post('/api/auth/register').send(user);
-    token = res.body.accessToken;
+        token = await registerVerified(app.getHttpServer(), user);
 
     // Fund the wallet directly so the order below has enough balance.
     const wallet = await prisma.walletAccount.findFirstOrThrow({ where: { user: { email: user.email } } });

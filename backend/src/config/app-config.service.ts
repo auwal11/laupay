@@ -40,4 +40,55 @@ export class AppConfigService {
 
   readonly paymentProvider = optional('PAYMENT_PROVIDER', 'mock');
   readonly vtuProvider = optional('VTU_PROVIDER', 'mock');
+
+  // === Staging/TEST-only provider credentials ============================
+  // Never rendered into a response and never sent to the client bundle —
+  // these live only in process.env. `requiredIf()` fails fast when the
+  // corresponding provider is selected, so a missing key is a boot error
+  // rather than a runtime surprise halfway through a customer's purchase.
+  private requiredIf(enabled: boolean, name: string): string {
+    if (!enabled) return optional(name, '');
+    return required(name);
+  }
+
+  readonly paystackEnabled = this.paymentProvider === 'paystack';
+  readonly paystackSecretKey = this.requiredIf(this.paystackEnabled, 'PAYSTACK_SECRET_KEY');
+  readonly paystackWebhookSecret = this.requiredIf(this.paystackEnabled, 'PAYSTACK_WEBHOOK_SECRET');
+
+  readonly monnifyEnabled = this.paymentProvider === 'monnify';
+  readonly monnifyApiKey = this.requiredIf(this.monnifyEnabled, 'MONNIFY_API_KEY');
+  readonly monnifySecretKey = this.requiredIf(this.monnifyEnabled, 'MONNIFY_SECRET_KEY');
+  readonly monnifyBaseUrl = optional('MONNIFY_BASE_URL', 'https://sandbox.monnify.com');
+  readonly monnifyContractCode = this.requiredIf(this.monnifyEnabled, 'MONNIFY_CONTRACT_CODE');
+
+  readonly vtpassEnabled = this.vtuProvider === 'vtpass';
+  readonly vtpassApiKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_API_KEY');
+  readonly vtpassSecretKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_SECRET_KEY');
+  readonly vtpassBaseUrl = optional('VTPASS_BASE_URL', 'https://sandbox.vtpass.com');
+  readonly vtpassWebhookSecret = this.requiredIf(this.vtpassEnabled, 'VTPASS_WEBHOOK_SECRET');
+
+  readonly mailProvider = optional('MAIL_PROVIDER', 'mock');
+  readonly brevoApiKey = optional('BREVO_API_KEY', '');
+  readonly brevoSenderEmail = optional('BREVO_SENDER_EMAIL', 'no-reply@laupay.app');
+  readonly brevoSenderName = optional('BREVO_SENDER_NAME', 'LAUPAY');
+
+  /** Base URL of THIS API, used to build the OTP link emailed to users. */
+  readonly publicApiBaseUrl = optional('PUBLIC_API_BASE_URL', 'http://localhost:3000');
+
+  /**
+   * Staging must never touch real money. This guard is evaluated at boot and
+   * refuses to start if a LIVE key is ever selected alongside staging env.
+   */
+  assertStagingSafety() {
+    const livePrefixes = ['sk_live_', 'pk_live_'];
+    const selected = [this.paystackSecretKey, this.paystackEnabled ? '' : ''].filter(Boolean);
+    for (const key of selected) {
+      if (livePrefixes.some((p) => key.startsWith(p))) {
+        throw new Error(
+          '[config] Refusing to start: a LIVE Paystack key was detected while PAYMENT_PROVIDER=paystack. ' +
+            'Staging must use sk_test_/pk_test_ only (requirement 16).',
+        );
+      }
+    }
+  }
 }

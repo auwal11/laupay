@@ -10,7 +10,8 @@ import { randomUUID, randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { PasswordHasher } from './password-hasher.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
+import { OtpService } from './otp.service';
 
 export interface AuthTokens {
   accessToken: string;
@@ -26,7 +27,41 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: AppConfigService,
     private readonly passwordHasher: PasswordHasher,
+    private readonly otp: OtpService,
   ) {}
+
+  /**
+   * Verifies the emailed code, flips PENDING_VERIFICATION -> ACTIVE and only
+   * then issues tokens (requirements 3 + 4). No code, no tokens.
+   */
+  async verifyEmail(dto: VerifyOtpDto) {
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    // Same message whether the email exists or the code is wrong.
+    if (!user) throw new UnauthorizedException('Invalid or expired verification code');
+
+    if (user.status === 'ACTIVE') {
+      return this.issueTokens(user.id, user.role);
+    }
+
+    await this.otp.consume(user.id, dto.code);
+
+    const activated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { status: 'ACTIVE' },
+    });
+    this.logger.log(`User ${user.id} email verified`);
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: AuditAction.UPDATE,
+        entityType: 'User',
+        entityId: user.id,
+      },
+    });
+
+    return this.issueTokens(activated.id, activated.role);
+  }
 
   async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
@@ -38,35 +73,52 @@ export class AuthService {
 
     // User creation + wallet provisioning happen in one transaction: a user
     // must never exist without a corresponding wallet account, and vice versa.
-    const user = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
-          email: dto.email,
-          phone: dto.phone,
-          passwordHash,
-          fullName: dto.fullName,
-          role: UserRole.CUSTOMER,
-        },
-      });
-      await tx.walletAccount.create({
-        data: {
-          ownerId: created.id,
-          ownerType: WalletOwnerType.USER,
-        },
-      });
-      await tx.auditLog.create({
-        data: {
-          actorId: created.id,
-          action: AuditAction.CREATE,
-          entityType: 'User',
-          entityId: created.id,
-        },
-      });
-      return created;
-    });
+    const user = await this.prisma.$transaction(
+      async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            email: dto.email,
+            phone: dto.phone,
+            passwordHash,
+            fullName: dto.fullName,
+            role: UserRole.CUSTOMER,
+          },
+        });
+        await tx.walletAccount.create({
+          data: {
+            ownerId: created.id,
+            ownerType: WalletOwnerType.USER,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            actorId: created.id,
+            action: AuditAction.CREATE,
+            entityType: 'User',
+            entityId: created.id,
+          },
+        });
+        return created;
+      },
+      // Interactive transactions default to 5s, which is fine on localhost but
+      // too short for a WAN round-trip to a managed Postgres (Supabase pooler).
+      // The password hash above is computed BEFORE the transaction opens, so
+      // argon2's CPU cost never counts against this budget.
+      PrismaService.txOptions(),
+    );
 
     this.logger.log(`New user registered: ${user.id}`);
-    return this.issueTokens(user.id, user.role);
+
+    // Requirement 3: registration must be followed by email verification
+    // before login. We deliberately return NO tokens here — the account sits
+    // at PENDING_VERIFICATION until OtpService.consume() succeeds.
+    await this.otp.issue(user.id);
+
+    return {
+      requiresVerification: true,
+      email: user.email,
+      message: 'A verification code has been sent to your email.',
+    };
   }
 
   async login(dto: LoginDto) {
@@ -79,6 +131,17 @@ export class AuthService {
     const passwordOk = await this.passwordHasher.verify(user.passwordHash, dto.password);
     if (!passwordOk) {
       await this.recordFailedLogin(dto.email, user.id);
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Requirement 3/4: an unverified account may never receive tokens.
+    // The message is intentionally identical to the wrong-password case so
+    // this endpoint cannot be used to enumerate registered-but-unverified
+    // addresses.
+    if (user.status === 'PENDING_VERIFICATION') {
+      await this.prisma.auditLog.create({
+        data: { actorId: user.id, action: AuditAction.LOGIN_FAILED, entityType: 'User', entityId: user.id },
+      });
       throw new UnauthorizedException('Invalid email or password');
     }
 

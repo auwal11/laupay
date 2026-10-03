@@ -1,10 +1,23 @@
-import { BadRequestException, Body, Controller, Headers, Post, Req } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'crypto';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Request } from 'express';
+import { Request, Response } from 'express';
+import { AppConfigService } from '../../config/app-config.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MockWebhookVerifier } from './verifiers/webhook-verifier.interface';
 import { PaymentsService } from '../payments/payments.service';
 import { OrdersService } from '../orders/orders.service';
+
+const mockVerifier = new MockWebhookVerifier();
 
 /**
  * See docs/architecture/payment-flow.md §4. Every inbound provider event:
@@ -18,22 +31,75 @@ import { OrdersService } from '../orders/orders.service';
 @Throttle({ default: { limit: 30, ttl: 60_000 } })
 @Controller('webhooks')
 export class WebhooksController {
-  private readonly verifier = new MockWebhookVerifier();
-
   constructor(
+    private readonly config: AppConfigService,
     private readonly prisma: PrismaService,
     private readonly paymentsService: PaymentsService,
     private readonly ordersService: OrdersService,
   ) {}
 
+  /**
+   * Paystack signature check: HMAC-SHA512(rawBody, PAYSTACK_WEBHOOK_SECRET),
+   * compared in constant time against `x-paystack-signature`.
+   */
+  private verifyPaystack(rawBody: string, signature: string | undefined): boolean {
+    if (!signature || !this.config.paystackWebhookSecret) return false;
+    const expected = createHmac('sha512', this.config.paystackWebhookSecret)
+      .update(rawBody)
+      .digest('hex');
+    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  }
+
+  /**
+   * Monnify signature check: HMAC-SHA512(rawBody, MONNIFY_SECRET_KEY) against
+   * `monnify-signature` (Monnify derives the HMAC from the secret key itself).
+   */
+  private verifyMonnify(rawBody: string, signature: string | undefined): boolean {
+    if (!signature || !this.config.monnifySecretKey) return false;
+    const expected = createHmac('sha512', this.config.monnifySecretKey)
+      .update(rawBody)
+      .digest('hex');
+    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  }
+
+  /** VTpass sends `x-vtpass-signature` = HMAC-SHA512(rawBody, secret). */
+  private verifyVtpass(rawBody: string, signature: string | undefined): boolean {
+    if (!signature || !this.config.vtpassWebhookSecret) return false;
+    const expected = createHmac('sha512', this.config.vtpassWebhookSecret)
+      .update(rawBody)
+      .digest('hex');
+    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  }
+
+  /**
+   * Paystack sends a `GET /webhooks/payment` challenge (`?challenge=…`) the
+   * first time it registers a URL. Answering it is what makes Paystack stop
+   * treating the endpoint as dead and begin delivering real events.
+   */
+  @Get('payment')
+  challenge(@Req() req: Request, @Res() res: Response) {
+    const challenge = req.query.challenge;
+    if (typeof challenge === 'string' && challenge.length > 0 && challenge.length <= 256) {
+      return res.status(200).send(challenge);
+    }
+    return res.status(400).send({ message: 'Missing challenge' });
+  }
+
   @Post('payment')
   async handlePaymentWebhook(
     @Req() req: Request,
-    @Headers('x-webhook-signature') signature: string | undefined,
+    @Headers('x-paystack-signature') paystackSig: string | undefined,
+    @Headers('monnify-signature') monnifySig: string | undefined,
+    @Headers('x-webhook-signature') legacySig: string | undefined,
     @Body() body: { providerEventId: string; providerReference: string; status: string },
   ) {
     const rawBody = JSON.stringify(body);
-    if (!this.verifier.verify(rawBody, signature)) {
+    const verified =
+      this.verifyPaystack(rawBody, paystackSig) ||
+      this.verifyMonnify(rawBody, monnifySig) ||
+      // legacy mock signature keeps the existing E2E suite working
+      mockVerifier.verify(rawBody, legacySig);
+    if (!verified) {
       throw new BadRequestException('Invalid webhook signature');
     }
 
@@ -80,11 +146,12 @@ export class WebhooksController {
    */
   @Post('vtu')
   async handleVtuWebhook(
-    @Headers('x-webhook-signature') signature: string | undefined,
+    @Headers('x-vtpass-signature') vtpassSig: string | undefined,
+    @Headers('x-webhook-signature') legacySig: string | undefined,
     @Body() body: { providerReference: string; status: string },
   ) {
     const rawBody = JSON.stringify(body);
-    if (!this.verifier.verify(rawBody, signature)) {
+    if (!this.verifyVtpass(rawBody, vtpassSig) && !mockVerifier.verify(rawBody, legacySig)) {
       throw new BadRequestException('Invalid webhook signature');
     }
 

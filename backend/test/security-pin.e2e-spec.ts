@@ -1,7 +1,24 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
+import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { MockMailProvider } from '../src/common/mail/mock-mail.provider';
+
+/** Registers + verifies via the real OTP flow (requirements 3 + 4). */
+async function registerVerified(
+  server: App,
+  user: { email: string; password: string; fullName: string; phone?: string },
+): Promise<string> {
+  await request(server).post('/api/auth/register').send(user).expect(201);
+  const code = MockMailProvider.lastCodeFor(user.email);
+  if (!code) throw new Error('No verification code captured for ' + user.email);
+  const res = await request(server)
+    .post('/api/auth/verify-otp')
+    .send({ email: user.email, code })
+    .expect(201);
+  return res.body.accessToken as string;
+}
 
 /**
  * Covers the minimum PIN backend added to unblock apps/customer-web's
@@ -25,8 +42,7 @@ describe('Security PIN (e2e)', () => {
     app.setGlobalPrefix('api');
     await app.init();
 
-    const res = await request(app.getHttpServer()).post('/api/auth/register').send(user);
-    token = res.body.accessToken;
+        token = await registerVerified(app.getHttpServer(), user);
   });
 
   afterAll(async () => {
@@ -90,8 +106,7 @@ describe('Security PIN (e2e)', () => {
 
   it('locks the PIN after 5 consecutive failed attempts, even with the correct PIN afterward', async () => {
     const lockUser = { email: `pin-lock-${Date.now()}@test.local`, password: 'Password123!', fullName: 'Lock Test' };
-    const lockRes = await request(app.getHttpServer()).post('/api/auth/register').send(lockUser);
-    const lockToken = lockRes.body.accessToken;
+    const lockToken = await registerVerified(app.getHttpServer(), lockUser);
 
     await request(app.getHttpServer())
       .post('/api/security/pin')
@@ -142,8 +157,7 @@ describe('Security PIN (e2e)', () => {
 
   it('rejects changing the PIN with an incorrect current PIN', async () => {
     const otherUser = { email: `pin-change-fail-${Date.now()}@test.local`, password: 'Password123!', fullName: 'Change Fail' };
-    const otherRes = await request(app.getHttpServer()).post('/api/auth/register').send(otherUser);
-    const otherToken = otherRes.body.accessToken;
+    const otherToken = await registerVerified(app.getHttpServer(), otherUser);
 
     await request(app.getHttpServer())
       .post('/api/security/pin')
@@ -176,8 +190,7 @@ describe('Order risk-decision placeholder shape (e2e)', () => {
     app.setGlobalPrefix('api');
     await app.init();
 
-    const res = await request(app.getHttpServer()).post('/api/auth/register').send(user);
-    token = res.body.accessToken;
+        token = await registerVerified(app.getHttpServer(), user);
 
     const prisma = moduleRef.get(require('../src/prisma/prisma.service').PrismaService);
     const wallet = await prisma.walletAccount.findFirstOrThrow({ where: { user: { email: user.email } } });

@@ -1,8 +1,25 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
+import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { MockMailProvider } from '../src/common/mail/mock-mail.provider';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+/** Registers + verifies via the real OTP flow (requirements 3 + 4). */
+async function registerVerified(
+  server: App,
+  user: { email: string; password: string; fullName: string; phone?: string },
+): Promise<string> {
+  await request(server).post('/api/auth/register').send(user).expect(201);
+  const code = MockMailProvider.lastCodeFor(user.email);
+  if (!code) throw new Error('No verification code captured for ' + user.email);
+  const res = await request(server)
+    .post('/api/auth/verify-otp')
+    .send({ email: user.email, code })
+    .expect(201);
+  return res.body.accessToken as string;
+}
 
 /**
  * Security-focused e2e suite. Boots the full Nest application (real HTTP
@@ -37,11 +54,9 @@ describe('Security (e2e)', () => {
 
     prisma = moduleRef.get(PrismaService);
 
-    const resA = await request(app.getHttpServer()).post('/api/auth/register').send(userA);
-    tokenA = resA.body.accessToken;
+        tokenA = await registerVerified(app.getHttpServer(), userA);
 
-    const resB = await request(app.getHttpServer()).post('/api/auth/register').send(userB);
-    tokenB = resB.body.accessToken;
+        tokenB = await registerVerified(app.getHttpServer(), userB);
 
     // Fund User A's wallet directly via Prisma so we can place a paid order
     // without depending on the payments flow in this test file.

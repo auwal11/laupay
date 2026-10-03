@@ -147,6 +147,7 @@ model User {
   orders        Order[]
   payments      Payment[]
   refreshTokens RefreshToken[]
+  emailOtps     EmailOtp[]
   auditLogs     AuditLog[]     @relation("AuditActor")
   security      UserSecurity?
 
@@ -184,6 +185,29 @@ model UserSecurity {
   pinLockedUntil    DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+}
+
+/// Email OTP for registration verification (requirement 4).
+/// Only the SHA-256 hash of the 6-digit code is stored, so a database dump
+/// cannot be replayed to verify an account. `consumedAt` is set exactly once
+/// on success (single-use), and `attempts` bounds brute force to `maxAttempts`
+/// tries before the row must be discarded and a fresh code requested.
+model EmailOtp {
+  id          String    @id @default(uuid())
+  userId      String
+  codeHash    String
+  purpose     String    @default("REGISTRATION")
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
 }
 
 model RefreshToken {

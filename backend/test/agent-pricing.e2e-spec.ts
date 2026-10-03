@@ -1,8 +1,25 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
+import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { MockMailProvider } from '../src/common/mail/mock-mail.provider';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+/** Registers + verifies via the real OTP flow (requirements 3 + 4). */
+async function registerVerified(
+  server: App,
+  user: { email: string; password: string; fullName: string; phone?: string },
+): Promise<string> {
+  await request(server).post('/api/auth/register').send(user).expect(201);
+  const code = MockMailProvider.lastCodeFor(user.email);
+  if (!code) throw new Error('No verification code captured for ' + user.email);
+  const res = await request(server)
+    .post('/api/auth/verify-otp')
+    .send({ email: user.email, code })
+    .expect(201);
+  return res.body.accessToken as string;
+}
 
 /**
  * Covers ADR 0002's "Pricing: Configurable, Never Hardcoded" section and
@@ -31,8 +48,7 @@ describe('Agent pricing & confirm-cash security (e2e)', () => {
     prisma = moduleRef.get(PrismaService);
 
     const agent = { email: `agent-pricing-${Date.now()}@test.local`, password: 'Password123!', fullName: 'Agent Pricing' };
-    const agentRes = await request(app.getHttpServer()).post('/api/auth/register').send(agent);
-    agentToken = agentRes.body.accessToken;
+        agentToken = await registerVerified(app.getHttpServer(), agent);
     const agentUser = await prisma.user.findUniqueOrThrow({ where: { email: agent.email } });
     agentUserId = agentUser.id;
     // No self-service way to become an AGENT (by design — see
@@ -50,8 +66,7 @@ describe('Agent pricing & confirm-cash security (e2e)', () => {
     await prisma.walletAccount.update({ where: { id: agentWallet.id }, data: { balance: 100000 } });
 
     const customer = { email: `customer-pricing-${Date.now()}@test.local`, password: 'Password123!', fullName: 'Customer Pricing' };
-    const customerRes = await request(app.getHttpServer()).post('/api/auth/register').send(customer);
-    customerToken = customerRes.body.accessToken;
+        customerToken = await registerVerified(app.getHttpServer(), customer);
   });
 
   afterAll(async () => {

@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Length, Matches, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -28,4 +28,20 @@ export class LoginDto {
 export class RefreshDto {
   @IsString()
   refreshToken!: string;
+}
+
+export class VerifyOtpDto {
+  @IsEmail()
+  email!: string;
+
+  /** Exactly 6 digits. Rejects anything non-numeric before it reaches the DB. */
+  @IsString()
+  @Length(6, 6)
+  @Matches(/^[0-9]{6}$/, { message: 'code must be a 6-digit number' })
+  code!: string;
+}
+
+export class ResendOtpDto {
+  @IsEmail()
+  email!: string;
 }
