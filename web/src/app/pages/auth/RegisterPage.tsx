@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AuthLayout } from "@app/layouts/AuthLayout";
+import { AuthShell } from "@app/components/auth/AuthShell";
 import { Input } from "@app/components/ui/Input";
 import { Button } from "@app/components/ui/Button";
 import { useAuth } from "@app/context/AuthContext";
@@ -32,31 +32,55 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthLayout>
-      <h1 className="font-display text-lg font-semibold text-laupay-ink">Create your account</h1>
-      <p className="mt-1 text-sm text-laupay-ink-muted">Set up LAUPAY in a couple of minutes.</p>
+    <AuthShell
+      variant="centered"
+      eyebrow="Get started"
+      header={
+        <>
+          <h1 className="mt-4 font-display text-2xl font-extrabold leading-[1.08] tracking-[-.045em] text-white">
+            Create your account
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-white/65">
+            Set up LAUPAY in a couple of minutes.
+          </p>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-sm font-medium text-laupay-ink">Account type</legend>
+          <div
+            className="flex gap-2"
+            role="radiogroup"
+            aria-label="Account type"
+          >
+            {(["customer", "agent"] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                role="radio"
+                aria-checked={role === r}
+                onClick={() => setRole(r)}
+                className={
+                  "flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium capitalize transition-colors duration-150 " +
+                  (role === r
+                    ? "border-laupay-indigo bg-laupay-indigo text-white shadow-raised"
+                    : "border-laupay-border bg-laupay-surface-muted text-laupay-ink-muted hover:border-laupay-indigo-soft/40 hover:bg-white")
+                }
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-        <div className="flex gap-2" role="radiogroup" aria-label="Account type">
-          {(["customer", "agent"] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              role="radio"
-              aria-checked={role === r}
-              onClick={() => setRole(r)}
-              className={
-                "flex-1 rounded-md border px-3 py-2 text-sm font-medium capitalize " +
-                (role === r
-                  ? "border-laupay-indigo bg-laupay-indigo text-white"
-                  : "border-laupay-border bg-white text-laupay-ink-muted")
-              }
-            >
-              {r}
-            </button>
-          ))}
-        </div>
-        <Input label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+        <Input
+          label="Full name"
+          autoComplete="name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          required
+        />
         <Input
           label="Email"
           type="email"
@@ -68,6 +92,7 @@ export function RegisterPage() {
         <Input
           label="Phone number"
           type="tel"
+          autoComplete="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           required
@@ -81,21 +106,27 @@ export function RegisterPage() {
           required
         />
         {error && (
-          <p role="alert" className="text-sm font-medium text-laupay-danger">
+          <p
+            role="alert"
+            className="rounded-lg border border-laupay-danger/25 bg-laupay-danger/[.06] px-3.5 py-2.5 text-sm font-medium text-laupay-danger"
+          >
             {error}
           </p>
         )}
-        <Button type="submit" fullWidth loading={submitting}>
+        <Button type="submit" fullWidth loading={submitting} className="mt-1 py-3">
           {submitting ? "Creating account…" : "Create account"}
         </Button>
       </form>
 
-      <p className="mt-5 text-center text-sm text-laupay-ink-muted">
+      <p className="mt-6 border-t border-laupay-border pt-5 text-center text-sm text-laupay-ink-muted">
         Already have an account?{" "}
-        <Link to="/login" className="font-medium text-laupay-indigo hover:underline">
+        <Link
+          to="/login"
+          className="font-medium text-laupay-indigo transition-colors hover:text-laupay-indigo-soft hover:underline"
+        >
           Log in
         </Link>
       </p>
-    </AuthLayout>
+    </AuthShell>
   );
 }
