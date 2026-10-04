@@ -252,7 +252,7 @@ function BridgeArtwork({ compact = false, activeService }: { compact?: boolean; 
 
   return (
     <div
-      className="relative mx-auto aspect-[480/560] w-full max-w-[28rem]"
+      className="relative mx-auto aspect-[480/560] w-full max-w-[22rem] sm:max-w-[28rem]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
@@ -458,16 +458,21 @@ function Home() {
       </header>
 
       <main id="top">
-        <section className="relative overflow-hidden bg-[#171A4A] pb-16 pt-32 text-white sm:pb-24 sm:pt-40">
-          <div className="absolute -right-40 top-0 h-[520px] w-[520px] rounded-full border border-white/[.05]" />
-          <div className="absolute -right-24 top-24 h-[340px] w-[340px] rounded-full border border-[#F4B33F]/[.10]" />
+        <section className="relative overflow-hidden bg-[#171A4A] pb-14 pt-28 text-white sm:pb-24 sm:pt-40">
+          {/* Decorative rings are hidden below `sm` — at 520px wide they extended well
+          past a 360px viewport and were a common source of sideways scroll. */}
+          <div className="absolute -right-40 top-0 hidden h-[520px] w-[520px] rounded-full border border-white/[.05] sm:block" />
+          <div className="absolute -right-24 top-24 hidden h-[340px] w-[340px] rounded-full border border-[#F4B33F]/[.10] sm:block" />
           <div className="section-shell relative">
             <div className="grid items-center gap-14 lg:grid-cols-[.95fr_1.05fr] lg:gap-8">
               <div className="max-w-[610px]">
                 <div className="reveal inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[.06] px-3 py-2 text-[10px] font-extrabold uppercase tracking-[.16em] text-white/65">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#F4B33F]" /> Digital services, connected
                 </div>
-                <h1 className="reveal reveal-delay-1 mt-7 max-w-[650px] font-display text-[clamp(2.8rem,7.5vw,6.2rem)] font-extrabold leading-[.96] tracking-[-.085em] text-balance">
+                {/* Lowered the clamp minimum: 7.5vw lands near 27px on a 360px
+                    Android, so the old 2.8rem floor forced ~45px type and
+                    overflowed small screens. Now fluid with a sane floor. */}
+                <h1 className="reveal reveal-delay-1 mt-6 max-w-[650px] font-display text-[clamp(2.05rem,8.4vw,6.2rem)] font-extrabold leading-[.98] tracking-[-.075em] text-balance sm:mt-7 sm:leading-[.96] sm:tracking-[-.085em]">
                   Everyday digital services.<br /><span className="flow-word-shift">One simple flow.</span>
                 </h1>
                 <p className="reveal reveal-delay-2 mt-7 max-w-[470px] text-[15px] leading-7 text-white/65 sm:text-[17px]">
@@ -494,7 +499,7 @@ function Home() {
             <div className="grid gap-12 lg:grid-cols-[.75fr_1.25fr] lg:items-end">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">Everyday value</p>
-                <h2 className="mt-5 max-w-[500px] font-display text-4xl font-extrabold leading-[1.02] tracking-[-.065em] sm:text-5xl">
+                <h2 className="mt-5 max-w-[500px] font-display text-[1.75rem] font-extrabold leading-[1.06] tracking-[-.055em] sm:text-5xl sm:leading-[1.02] sm:tracking-[-.065em]">
                   More value in every <span className="flow-word-shift">flow.</span>
                 </h2>
               </div>
@@ -509,7 +514,7 @@ function Home() {
                   <span className="rounded-full border border-border px-3 py-1 text-[10px] font-extrabold uppercase tracking-[.15em]">For customers</span>
                   <Smartphone size={20} className="text-[#B17819] dark:text-[#F4B33F]" />
                 </div>
-                <h3 className="relative mt-12 font-display text-2xl font-extrabold tracking-[-.05em]">Quality digital services.</h3>
+                <h3 className="relative mt-8 font-display text-xl sm:mt-12 sm:text-2xl font-extrabold tracking-[-.05em]">Quality digital services.</h3>
                 <ul className="relative mt-5 grid gap-3 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2"><Check size={15} className="text-[#B17819] dark:text-[#F4B33F]" /> Competitive pricing</li>
                   <li className="flex items-center gap-2"><Check size={15} className="text-[#B17819] dark:text-[#F4B33F]" /> Simple purchasing</li>
@@ -522,7 +527,7 @@ function Home() {
                   <span className="rounded-full border border-white/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-[.15em] text-white/70">For agents</span>
                   <ScanLine size={20} className="text-[#F4B33F]" />
                 </div>
-                <h3 className="relative mt-12 font-display text-2xl font-extrabold tracking-[-.05em]">Better business value.</h3>
+                <h3 className="relative mt-8 font-display text-xl sm:mt-12 sm:text-2xl font-extrabold tracking-[-.05em]">Better business value.</h3>
                 <ul className="relative mt-5 grid gap-3 text-sm text-white/65">
                   <li className="flex items-center gap-2"><Check size={15} className="text-[#F4B33F]" /> Agent-friendly pricing</li>
                   <li className="flex items-center gap-2"><Check size={15} className="text-[#F4B33F]" /> Fast service access</li>
@@ -543,7 +548,7 @@ function Home() {
             <div className="mb-12 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">A look inside</p>
-                <h2 className="mt-5 max-w-[500px] font-display text-4xl font-extrabold leading-[1.02] tracking-[-.065em] sm:text-5xl">Open LAUPAY. See what’s next.</h2>
+                <h2 className="mt-5 max-w-[500px] font-display text-[1.75rem] font-extrabold leading-[1.06] tracking-[-.055em] sm:text-5xl sm:leading-[1.02] sm:tracking-[-.065em]">Open LAUPAY. See what’s next.</h2>
               </div>
               <p className="max-w-[330px] text-sm leading-6 text-muted-foreground">Start at your dashboard, then choose a service.</p>
             </div>
@@ -607,7 +612,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
             <div className="grid gap-10 lg:grid-cols-[.75fr_1.25fr]">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">One place, useful things</p>
-                <h2 className="mt-5 font-display text-4xl font-extrabold leading-[1.02] tracking-[-.065em] sm:text-5xl">The everyday, joined up.</h2>
+                <h2 className="mt-5 font-display text-[1.75rem] font-extrabold leading-[1.06] tracking-[-.055em] sm:text-5xl sm:leading-[1.02] sm:tracking-[-.065em]">The everyday, joined up.</h2>
                 <p className="mt-5 max-w-[360px] text-sm leading-6 text-muted-foreground">A service should feel close at hand, whether it is in your pocket or across the counter.</p>
                 <button type="button" onClick={() => scrollTo('demo')} className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#171A4A] px-5 py-3.5 text-xs font-extrabold text-white transition-transform hover:-translate-y-0.5 dark:bg-[#F4B33F] dark:text-[#171A4A]">Explore the preview <ArrowRight size={14} /></button>
               </div>
@@ -631,7 +636,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
             <div className="flex flex-col justify-between gap-8 sm:flex-row sm:items-end">
               <div>
                 <p className="eyebrow text-[#F4B33F]">Different days, same clarity</p>
-                <h2 className="mt-5 max-w-[550px] font-display text-4xl font-extrabold leading-[1.02] tracking-[-.065em] sm:text-5xl">Built around real moments.</h2>
+                <h2 className="mt-5 max-w-[550px] font-display text-[1.75rem] font-extrabold leading-[1.06] tracking-[-.055em] sm:text-5xl sm:leading-[1.02] sm:tracking-[-.065em]">Built around real moments.</h2>
               </div>
               <p className="max-w-[340px] text-sm leading-6 text-white/55">The bridge works from both sides: for the person making a request and the person helping it happen.</p>
             </div>
@@ -672,7 +677,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
             <div className="grid gap-12 lg:grid-cols-[.8fr_1.2fr] lg:items-start">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">Built with care</p>
-                <h2 className="mt-5 max-w-[460px] font-display text-4xl font-extrabold leading-[1.02] tracking-[-.065em] sm:text-5xl">Built with security at every step.</h2>
+                <h2 className="mt-5 max-w-[460px] font-display text-[1.75rem] font-extrabold leading-[1.06] tracking-[-.055em] sm:text-5xl sm:leading-[1.02] sm:tracking-[-.065em]">Built with security at every step.</h2>
                 <p className="mt-5 max-w-[390px] text-sm leading-6 text-muted-foreground">Clear choices, clear confirmations, and useful status updates keep you in control.</p>
               </div>
               <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
@@ -698,7 +703,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
             <div className="grid gap-12 lg:grid-cols-[.75fr_1.25fr]">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">The direction</p>
-                <h2 className="mt-5 max-w-[480px] font-display text-4xl font-extrabold leading-[1.02] tracking-[-.065em] sm:text-5xl">Today, then tomorrow.</h2>
+                <h2 className="mt-5 max-w-[480px] font-display text-[1.75rem] font-extrabold leading-[1.06] tracking-[-.055em] sm:text-5xl sm:leading-[1.02] sm:tracking-[-.065em]">Today, then tomorrow.</h2>
                  <p className="mt-5 max-w-[390px] text-sm leading-6 text-muted-foreground">Useful services first, with more connected possibilities ahead.</p>
                 <div className="mt-8 inline-flex rounded-full border border-border bg-card p-1">
                   {(['today', 'tomorrow'] as const).map((item) => <button type="button" key={item} onClick={() => setStory(item)} className={`rounded-full px-4 py-2 text-xs font-extrabold capitalize ${story === item ? 'bg-[#171A4A] text-white dark:bg-[#F4B33F] dark:text-[#171A4A]' : 'text-muted-foreground'}`}>{item}</button>)}
@@ -710,7 +715,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
                 <div className="absolute right-10 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-[#171A4A] ring-8 ring-[#171A4A]/10 dark:bg-white" />
                 <div className="absolute left-7 top-7 text-[10px] font-bold uppercase tracking-[.15em] text-muted-foreground sm:left-10 sm:top-10">Now</div>
                 <div className="absolute right-7 top-7 text-[10px] font-bold uppercase tracking-[.15em] text-muted-foreground sm:right-10 sm:top-10">Next horizon</div>
-                <div className="relative mt-28 grid grid-cols-2 gap-10">
+                <div className="relative mt-20 grid grid-cols-2 gap-5 sm:mt-28 sm:gap-10">
                   <div><span className="font-mono text-3xl font-bold text-[#B17819] dark:text-[#F4B33F]">01</span><h3 className="mt-4 font-display text-xl font-extrabold tracking-[-.04em]">Useful today</h3><p className="mt-2 text-xs leading-5 text-muted-foreground">Airtime, data, payments, wallets, and POS — a clear starting point for everyday needs.</p></div>
                   <div><span className="font-mono text-3xl font-bold text-[#171A4A] dark:text-white">02</span><h3 className="mt-4 font-display text-xl font-extrabold tracking-[-.04em]">Ready for more</h3><p className="mt-2 text-xs leading-5 text-muted-foreground">A connected foundation for future digital services, without losing the simple flow.</p></div>
                 </div>
@@ -724,7 +729,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
           <div className="section-shell">
             <div className="mx-auto max-w-[650px] text-center">
                  <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">Good to know</p>
-                 <h2 className="mt-5 font-display text-4xl font-extrabold leading-[1.02] tracking-[-.065em] sm:text-5xl">A few useful answers.</h2>
+                 <h2 className="mt-5 font-display text-[1.75rem] font-extrabold leading-[1.06] tracking-[-.055em] sm:text-5xl sm:leading-[1.02] sm:tracking-[-.065em]">A few useful answers.</h2>
             </div>
             <div className="mx-auto mt-12 max-w-[760px] border-t border-border">
               {faqs.map((item, index) => (
@@ -755,10 +760,29 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
       </main>
 
       <footer className="bg-[#11142A] py-10 text-white">
-        <div className="section-shell flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
+        <div className="section-shell flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
           <div className="flex items-center gap-2.5"><FlowMark inverse /><span className="font-display text-[17px] font-extrabold tracking-[-.06em]">LAUPAY</span></div>
           <div className="flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-bold text-white/45"><a className="hover:text-white" href="#services">Services</a><a className="hover:text-white" href="#security">Security</a><a className="hover:text-white" href="#future">Our horizon</a><a href={`${CUSTOMER_APP_ORIGIN}/login`} className="hover:text-white">Login</a></div>
-           <p className="text-[10px] font-semibold text-white/30">© 2026 LAUPAY. Digital services, simply connected.</p>
+           <p className="text-[10px] font-semibold text-white/30">
+            © 2026 IBRAHIM LAU PROVISION SHOP. LAUPAY is a consumer brand of IBRAHIM LAU PROVISION SHOP. Digital services, simply connected.
+          </p>
+        </div>
+
+        {/* Developer credit — deliberately subtle: low-contrast, small, and
+            readable in both light and dark. Opens in a new tab and is safe
+            to follow (noopener/noreferrer). */}
+        <div className="border-t border-white/[.08]">
+          <div className="section-shell flex flex-col items-center justify-between gap-2 py-4 text-[10px] font-semibold text-white/35 sm:flex-row">
+            <span>Digital services, simply connected.</span>
+            <a
+              href="https://auwalbussines.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded transition-colors duration-150 hover:text-laupay-amber focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-amber"
+            >
+              Developed by Auwalbussines
+            </a>
+          </div>
         </div>
       </footer>
 

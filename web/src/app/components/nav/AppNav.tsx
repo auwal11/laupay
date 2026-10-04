@@ -221,7 +221,7 @@ export function AppNav({
         </div>
       </aside>
 
-// Mobile: slide-in drawer (replaces the old always-on bottom bar).
+{/* Mobile: slide-in drawer (replaces the old always-on bottom bar). */}
       {drawerMounted && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div
