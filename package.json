@@ -1,0 +1,8 @@
+{
+  "name": "laupay-railway-root",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix backend ci && npm --prefix backend run prisma:generate && npm --prefix backend run build",
+    "start": "npm --prefix backend run start:prod"
+  }
+}
