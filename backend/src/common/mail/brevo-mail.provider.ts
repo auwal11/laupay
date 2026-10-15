@@ -56,4 +56,9 @@ export class BrevoMailProvider implements MailProvider {
     const body = (await response.json()) as { messageId?: string };
     this.logger.log(`Brevo verification email accepted: ${body.messageId ?? 'ok'}`);
   }
+
+  async sendPasswordReset({ to, fullName, resetUrl }: { to: string; fullName: string; resetUrl: string }): Promise<void> {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', { method: 'POST', headers: { 'api-key': this.config.brevoApiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: { email: this.config.brevoSenderEmail, name: this.config.brevoSenderName }, to: [{ email: to, name: fullName }], subject: 'Reset your LAUPAY password', htmlContent: `<p>Hi ${fullName},</p><p><a href="${resetUrl}">Reset your LAUPAY password</a></p><p>This link expires in 30 minutes.</p>` }) });
+    if (!response.ok) throw new ServiceUnavailableException('Could not send password reset email');
+  }
 }

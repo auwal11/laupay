@@ -4,6 +4,8 @@ import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { AppShellLayout } from "@/layouts/AppShellLayout";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
+import { VerifyOtpPage } from "@/pages/auth/VerifyOtpPage";
+import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { DashboardPage } from "@/pages/customer/DashboardPage";
 import { AgentDashboardPage } from "@/pages/agent/AgentDashboardPage";
@@ -31,6 +33,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify-otp" element={<VerifyOtpPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           <Route

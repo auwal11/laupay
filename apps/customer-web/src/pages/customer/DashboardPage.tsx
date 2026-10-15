@@ -3,6 +3,7 @@ import { Smartphone, Wifi } from "lucide-react";
 import { BalanceCard } from "@/components/wallet/BalanceCard";
 import { TransactionList } from "@/components/wallet/TransactionList";
 import { useAuth } from "@/context/AuthContext";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -10,9 +11,7 @@ export function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-xl font-semibold text-laupay-ink">
-          Hi {user?.fullName.split(" ")[0]}
-        </h1>
+        <div className="flex items-center gap-3"><UserAvatar user={user!} /><div><h1 className="font-display text-xl font-semibold text-laupay-ink">Hi {user?.fullName.split(" ")[0]}</h1><p className="text-xs capitalize text-laupay-ink-muted">{user?.role}</p></div></div>
         <p className="text-sm text-laupay-ink-muted">Here's what's happening with your account.</p>
       </div>
 

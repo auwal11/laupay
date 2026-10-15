@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
 import { LoginDto, RefreshDto, RegisterDto, ResendOtpDto, VerifyOtpDto } from './dto/auth.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -54,6 +55,12 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) { return this.authService.forgotPassword(dto.email); }
+
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) { return this.authService.resetPassword(dto.token, dto.password); }
+
   @Post('refresh')
   refresh(@Body() dto: RefreshDto) {
     return this.authService.refresh(dto.refreshToken);
@@ -72,6 +79,8 @@ export class AuthController {
       id: record.id,
       email: record.email,
       fullName: record.fullName,
+      phone: record.phone,
+      profilePhotoUrl: record.profilePhotoUrl,
       role: record.role,
       status: record.status,
     };

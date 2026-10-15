@@ -6,6 +6,8 @@ export interface AuthUser {
   email: string;
   phone: string;
   role: Role;
+  status: "ACTIVE" | "SUSPENDED" | "PENDING_VERIFICATION";
+  profilePhotoUrl?: string | null;
   createdAt: string; // ISO 8601, backend-authoritative
 }
 
@@ -25,7 +27,9 @@ export interface RegisterPayload {
   email: string;
   phone: string;
   password: string;
+  confirmPassword: string;
   role: Role;
+  profilePhotoData?: string;
 }
 
 export interface ForgotPasswordPayload {
@@ -33,6 +37,16 @@ export interface ForgotPasswordPayload {
 }
 
 export interface AuthSession {
-  user: AuthUser;
-  tokens: AuthTokens;
+  user?: AuthUser;
+  accessToken: string;
+  refreshToken: string;
+  tokens?: AuthTokens;
 }
+
+export interface RegistrationReceipt {
+  requiresVerification: true;
+  email: string;
+  message: string;
+}
+
+export interface OtpPayload { email: string; code: string }

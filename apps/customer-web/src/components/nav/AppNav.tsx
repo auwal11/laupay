@@ -1,89 +1,16 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Home, Wallet, Smartphone, Wifi, Receipt, User, LayoutDashboard } from "lucide-react";
+import { Home, Wallet, Smartphone, Wifi, Receipt, User, ShieldCheck, Menu, X, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { Role } from "@/types/common";
+import { useAuth } from "@/context/AuthContext";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
-interface NavItem {
-  to: string;
-  label: string;
-  icon: typeof Home;
-}
+const ITEMS = [["/app", "Home", Home], ["/app/airtime", "Airtime", Smartphone], ["/app/data", "Data", Wifi], ["/app/wallet", "Wallet", Wallet], ["/app/transactions", "Transactions", Receipt], ["/app/security", "Security", ShieldCheck], ["/app/profile", "Profile", User]] as const;
 
-const CUSTOMER_ITEMS: NavItem[] = [
-  { to: "/app", label: "Home", icon: Home },
-  { to: "/app/airtime", label: "Airtime", icon: Smartphone },
-  { to: "/app/data", label: "Data", icon: Wifi },
-  { to: "/app/wallet", label: "Wallet", icon: Wallet },
-  { to: "/app/transactions", label: "Transactions", icon: Receipt },
-  { to: "/app/profile", label: "Profile", icon: User },
-];
-
-const AGENT_ITEMS: NavItem[] = [
-  { to: "/app", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/app/wallet", label: "Wallet", icon: Wallet },
-  { to: "/app/airtime", label: "Airtime", icon: Smartphone },
-  { to: "/app/data", label: "Data", icon: Wifi },
-  { to: "/app/transactions", label: "Transactions", icon: Receipt },
-  { to: "/app/profile", label: "Profile", icon: User },
-];
-
-export function AppNav({ role }: { role: Role }) {
-  const items = role === "agent" ? AGENT_ITEMS : CUSTOMER_ITEMS;
-
-  return (
-    <>
-      {/* Desktop: vertical rail */}
-      <nav
-        aria-label="Primary"
-        className="hidden w-56 shrink-0 flex-col gap-1 border-r border-laupay-border bg-white p-4 md:flex"
-      >
-        {items.map((item) => (
-          <NavEntry key={item.to} item={item} orientation="vertical" end={item.to === "/app"} />
-        ))}
-      </nav>
-
-      {/* Mobile: bottom bar */}
-      <nav
-        aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-10 flex justify-around border-t border-laupay-border bg-white py-1 md:hidden"
-      >
-        {items.map((item) => (
-          <NavEntry key={item.to} item={item} orientation="horizontal" end={item.to === "/app"} />
-        ))}
-      </nav>
-    </>
-  );
-}
-
-function NavEntry({
-  item,
-  orientation,
-  end,
-}: {
-  item: NavItem;
-  orientation: "vertical" | "horizontal";
-  end: boolean;
-}) {
-  const Icon = item.icon;
-  return (
-    <NavLink
-      to={item.to}
-      end={end}
-      className={({ isActive }) =>
-        cn(
-          "flex items-center gap-2.5 rounded-md text-sm font-medium",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo",
-          orientation === "vertical"
-            ? "px-3 py-2.5"
-            : "flex-col gap-0.5 px-3 py-1.5 text-[11px]",
-          isActive
-            ? "bg-laupay-surface-muted text-laupay-indigo"
-            : "text-laupay-ink-muted hover:text-laupay-ink",
-        )
-      }
-    >
-      <Icon size={orientation === "vertical" ? 18 : 20} aria-hidden="true" />
-      <span>{item.label}</span>
-    </NavLink>
-  );
+export function AppNav({ role: _role }: { role: Role }) {
+  const { user, logout } = useAuth(); const [collapsed, setCollapsed] = useState(false); const [open, setOpen] = useState(false);
+  const links = (mobile = false) => ITEMS.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/app"} onClick={() => mobile && setOpen(false)} title={!mobile && collapsed ? label : undefined} className={({ isActive }) => cn("flex items-center gap-2.5 rounded-md px-3 py-2.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-laupay-indigo", !mobile && collapsed && "justify-center px-2", isActive ? "bg-laupay-surface-muted text-laupay-indigo" : "text-laupay-ink-muted hover:bg-laupay-surface-muted hover:text-laupay-ink")}><Icon size={18} aria-hidden="true" />{(mobile || !collapsed) && <span>{label}</span>}</NavLink>);
+  const profile = user && <div className={cn("mb-4 flex items-center gap-2 rounded-lg bg-laupay-surface-muted p-2", collapsed && "justify-center p-1")}><UserAvatar user={user} size="sm" />{!collapsed && <div className="min-w-0"><p className="truncate text-xs font-semibold text-laupay-ink">{user.fullName}</p><p className="text-[11px] capitalize text-laupay-ink-muted">{user.role}</p></div>}</div>;
+  return <><aside className={cn("hidden shrink-0 flex-col border-r border-laupay-border bg-white p-3 transition-[width] duration-200 md:flex", collapsed ? "w-[72px]" : "w-56")}><div className={cn("mb-5 flex items-center", collapsed ? "justify-center" : "justify-between")}><span className={cn("font-display text-lg font-bold text-laupay-indigo", collapsed && "sr-only")}>LAUPAY</span><button aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setCollapsed((v) => !v)} className="rounded-md p-2 text-laupay-ink-muted hover:bg-laupay-surface-muted">{collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}</button></div>{profile}<nav aria-label="Primary" className="flex flex-1 flex-col gap-1">{links()}</nav><button onClick={logout} className={cn("flex items-center gap-2.5 rounded-md px-3 py-2.5 text-sm font-medium text-laupay-ink-muted hover:bg-laupay-surface-muted", collapsed && "justify-center px-2")} title={collapsed ? "Log out" : undefined}><LogOut size={18} />{!collapsed && "Log out"}</button></aside><button aria-label="Open menu" onClick={() => setOpen(true)} className="fixed left-4 top-3 z-20 rounded-md bg-white p-2 shadow md:hidden"><Menu size={20} /></button>{open && <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setOpen(false)} />}<aside className={cn("fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-laupay-border bg-white p-4 shadow-xl transition-transform md:hidden", open ? "translate-x-0" : "-translate-x-full")}><div className="mb-5 flex items-center justify-between"><span className="font-display text-lg font-bold text-laupay-indigo">LAUPAY</span><button aria-label="Close menu" onClick={() => setOpen(false)}><X size={20} /></button></div>{user && <div className="mb-4 flex items-center gap-2 rounded-lg bg-laupay-surface-muted p-2"><UserAvatar user={user} size="sm" /><div><p className="text-xs font-semibold">{user.fullName}</p><p className="text-[11px] capitalize text-laupay-ink-muted">{user.role}</p></div></div>}<nav aria-label="Mobile primary" className="flex flex-col gap-1">{links(true)}</nav><button onClick={logout} className="mt-auto flex items-center gap-2.5 rounded-md px-3 py-2.5 text-sm font-medium text-laupay-ink-muted"><LogOut size={18} />Log out</button></aside></>;
 }

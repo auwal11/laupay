@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, Length, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, Length, Matches, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -15,6 +15,15 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsIn(['CUSTOMER', 'AGENT'])
+  role?: 'CUSTOMER' | 'AGENT';
+
+  /** A validated image data URL. It is stored by the application, never sent to email. */
+  @IsOptional()
+  @IsString()
+  profilePhotoData?: string;
 }
 
 export class LoginDto {

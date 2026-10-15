@@ -60,6 +60,21 @@ export class SecurityService {
     await this.assertPinCorrect(userId, pin);
   }
 
+  async getDevices(userId: string) {
+    const sessions = await this.prisma.refreshToken.findMany({ where: { userId, revokedAt: null }, orderBy: { createdAt: 'desc' } });
+    return sessions.map((session, index) => ({ id: session.id, label: index === 0 ? 'Current session' : 'Signed-in session', lastActiveAt: session.createdAt, isCurrent: index === 0, trusted: true }));
+  }
+
+  async revokeDevice(userId: string, id: string) {
+    const result = await this.prisma.refreshToken.updateMany({ where: { id, userId, revokedAt: null }, data: { revokedAt: new Date() } });
+    return { revoked: result.count === 1 };
+  }
+
+  async getNotifications(userId: string) {
+    const logs = await this.prisma.auditLog.findMany({ where: { actorId: userId }, orderBy: { createdAt: 'desc' }, take: 20 });
+    return logs.map((log) => ({ id: log.id, category: log.action === 'LOGIN_FAILED' ? 'security' : 'account', message: log.action.replace('_', ' ').toLowerCase(), createdAt: log.createdAt, read: true }));
+  }
+
   private async assertPinCorrect(userId: string, pin: string): Promise<void> {
     const record = await this.prisma.userSecurity.findUnique({ where: { userId } });
     if (!record?.pinHash) {

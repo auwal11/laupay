@@ -13,6 +13,7 @@ export interface VerificationMessage {
 
 export interface MailProvider {
   sendVerificationCode(message: VerificationMessage): Promise<void>;
+  sendPasswordReset(message: { to: string; fullName: string; resetUrl: string }): Promise<void>;
 }
 
 export const MAIL_PROVIDER = Symbol('MAIL_PROVIDER');

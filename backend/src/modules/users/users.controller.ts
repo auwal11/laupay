@@ -1,7 +1,27 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+
+class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  fullName?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  profilePhotoData?: string;
+
+  @IsOptional()
+  @IsString()
+  removeProfilePhoto?: string;
+}
 
 @UseGuards(JwtAuthGuard)
 @Controller('users')
@@ -11,5 +31,10 @@ export class UsersController {
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.usersService.getProfile(user.userId);
+  }
+
+  @Patch('me')
+  update(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
+    return this.usersService.updateProfile(user.userId, dto);
   }
 }

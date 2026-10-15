@@ -74,6 +74,9 @@ export class AppConfigService {
 
   /** Base URL of THIS API, used to build the OTP link emailed to users. */
   readonly publicApiBaseUrl = optional('PUBLIC_API_BASE_URL', 'http://localhost:3000');
+  readonly supabaseUrl = optional('SUPABASE_URL', '');
+  readonly supabaseServiceRoleKey = optional('SUPABASE_SERVICE_ROLE_KEY', '');
+  readonly supabaseStorageBucket = optional('SUPABASE_STORAGE_BUCKET', 'profile-photos');
 
   /**
    * Staging must never touch real money. This guard is evaluated at boot and

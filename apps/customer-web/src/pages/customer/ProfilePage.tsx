@@ -1,44 +1,14 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/context/AuthContext";
+import { request } from "@/services/api";
 
 export function ProfilePage() {
-  const { user, logout } = useAuth();
-  if (!user) return null;
-
-  return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
-      <h1 className="font-display text-xl font-semibold text-laupay-ink">Profile</h1>
-
-      <Card>
-        <dl className="flex flex-col gap-3 text-sm">
-          <Row label="Name" value={user.fullName} />
-          <Row label="Email" value={user.email} />
-          <Row label="Phone" value={user.phone} />
-          <Row label="Account type" value={user.role} />
-        </dl>
-      </Card>
-
-      <Link
-        to="/app/security"
-        className="rounded-lg border border-laupay-border bg-white px-4 py-3.5 text-sm font-medium text-laupay-ink hover:border-laupay-indigo"
-      >
-        Security — PIN, devices, notifications
-      </Link>
-
-      <Button variant="danger" onClick={logout} className="self-start">
-        Log out
-      </Button>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <dt className="text-laupay-ink-muted">{label}</dt>
-      <dd className="font-medium capitalize text-laupay-ink">{value}</dd>
-    </div>
-  );
+  const { user, refreshUser } = useAuth(); if (!user) return null;
+  const [fullName, setFullName] = useState(user.fullName); const [phone, setPhone] = useState(user.phone ?? ""); const [photo, setPhoto] = useState<string | undefined>(); const [removePhoto, setRemovePhoto] = useState(false); const [message, setMessage] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  async function save() { setBusy(true); setMessage(null); const result = await request<any>("/api/users/me", { method: "PATCH", body: { fullName, phone, ...(photo ? { profilePhotoData: photo } : {}), ...(removePhoto ? { removeProfilePhoto: "true" } : {}) } }); if (result.ok) await refreshUser(); setBusy(false); setMessage(result.ok ? "Profile updated." : result.error.message); }
+  return <div className="mx-auto flex max-w-lg flex-col gap-6"><h1 className="font-display text-xl font-semibold text-laupay-ink">Profile</h1><Card><div className="flex flex-col items-center gap-3"><UserAvatar user={{ ...user, ...(photo ? { profilePhotoUrl: photo } : {}), ...(removePhoto ? { profilePhotoUrl: null } : {}) }} size="lg" /><div className="flex gap-3"><label className="cursor-pointer text-sm font-medium text-laupay-indigo">Change profile photo<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { const file = e.target.files?.[0]; if (!file || file.size > 2 * 1024 * 1024) { setMessage("Choose a JPG, PNG or WebP image up to 2MB."); return; } const reader = new FileReader(); reader.onload = () => { setPhoto(String(reader.result)); setRemovePhoto(false); }; reader.readAsDataURL(file); }} /></label>{(user.profilePhotoUrl || photo) && <button type="button" className="text-sm text-laupay-danger" onClick={() => { setPhoto(undefined); setRemovePhoto(true); }}>Remove</button>}</div></div><div className="mt-6 flex flex-col gap-4"><Input label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} /><Input label="Email" value={user.email} readOnly /><Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} /><div className="grid grid-cols-2 gap-3 text-sm"><span className="text-laupay-ink-muted">Account type</span><span className="capitalize">{user.role}</span><span className="text-laupay-ink-muted">Status</span><span className="capitalize">{user.status.toLowerCase().replace("_", " ")}</span></div>{message && <p role="status" className="text-sm text-laupay-ink-muted">{message}</p>}<Button onClick={() => void save()} loading={busy}>{busy ? "Saving…" : "Save changes"}</Button></div></Card></div>;
 }

@@ -11,12 +11,14 @@ import type { ApiError, ApiResult } from "@/types/common";
  * a real security decision the integrating team should make on purpose.
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
-let accessToken: string | null = null;
+let accessToken: string | null = sessionStorage.getItem("laupay_access_token");
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+  if (token) sessionStorage.setItem("laupay_access_token", token);
+  else sessionStorage.removeItem("laupay_access_token");
 }
 
 /**
@@ -45,7 +47,7 @@ export async function request<T>(
     const res = await fetch(`${BASE_URL}${path}`, {
       method: options.method ?? "GET",
       headers: {
-        "Content-Type": "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
@@ -79,7 +81,7 @@ export async function request<T>(
       ok: false,
       error: {
         code: "NETWORK_ERROR",
-        message: "Couldn't reach LAUPAY. Check your connection and try again.",
+        message: "LAUPAY is temporarily unable to reach the service. Please try again.",
       },
     };
   }

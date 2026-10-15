@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { SecurityService } from './security.service';
 import { ChangePinDto, SetPinDto, VerifyPinDto } from './dto/security.dto';
@@ -44,4 +44,13 @@ export class SecurityController {
     await this.securityService.verifyPin(user.userId, dto.pin);
     return { verified: true };
   }
+
+  @Get('devices')
+  devices(@CurrentUser() user: AuthenticatedUser) { return this.securityService.getDevices(user.userId); }
+
+  @Post('devices/:id/revoke')
+  revokeDevice(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) { return this.securityService.revokeDevice(user.userId, id); }
+
+  @Get('notifications')
+  notifications(@CurrentUser() user: AuthenticatedUser) { return this.securityService.getNotifications(user.userId); }
 }

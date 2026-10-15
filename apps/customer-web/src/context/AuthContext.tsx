@@ -12,6 +12,7 @@ interface AuthContextValue {
   login: (payload: LoginPayload) => Promise<ApiError | null>;
   register: (payload: RegisterPayload) => Promise<ApiError | null>;
   logout: () => void;
+  refreshUser: () => Promise<ApiError | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -50,7 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (payload: LoginPayload) => {
     const result = await auth.login(payload);
     if (result.ok) {
-      setUser(result.data.user);
+      const profile = await auth.me();
+      if (!profile.ok) return profile.error;
+      setUser(profile.data);
       setStatus("authenticated");
       return null;
     }
@@ -60,8 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (payload: RegisterPayload) => {
     const result = await auth.register(payload);
     if (result.ok) {
-      setUser(result.data.user);
-      setStatus("authenticated");
+      setStatus("anonymous");
       return null;
     }
     return result.error;
@@ -73,9 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("anonymous");
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const result = await auth.me();
+    if (result.ok) { setUser(result.data); return null; }
+    return result.error;
+  }, []);
+
   const value = useMemo(
-    () => ({ user, status, login, register, logout }),
-    [user, status, login, register, logout],
+    () => ({ user, status, login, register, logout, refreshUser }),
+    [user, status, login, register, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -86,4 +94,3 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
 }
-

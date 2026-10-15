@@ -12,6 +12,9 @@ import { AppConfigService } from '../../config/app-config.service';
 import { PasswordHasher } from './password-hasher.service';
 import { RegisterDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
 import { OtpService } from './otp.service';
+import { Inject } from '@nestjs/common';
+import { MAIL_PROVIDER, MailProvider } from '../../common/mail/mail-provider.interface';
+import { ProfileStorageService } from '../../common/storage/profile-storage.service';
 
 export interface AuthTokens {
   accessToken: string;
@@ -28,6 +31,8 @@ export class AuthService {
     private readonly config: AppConfigService,
     private readonly passwordHasher: PasswordHasher,
     private readonly otp: OtpService,
+    @Inject(MAIL_PROVIDER) private readonly mail: MailProvider,
+    private readonly profileStorage: ProfileStorageService,
   ) {}
 
   /**
@@ -70,6 +75,9 @@ export class AuthService {
     }
 
     const passwordHash = await this.passwordHasher.hash(dto.password);
+    const profilePhotoUrl = dto.profilePhotoData
+      ? await this.profileStorage.save(dto.profilePhotoData)
+      : undefined;
 
     // User creation + wallet provisioning happen in one transaction: a user
     // must never exist without a corresponding wallet account, and vice versa.
@@ -81,7 +89,8 @@ export class AuthService {
             phone: dto.phone,
             passwordHash,
             fullName: dto.fullName,
-            role: UserRole.CUSTOMER,
+            role: dto.role === 'AGENT' ? UserRole.AGENT : UserRole.CUSTOMER,
+            profilePhotoUrl,
           },
         });
         await tx.walletAccount.create({
@@ -152,6 +161,25 @@ export class AuthService {
     return this.issueTokens(user.id, user.role);
   }
 
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const token = randomUUID() + randomBytes(32).toString('hex');
+      await this.prisma.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } });
+      await this.prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: this.hashToken(token), expiresAt: new Date(Date.now() + 30 * 60 * 1000) } });
+      await this.mail.sendPasswordReset({ to: user.email, fullName: user.fullName, resetUrl: `${this.config.publicApiBaseUrl}/reset-password?token=${encodeURIComponent(token)}` });
+    }
+    return { sent: true };
+  }
+
+  async resetPassword(token: string, password: string) {
+    const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash: this.hashToken(token) } });
+    if (!record || record.usedAt || record.expiresAt < new Date()) throw new UnauthorizedException('Invalid or expired reset link');
+    const passwordHash = await this.passwordHasher.hash(password);
+    await this.prisma.$transaction([this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash } }), this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }), this.prisma.refreshToken.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: new Date() } })]);
+    return { reset: true };
+  }
+
   async refresh(refreshToken: string): Promise<AuthTokens> {
     const tokenHash = this.hashToken(refreshToken);
     const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
@@ -204,6 +232,7 @@ export class AuthService {
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
+
 
   private async recordFailedLogin(email: string, userId?: string): Promise<void> {
     await this.prisma.auditLog.create({
