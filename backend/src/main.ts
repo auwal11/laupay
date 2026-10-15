@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { AppConfigService } from './config/app-config.service';
 
@@ -9,6 +10,7 @@ async function bootstrap() {
   const config = app.get(AppConfigService);
 
   app.use(helmet());
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
   app.enableCors({ origin: config.adminWebOrigin, credentials: true });
 
   // Strips/rejects any field not explicitly declared on a DTO — this is
