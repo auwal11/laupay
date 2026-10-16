@@ -22,8 +22,14 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Used by the Prisma CLI for migrations (migrate deploy/dev, db push), which
+  // need session-level advisory locks that the Supabase transaction pooler
+  // (pgbouncer, port 6543) does not provide. Point this at the SESSION pooler
+  // (port 5432) or the direct connection. The generated client uses `url` for
+  // runtime queries; only the migration engine uses `directUrl`.
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================================

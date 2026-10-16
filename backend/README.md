@@ -11,7 +11,11 @@ implemented yet.
 ```bash
 cd backend
 cp .env.example .env
-# edit .env — at minimum set DATABASE_URL to point at your Postgres instance
+# edit .env — set DATABASE_URL (runtime queries) and DIRECT_URL
+# (Prisma migrations) to point at your Postgres instance. On Supabase,
+# DATABASE_URL uses the transaction pooler (port 6543) and DIRECT_URL must
+# use the session pooler (port 5432) or the direct connection — see
+# backend/.env.example for why.
 
 npm install
 npx prisma generate
