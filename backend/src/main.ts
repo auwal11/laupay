@@ -27,7 +27,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  await app.listen(config.port);
+  await app.listen(config.port, '0.0.0.0');
   // eslint-disable-next-line no-console
   console.log(`LAUPAY backend listening on port ${config.port} (${config.nodeEnv})`);
 }
