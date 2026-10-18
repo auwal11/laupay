@@ -72,6 +72,27 @@ export class AppConfigService {
   readonly brevoSenderEmail = optional('BREVO_SENDER_EMAIL', 'no-reply@laupay.app');
   readonly brevoSenderName = optional('BREVO_SENDER_NAME', 'LAUPAY');
 
+  /**
+   * How VTU orders are fulfilled:
+   *   simulated     - debit the wallet, mark SUCCESS, never call a real provider
+   *   provider_test - call the provider's TEST/SANDBOX API, use its status
+   *   live          - real fulfillment (requires live keys)
+   * Defaults to `simulated` so nothing real can be purchased by accident.
+   */
+  readonly fulfillmentMode = optional('FULFILLMENT_MODE', 'simulated');
+  get isSimulatedFulfillment(): boolean {
+    return this.fulfillmentMode === 'simulated';
+  }
+
+  /**
+   * Optional one-time admin bootstrap. When both are set, the app ensures an
+   * ADMIN user with this email/password exists at boot (idempotent). Used to
+   * create the first admin on a fresh deployment without shell/DB access.
+   */
+  readonly adminBootstrapEmail = optional('ADMIN_EMAIL', '');
+  readonly adminBootstrapPassword = optional('ADMIN_PASSWORD', '');
+  readonly adminBootstrapName = optional('ADMIN_NAME', 'LAUPAY Admin');
+
   /** Base URL of THIS API, used to build the OTP link emailed to users. */
   readonly publicApiBaseUrl = optional('PUBLIC_API_BASE_URL', 'http://localhost:3000');
   readonly supabaseUrl = optional('SUPABASE_URL', '');

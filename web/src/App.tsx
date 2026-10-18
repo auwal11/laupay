@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { LookInsideShowcase } from './components/laupay/LookInsideShowcase';
 import { AuthProvider } from '@app/context/AuthContext';
+import { AdminAuthProvider } from '@app/admin/AdminAuthContext';
 import { appRoutes } from './app/AppRoutes';
 import NotFound from './pages/not-found';
 
@@ -797,11 +798,13 @@ function LaupayApp() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          {appRoutes}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AdminAuthProvider>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            {appRoutes}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AdminAuthProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -1,6 +1,7 @@
-import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PasswordHasher } from '../auth/password-hasher.service';
+import { CreditsService } from '../credits/credits.service';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -9,9 +10,12 @@ export type RiskDecision = 'allow' | 'verify' | 'hold' | 'reject';
 
 @Injectable()
 export class SecurityService {
+  private readonly logger = new Logger(SecurityService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwordHasher: PasswordHasher,
+    private readonly credits: CreditsService,
   ) {}
 
   async getPinStatus(userId: string) {
@@ -37,6 +41,16 @@ export class SecurityService {
       create: { userId, pinHash, pinSetAt: new Date() },
       update: { pinHash, pinSetAt: new Date(), failedPinAttempts: 0, pinLockedUntil: null },
     });
+
+    // The account is now ACTIVE with a PIN — the second of the two conditions
+    // for the one-shot automatic test credit (see CreditsService). Best-effort:
+    // a failure here must never fail PIN setup.
+    try {
+      await this.credits.maybeApplyAutoTestCredit(userId);
+    } catch (err) {
+      this.logger.warn(`Auto test credit skipped for ${userId}: ${String(err)}`);
+    }
+
     return { hasPin: true };
   }
 

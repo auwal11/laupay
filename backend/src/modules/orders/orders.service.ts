@@ -5,6 +5,7 @@ import { LedgerService } from '../ledger/ledger.service';
 import { VtuService } from '../vtu/vtu.service';
 import { SecurityService } from '../security/security.service';
 import { InsufficientBalanceError } from '../ledger/ledger.errors';
+import { AppConfigService } from '../../config/app-config.service';
 
 /** Orders that have already reached a terminal state — never re-touched by
  * async resolution once here (see reconcileVtuTransaction below). */
@@ -23,6 +24,7 @@ export class OrdersService {
     private readonly ledger: LedgerService,
     private readonly vtu: VtuService,
     private readonly security: SecurityService,
+    private readonly config: AppConfigService,
   ) {}
 
   /**
@@ -51,6 +53,7 @@ export class OrdersService {
         network,
         phoneNumber,
         amount,
+        mode: this.config.fulfillmentMode,
         idempotencyKey,
       },
     });
@@ -103,6 +106,7 @@ export class OrdersService {
         phoneNumber,
         dataPlanId,
         amount,
+        mode: this.config.fulfillmentMode,
         idempotencyKey,
       },
     });

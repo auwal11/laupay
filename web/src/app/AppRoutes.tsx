@@ -17,6 +17,18 @@ import { TransactionDetailPage } from '@app/pages/customer/TransactionDetailPage
 import { ReceiptPage } from '@app/pages/customer/ReceiptPage';
 import { ProfilePage } from '@app/pages/customer/ProfilePage';
 import { SecurityPage } from '@app/pages/customer/SecurityPage';
+import { AdminLoginPage } from '@app/pages/admin/AdminLoginPage';
+import { AdminOverviewPage } from '@app/pages/admin/AdminOverviewPage';
+import { AdminUsersPage } from '@app/pages/admin/AdminUsersPage';
+import { AdminUserDetailPage } from '@app/pages/admin/AdminUserDetailPage';
+import { AdminTransactionsPage } from '@app/pages/admin/AdminTransactionsPage';
+import { AdminTransactionDetailPage } from '@app/pages/admin/AdminTransactionDetailPage';
+import { AdminWalletsPage } from '@app/pages/admin/AdminWalletsPage';
+import { AdminOrdersPage } from '@app/pages/admin/AdminOrdersPage';
+import { AdminAuditPage } from '@app/pages/admin/AdminAuditPage';
+import { AdminSettingsPage } from '@app/pages/admin/AdminSettingsPage';
+import { AdminLayout } from '@app/admin/AdminLayout';
+import { AdminProtectedRoute } from '@app/admin/AdminProtectedRoute';
 
 function RoleAwareDashboard() {
   const { user } = useAuth();
@@ -52,6 +64,27 @@ export const appRoutes = (
       <Route path="receipt/:id" element={<ReceiptPage />} />
       <Route path="profile" element={<ProfilePage />} />
       <Route path="security" element={<SecurityPage />} />
+    </Route>
+
+    {/* Admin console — its own session, isolated from the customer app. */}
+    <Route path="/admin/login" element={<AdminLoginPage />} />
+    <Route
+      path="/admin"
+      element={
+        <AdminProtectedRoute>
+          <AdminLayout />
+        </AdminProtectedRoute>
+      }
+    >
+      <Route index element={<AdminOverviewPage />} />
+      <Route path="users" element={<AdminUsersPage />} />
+      <Route path="users/:id" element={<AdminUserDetailPage />} />
+      <Route path="transactions" element={<AdminTransactionsPage />} />
+      <Route path="transactions/:id" element={<AdminTransactionDetailPage />} />
+      <Route path="wallets" element={<AdminWalletsPage />} />
+      <Route path="orders" element={<AdminOrdersPage />} />
+      <Route path="audit" element={<AdminAuditPage />} />
+      <Route path="settings" element={<AdminSettingsPage />} />
     </Route>
   </>
 );

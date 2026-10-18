@@ -149,6 +149,10 @@ model User {
   role          UserRole   @default(CUSTOMER)
   status        UserStatus @default(PENDING_VERIFICATION)
 
+  /// Set once when an automatic test credit is granted (see AdminService),
+  /// so the "apply once after verify + PIN" grant can never double-apply.
+  testCreditGrantedAt DateTime?
+
   // Agent-specific profile fields live in AgentProfile (1:1, optional)
   agentProfile  AgentProfile?
 
@@ -160,6 +164,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   auditLogs     AuditLog[]     @relation("AuditActor")
   security      UserSecurity?
+  notifications Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -276,6 +281,16 @@ model LedgerEntry {
   balanceAfter  Decimal         @db.Decimal(18, 2) // snapshot for fast audit/reconciliation
   reason        LedgerReason
 
+  /// Human-readable line shown on statements/receipts, e.g.
+  /// "Test credit — Ibrahim Lau Provision Shop".
+  narrative String?
+  /// Machine source of the entry, e.g. "test_allocation", "order_payment".
+  source    String?
+  /// Execution mode the entry was booked under: test | simulated | live.
+  mode      String?
+  /// Admin who performed the action, when the entry is admin-initiated.
+  adminId   String?
+
   referenceType String? // e.g. "Order", "Payment"
   referenceId   String? // polymorphic FK, validated at application layer
 
@@ -285,6 +300,7 @@ model LedgerEntry {
 
   @@index([walletAccountId, createdAt])
   @@index([referenceType, referenceId])
+  @@index([source])
 }
 
 // ============================================================
@@ -354,6 +370,10 @@ model Order {
   dataPlanId   String?
   dataPlan     DataPlan? @relation(fields: [dataPlanId], references: [id])
   amount       Decimal   @db.Decimal(18, 2)
+
+  /// Fulfillment mode this order was placed under: simulated | provider_test | live.
+  /// Captured at creation so history stays truthful if the env mode changes.
+  mode         String?
 
   payments        Payment[]
   vtuTransaction  VtuTransaction?
@@ -445,4 +465,40 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([actorId, createdAt])
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+/// User-facing notification feed. Materialised (rather than derived from
+/// AuditLog) so the product can show narrative messages — e.g. a test credit
+/// from Ibrahim Lau Provision Shop, or an order receipt — with a read state.
+model Notification {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category String   @default("account") // account | wallet | order | security | system
+  title    String
+  body     String
+  metadata Json?
+  readAt   DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+// ============================================================
+// SYSTEM SETTINGS
+// ============================================================
+
+/// Small key/value store for runtime-tunable, non-secret system settings
+/// (e.g. auto_test_credit_enabled, auto_test_credit_amount). Secrets never
+/// live here — provider keys stay in environment variables only.
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedBy String?
+  updatedAt DateTime @updatedAt
 }

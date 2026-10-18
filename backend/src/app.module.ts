@@ -16,6 +16,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 import { SecurityModule } from './modules/security/security.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { CreditsModule } from './modules/credits/credits.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 @Module({
@@ -38,6 +40,8 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     AdminModule,
     ReconciliationModule,
     SecurityModule,
+    NotificationsModule,
+    CreditsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

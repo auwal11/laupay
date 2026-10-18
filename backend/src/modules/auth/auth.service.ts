@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -16,6 +17,7 @@ import { Inject } from '@nestjs/common';
 import { MAIL_PROVIDER, MailProvider } from '../../common/mail/mail-provider.interface';
 import { ProfileStorageService } from '../../common/storage/profile-storage.service';
 import { normalizeFullName } from '../../common/utils/name.util';
+import { CreditsService } from '../credits/credits.service';
 
 export interface AuthTokens {
   accessToken: string;
@@ -34,6 +36,7 @@ export class AuthService {
     private readonly otp: OtpService,
     @Inject(MAIL_PROVIDER) private readonly mail: MailProvider,
     private readonly profileStorage: ProfileStorageService,
+    private readonly credits: CreditsService,
   ) {}
 
   /**
@@ -46,6 +49,7 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid or expired verification code');
 
     if (user.status === 'ACTIVE') {
+      await this.tryAutoTestCredit(user.id);
       return this.issueTokens(user.id, user.role);
     }
 
@@ -74,7 +78,22 @@ export class AuthService {
       this.logger.warn(`Welcome email skipped for ${activated.id}: ${String(err)}`);
     }
 
+    await this.tryAutoTestCredit(activated.id);
+
     return this.issueTokens(activated.id, activated.role);
+  }
+
+  /**
+   * Applies the one-shot automatic test credit once the account is ACTIVE and
+   * a transaction PIN exists (see CreditsService). No-op unless enabled in
+   * admin settings; failures are swallowed so they can never block auth.
+   */
+  private async tryAutoTestCredit(userId: string): Promise<void> {
+    try {
+      await this.credits.maybeApplyAutoTestCredit(userId);
+    } catch (err) {
+      this.logger.warn(`Auto test credit skipped for ${userId}: ${String(err)}`);
+    }
   }
 
   async register(dto: RegisterDto) {
@@ -201,6 +220,59 @@ export class AuthService {
     });
 
     return this.issueTokens(user.id, user.role);
+  }
+
+  /**
+   * Admin-console login. Same credential checks as `login`, but tokens are
+   * only issued to an ADMIN/SUPPORT account — a normal customer that happens
+   * to hit /admin/login is rejected with 403 after the password is verified,
+   * so this cannot be used to enumerate admin emails.
+   */
+  async adminLogin(dto: LoginDto): Promise<AuthTokens & { role: UserRole }> {
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (!user) {
+      await this.recordFailedLogin(dto.email);
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const passwordOk = await this.passwordHasher.verify(user.passwordHash, dto.password);
+    if (!passwordOk) {
+      await this.recordFailedLogin(dto.email, user.id);
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPPORT) {
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: AuditAction.LOGIN_FAILED,
+          entityType: 'User',
+          entityId: user.id,
+          metadata: { reason: 'not_admin', surface: 'admin' },
+        },
+      });
+      throw new ForbiddenException('This account does not have admin access');
+    }
+
+    if (user.status === 'PENDING_VERIFICATION') {
+      await this.prisma.auditLog.create({
+        data: { actorId: user.id, action: AuditAction.LOGIN_FAILED, entityType: 'User', entityId: user.id },
+      });
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: AuditAction.LOGIN,
+        entityType: 'User',
+        entityId: user.id,
+        metadata: { surface: 'admin' },
+      },
+    });
+
+    const tokens = await this.issueTokens(user.id, user.role);
+    return { ...tokens, role: user.role };
   }
 
   async forgotPassword(email: string) {

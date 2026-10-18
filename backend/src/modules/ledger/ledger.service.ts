@@ -13,6 +13,14 @@ export interface LedgerEntryRequest {
   reason: LedgerReason;
   referenceType?: string;
   referenceId?: string;
+  /** Human-readable statement line, e.g. "Test credit — Ibrahim Lau Provision Shop". */
+  narrative?: string;
+  /** Machine source, e.g. "test_allocation", "order_payment". */
+  source?: string;
+  /** Execution mode: test | simulated | live. */
+  mode?: string;
+  /** Admin who initiated the entry, when admin-driven. */
+  adminId?: string;
   /**
    * MUST be unique per logical business event. Retrying the same request
    * with the same key is always safe — it returns the original result
@@ -135,6 +143,10 @@ export class LedgerService {
             amount,
             balanceAfter,
             reason: req.reason,
+            narrative: req.narrative,
+            source: req.source,
+            mode: req.mode,
+            adminId: req.adminId,
             referenceType: req.referenceType,
             referenceId: req.referenceId,
             idempotencyKey: req.idempotencyKey,
