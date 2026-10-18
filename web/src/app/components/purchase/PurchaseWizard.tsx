@@ -57,7 +57,7 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
         >
           {state.step === "select_network" && (
             <StepCard title={STEP_LABELS.select_network}>
-              <div className="grid grid-cols-2 gap-2">
+              {state.networksLoading ? <div role="status" aria-label="Loading networks" className="grid grid-cols-2 gap-2">{[1, 2, 3, 4].map((item) => <span key={item} className="h-12 animate-pulse rounded-md bg-laupay-surface-muted" />)}</div> : state.networks.length > 0 ? <div className="grid grid-cols-2 gap-2">
                 {state.networks.map((n) => (
                   <button
                     key={n.id}
@@ -67,7 +67,7 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
                     {n.name}
                   </button>
                 ))}
-              </div>
+              </div> : <div role="alert" className="text-sm text-laupay-danger"><p>Unable to load networks. Please try again.</p><button type="button" onClick={flow.loadNetworks} className="mt-3 font-medium underline">Retry</button></div>}
             </StepCard>
           )}
 
@@ -90,6 +90,15 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
                       {formatNaira(amount)}
                     </button>
                   ))}
+                </div>
+              ) : state.plansLoading ? (
+                <div role="status" aria-label="Loading data plans" className="flex flex-col gap-2">
+                  {[1, 2, 3].map((item) => <span key={item} className="h-12 animate-pulse rounded-md bg-laupay-surface-muted" />)}
+                </div>
+              ) : state.plansError ? (
+                <div role="alert" className="text-sm text-laupay-danger">
+                  <p>{state.plansError}</p>
+                  <button type="button" onClick={flow.retryPlans} className="mt-3 font-medium underline">Retry</button>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">

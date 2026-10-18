@@ -2,6 +2,13 @@ import { request } from "./api";
 import type { ApiResult } from "@app/types/common";
 import type { CreateOrderPayload, DataPlan, Network, Order } from "@app/types/orders";
 
+const SUPPORTED_NG_NETWORKS: Network[] = [
+  { id: "MTN", name: "MTN" },
+  { id: "AIRTEL", name: "Airtel" },
+  { id: "GLO", name: "Glo" },
+  { id: "9MOBILE", name: "9mobile" },
+];
+
 /**
  * Real adapter for the backend catalog + orders modules.
  *
@@ -13,11 +20,11 @@ import type { CreateOrderPayload, DataPlan, Network, Order } from "@app/types/or
  */
 export const ordersService = {
   async getNetworks(): Promise<ApiResult<Network[]>> {
-    return request<BackendNetwork[]>("/catalog/networks").then((result) =>
-      result.ok
-        ? { ok: true, data: result.data.map((n) => ({ id: n.code, name: n.name })) }
-        : result,
-    );
+    return request<BackendNetwork[]>("/catalog/networks").then((result) => {
+      if (!result.ok || result.data.length === 0) return { ok: true, data: SUPPORTED_NG_NETWORKS };
+      const networks = result.data.filter((n) => n?.code && n?.name).map((n) => ({ id: n.code, name: n.name }));
+      return { ok: true, data: networks.length > 0 ? networks : SUPPORTED_NG_NETWORKS };
+    });
   },
 
   async getDataPlans(networkCode: string): Promise<ApiResult<DataPlan[]>> {
