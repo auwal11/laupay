@@ -764,7 +764,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
           <div className="flex items-center gap-2.5"><FlowMark inverse /><span className="font-display text-[17px] font-extrabold tracking-[-.06em]">LAUPAY</span></div>
           <div className="flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-bold text-white/45"><a className="hover:text-white" href="#services">Services</a><a className="hover:text-white" href="#security">Security</a><a className="hover:text-white" href="#future">Our horizon</a><a href={`${CUSTOMER_APP_ORIGIN}/login`} className="hover:text-white">Login</a></div>
            <p className="text-[10px] font-semibold text-white/30">
-            © 2026 IBRAHIM LAU PROVISION SHOP
+            © 2026 LAUPAY — a service of Ibrahim Lau Provision Shop
           </p>
         </div>
 

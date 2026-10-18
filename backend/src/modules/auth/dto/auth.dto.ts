@@ -1,4 +1,9 @@
+import { Transform } from 'class-transformer';
 import { IsEmail, IsIn, IsOptional, IsString, Length, Matches, MinLength } from 'class-validator';
+
+/** Trims and collapses whitespace so stored names are always clean. */
+const cleanName = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value;
 
 export class RegisterDto {
   @IsEmail()
@@ -8,6 +13,7 @@ export class RegisterDto {
   @MinLength(8)
   password!: string;
 
+  @Transform(cleanName)
   @IsString()
   @MinLength(2)
   fullName!: string;

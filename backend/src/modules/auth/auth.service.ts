@@ -15,6 +15,7 @@ import { OtpService } from './otp.service';
 import { Inject } from '@nestjs/common';
 import { MAIL_PROVIDER, MailProvider } from '../../common/mail/mail-provider.interface';
 import { ProfileStorageService } from '../../common/storage/profile-storage.service';
+import { normalizeFullName } from '../../common/utils/name.util';
 
 export interface AuthTokens {
   accessToken: string;
@@ -65,6 +66,14 @@ export class AuthService {
       },
     });
 
+    // Best-effort welcome email: a mail hiccup must never block activation —
+    // the account is already ACTIVE and the client still gets its tokens.
+    try {
+      await this.mail.sendWelcome({ to: activated.email, fullName: activated.fullName });
+    } catch (err) {
+      this.logger.warn(`Welcome email skipped for ${activated.id}: ${String(err)}`);
+    }
+
     return this.issueTokens(activated.id, activated.role);
   }
 
@@ -107,7 +116,7 @@ export class AuthService {
               email: dto.email,
               phone: dto.phone,
               passwordHash,
-              fullName: dto.fullName,
+              fullName: normalizeFullName(dto.fullName),
               role: dto.role === 'AGENT' ? UserRole.AGENT : UserRole.CUSTOMER,
               profilePhotoUrl,
             },

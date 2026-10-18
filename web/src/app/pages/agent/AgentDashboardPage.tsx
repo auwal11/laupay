@@ -3,6 +3,7 @@ import { Smartphone, Wifi } from "lucide-react";
 import { BalanceCard } from "@app/components/wallet/BalanceCard";
 import { TransactionList } from "@app/components/wallet/TransactionList";
 import { useAuth } from "@app/context/AuthContext";
+import { firstNameFrom } from "@app/lib/name";
 
 export function AgentDashboardPage() {
   const { user } = useAuth();
@@ -11,7 +12,7 @@ export function AgentDashboardPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-xl font-semibold text-laupay-ink">
-          Hi {user?.fullName.split(" ")[0]}
+          Hi {firstNameFrom(user?.fullName)}
         </h1>
         <p className="text-sm text-laupay-ink-muted">Agent overview — wallet and recent sales.</p>
       </div>

@@ -1,6 +1,12 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { AppConfigService } from '../../config/app-config.service';
 import { MailProvider, VerificationMessage } from './mail-provider.interface';
+import {
+  passwordResetEmail,
+  verificationEmail,
+  welcomeEmail,
+  type RenderedEmail,
+} from './email-templates';
 
 /**
  * Brevo transactional email (staging/TEST). Uses the SMTP relay endpoint
@@ -16,6 +22,35 @@ export class BrevoMailProvider implements MailProvider {
   constructor(private readonly config: AppConfigService) {}
 
   async sendVerificationCode({ to, fullName, code }: VerificationMessage): Promise<void> {
+    await this.send(to, fullName, verificationEmail(fullName, code), 'verification');
+  }
+
+  async sendPasswordReset({
+    to,
+    fullName,
+    resetUrl,
+  }: {
+    to: string;
+    fullName: string;
+    resetUrl: string;
+  }): Promise<void> {
+    await this.send(to, fullName, passwordResetEmail(fullName, resetUrl), 'password reset');
+  }
+
+  async sendWelcome({ to, fullName }: { to: string; fullName: string }): Promise<void> {
+    await this.send(to, fullName, welcomeEmail(fullName), 'welcome');
+  }
+
+  /**
+   * Single send path for every message: one place for the sender identity,
+   * the allow-list handling and the "never leak a raw provider error" rule.
+   */
+  private async send(
+    to: string,
+    fullName: string,
+    { subject, html }: RenderedEmail,
+    kind: string,
+  ): Promise<void> {
     let response: Response;
     try {
       response = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -24,41 +59,28 @@ export class BrevoMailProvider implements MailProvider {
         body: JSON.stringify({
           sender: { email: this.config.brevoSenderEmail, name: this.config.brevoSenderName },
           to: [{ email: to, name: fullName }],
-          subject: `Your LAUPAY verification code: ${code}`,
-          htmlContent: `
-          <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">
-            <h2 style="color:#171A4A;margin:0 0 8px">Verify your email</h2>
-            <p style="color:#5B5E80;font-size:14px">Hi ${fullName}, use this code to finish creating your LAUPAY account.</p>
-            <div style="background:#F4B33F;color:#171A4A;font-size:32px;letter-spacing:8px;
-                        font-weight:700;text-align:center;padding:16px;border-radius:12px">${code}</div>
-            <p style="color:#5B5E80;font-size:13px;margin-top:16px">
-              This code expires in 10 minutes. If you did not create an account, ignore this email.
-            </p>
-          </div>`,
+          subject,
+          htmlContent: html,
         }),
       });
     } catch (err) {
-      this.logger.error(`Brevo transport error: ${String(err)}`);
-      throw new ServiceUnavailableException('Could not send verification email');
+      this.logger.error(`Brevo transport error (${kind}): ${String(err)}`);
+      throw new ServiceUnavailableException('Could not send email');
     }
 
     if (!response.ok) {
       const text = await response.text();
-      this.logger.error(`Brevo send failed (${response.status}): ${text}`);
+      this.logger.error(`Brevo ${kind} send failed (${response.status}): ${text}`);
       if (response.status === 401) {
         this.logger.error(
           'Brevo rejected the key — check BREVO_API_KEY and the account IP allow-list.',
         );
       }
-      throw new ServiceUnavailableException('Could not send verification email');
+      // Deliberately generic: the provider response never reaches the client.
+      throw new ServiceUnavailableException('Could not send email');
     }
 
     const body = (await response.json()) as { messageId?: string };
-    this.logger.log(`Brevo verification email accepted: ${body.messageId ?? 'ok'}`);
-  }
-
-  async sendPasswordReset({ to, fullName, resetUrl }: { to: string; fullName: string; resetUrl: string }): Promise<void> {
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', { method: 'POST', headers: { 'api-key': this.config.brevoApiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: { email: this.config.brevoSenderEmail, name: this.config.brevoSenderName }, to: [{ email: to, name: fullName }], subject: 'Reset your LAUPAY password', htmlContent: `<p>Hi ${fullName},</p><p><a href="${resetUrl}">Reset your LAUPAY password</a></p><p>This link expires in 30 minutes.</p>` }) });
-    if (!response.ok) throw new ServiceUnavailableException('Could not send password reset email');
+    this.logger.log(`Brevo ${kind} email accepted: ${body.messageId ?? 'ok'}`);
   }
 }

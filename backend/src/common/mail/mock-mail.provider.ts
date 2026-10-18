@@ -18,6 +18,10 @@ export class MockMailProvider implements MailProvider {
 
   async sendPasswordReset(): Promise<void> {}
 
+  async sendWelcome({ to }: { to: string; fullName: string }): Promise<void> {
+    this.logger.debug(`[mock-mail] welcome email for ${to}`);
+  }
+
   /** Last code sent to an address — used by the E2E suite. */
   static lastCodeFor(to: string): string | undefined {
     return [...MockMailProvider.sent].reverse().find((m) => m.to === to)?.code;

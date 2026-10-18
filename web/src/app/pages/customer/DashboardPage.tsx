@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { BalanceCard } from "@app/components/wallet/BalanceCard";
 import { TransactionList } from "@app/components/wallet/TransactionList";
 import { useAuth } from "@app/context/AuthContext";
+import { firstNameFrom } from "@app/lib/name";
 
 const QUICK_ACTIONS: { to: string; icon: LucideIcon; label: string; ready: boolean }[] = [
   { to: "/app/airtime", icon: Smartphone, label: "Airtime", ready: true },
@@ -24,7 +25,7 @@ export function DashboardPage() {
           Built for everyday payments
         </p>
         <h1 className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-laupay-ink">
-          Hi {user?.fullName.split(" ")[0]}
+          Hi {firstNameFrom(user?.fullName)}
         </h1>
         <p className="text-sm text-laupay-ink-muted">Here's what's happening with your account.</p>
       </div>
@@ -64,11 +65,8 @@ function QuickAction({
   label: string;
   ready: boolean;
 }) {
-  return (
-    <Link
-      to={to}
-      className="group flex flex-col items-center gap-2 rounded-xl border border-laupay-border bg-white px-2 py-4 shadow-card transition-colors hover:border-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo"
-    >
+  const inner = (
+    <>
       <span
         className={
           ready
@@ -79,6 +77,31 @@ function QuickAction({
         <Icon size={18} aria-hidden="true" />
       </span>
       <span className="text-xs font-semibold text-laupay-ink">{label}</span>
+      {!ready && (
+        <span className="rounded-full bg-laupay-amber-soft px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#8a5a00]">
+          Coming soon
+        </span>
+      )}
+    </>
+  );
+
+  if (!ready) {
+    return (
+      <div
+        aria-disabled="true"
+        className="flex cursor-not-allowed flex-col items-center gap-2 rounded-xl border border-dashed border-laupay-border bg-laupay-surface-muted/60 px-2 py-4 text-center"
+      >
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to={to}
+      className="group flex flex-col items-center gap-2 rounded-xl border border-laupay-border bg-white px-2 py-4 shadow-card transition-colors hover:border-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo"
+    >
+      {inner}
     </Link>
   );
 }

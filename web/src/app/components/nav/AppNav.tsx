@@ -307,7 +307,6 @@ function SidebarLink({
       to={item.to}
       end={end}
       onClick={onNavigate}
-      title={expanded ? undefined : item.label}
       className={({ isActive }) =>
         cn(
           "group/item relative flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium",
