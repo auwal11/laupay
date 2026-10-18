@@ -72,7 +72,7 @@ function BrandPanel({ children }: { children: ReactNode }) {
           <span className="text-laupay-amber">One simple flow.</span>
         </h2>
         <p className="mt-5 text-[15px] leading-7 text-white/60">
-          Airtime, data, payments, wallet and POS — connected so your next
+          Airtime, data, payments and your wallet — connected so your next
           transaction feels clear from the start.
         </p>
       </div>
