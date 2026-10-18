@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import * as bodyParser from 'body-parser';
 import type { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import { join } from 'path';
@@ -8,8 +9,16 @@ import { AppModule } from './app.module';
 import { AppConfigService } from './config/app-config.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   const config = app.get(AppConfigService);
+
+  // Paystack signs the exact bytes received over HTTP. Capture them before
+  // JSON parsing; re-serialising req.body can change whitespace/key order.
+  app.use(bodyParser.json({
+    verify: (req, _res, buffer) => {
+      (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    },
+  }));
 
   app.use(helmet());
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });

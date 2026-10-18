@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import { Prisma } from '@prisma/client';
 import {
   BadRequestException,
   Body,
@@ -18,6 +19,21 @@ import { PaymentsService } from '../payments/payments.service';
 import { OrdersService } from '../orders/orders.service';
 
 const mockVerifier = new MockWebhookVerifier();
+
+type RawBodyRequest = Request & { rawBody?: Buffer };
+
+interface PaystackWebhook {
+  event?: string;
+  data?: { id?: string | number; reference?: string; status?: string };
+}
+
+interface VtpassCallback {
+  type?: string;
+  data?: {
+    requestId?: string;
+    content?: { transactions?: { transactionId?: string; status?: string } };
+  };
+}
 
 /**
  * See docs/architecture/payment-flow.md §4. Every inbound provider event:
@@ -42,33 +58,28 @@ export class WebhooksController {
    * Paystack signature check: HMAC-SHA512(rawBody, PAYSTACK_WEBHOOK_SECRET),
    * compared in constant time against `x-paystack-signature`.
    */
-  private verifyPaystack(rawBody: string, signature: string | undefined): boolean {
+  private verifyPaystack(rawBody: Buffer, signature: string | undefined): boolean {
     if (!signature || !this.config.paystackWebhookSecret) return false;
     const expected = createHmac('sha512', this.config.paystackWebhookSecret)
       .update(rawBody)
       .digest('hex');
-    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+    const actual = Buffer.from(signature, 'utf8');
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    return actual.length === expectedBuffer.length && timingSafeEqual(expectedBuffer, actual);
   }
 
   /**
    * Monnify signature check: HMAC-SHA512(rawBody, MONNIFY_SECRET_KEY) against
    * `monnify-signature` (Monnify derives the HMAC from the secret key itself).
    */
-  private verifyMonnify(rawBody: string, signature: string | undefined): boolean {
+  private verifyMonnify(rawBody: Buffer, signature: string | undefined): boolean {
     if (!signature || !this.config.monnifySecretKey) return false;
     const expected = createHmac('sha512', this.config.monnifySecretKey)
       .update(rawBody)
       .digest('hex');
-    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-  }
-
-  /** VTpass sends `x-vtpass-signature` = HMAC-SHA512(rawBody, secret). */
-  private verifyVtpass(rawBody: string, signature: string | undefined): boolean {
-    if (!signature || !this.config.vtpassWebhookSecret) return false;
-    const expected = createHmac('sha512', this.config.vtpassWebhookSecret)
-      .update(rawBody)
-      .digest('hex');
-    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+    const actual = Buffer.from(signature, 'utf8');
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    return actual.length === expectedBuffer.length && timingSafeEqual(expectedBuffer, actual);
   }
 
   /**
@@ -87,24 +98,31 @@ export class WebhooksController {
 
   @Post('payment')
   async handlePaymentWebhook(
-    @Req() req: Request,
+    @Req() req: RawBodyRequest,
     @Headers('x-paystack-signature') paystackSig: string | undefined,
     @Headers('monnify-signature') monnifySig: string | undefined,
     @Headers('x-webhook-signature') legacySig: string | undefined,
-    @Body() body: { providerEventId: string; providerReference: string; status: string },
+    @Body() body: PaystackWebhook,
   ) {
-    const rawBody = JSON.stringify(body);
+    const rawBody = req.rawBody;
+    if (!rawBody) throw new BadRequestException('Missing raw request body');
     const verified =
       this.verifyPaystack(rawBody, paystackSig) ||
       this.verifyMonnify(rawBody, monnifySig) ||
       // legacy mock signature keeps the existing E2E suite working
-      mockVerifier.verify(rawBody, legacySig);
+      (this.config.nodeEnv !== 'production' && mockVerifier.verify(rawBody.toString('utf8'), legacySig));
     if (!verified) {
       throw new BadRequestException('Invalid webhook signature');
     }
 
+    const providerReference = body.data?.reference;
+    const providerEventId = body.data?.id != null ? `${body.event ?? 'paystack'}:${body.data.id}` : `${body.event ?? 'paystack'}:${providerReference ?? ''}`;
+    if (!body.event || !providerReference || !providerEventId || providerEventId.endsWith(':')) {
+      throw new BadRequestException('Invalid Paystack event payload');
+    }
+
     const payment = await this.prisma.payment.findUnique({
-      where: { providerReference: body.providerReference },
+      where: { providerReference },
     });
     if (!payment) throw new BadRequestException('Unknown payment reference');
 
@@ -112,9 +130,9 @@ export class WebhooksController {
       await this.prisma.paymentEvent.create({
         data: {
           paymentId: payment.id,
-          provider: 'mock',
-          providerEventId: body.providerEventId,
-          rawPayload: body,
+          provider: 'paystack',
+          providerEventId,
+          rawPayload: body as Prisma.InputJsonValue,
         },
       });
     } catch (err) {
@@ -124,8 +142,10 @@ export class WebhooksController {
       throw err;
     }
 
-    await this.paymentsService.requeryPayment(payment.id);
-    return { status: 'processed' };
+    // Do not trust data.status from the callback. The provider adapter
+    // re-queries Paystack and only that verified result can credit the wallet.
+    void this.paymentsService.requeryPayment(payment.id).catch(() => undefined);
+    return { status: 'accepted' };
   }
 
   /**
@@ -146,22 +166,20 @@ export class WebhooksController {
    */
   @Post('vtu')
   async handleVtuWebhook(
-    @Headers('x-vtpass-signature') vtpassSig: string | undefined,
-    @Headers('x-webhook-signature') legacySig: string | undefined,
-    @Body() body: { providerReference: string; status: string },
+    @Body() body: VtpassCallback,
   ) {
-    const rawBody = JSON.stringify(body);
-    if (!this.verifyVtpass(rawBody, vtpassSig) && !mockVerifier.verify(rawBody, legacySig)) {
-      throw new BadRequestException('Invalid webhook signature');
-    }
+    if (!body.type || !body.data) throw new BadRequestException('Invalid VTpass callback payload');
+    if (body.type !== 'transaction-update') return { response: 'success' };
 
-    const txn = await this.prisma.vtuTransaction.findUnique({
-      where: { providerReference: body.providerReference },
-    });
+    const providerReference = body.data.content?.transactions?.transactionId;
+    if (!providerReference) throw new BadRequestException('Missing VTpass transactionId');
+    const txn = await this.prisma.vtuTransaction.findUnique({ where: { providerReference } });
     if (!txn) throw new BadRequestException('Unknown VTU transaction reference');
 
-    await this.ordersService.reconcileVtuTransaction(txn.id);
-    return { status: 'processed' };
+    // VTpass documents no signing header/secret. Never trust its status field;
+    // reconcileVtuTransaction re-queries the provider before changing state.
+    void this.ordersService.reconcileVtuTransaction(txn.id).catch(() => undefined);
+    return { response: 'success' };
   }
 
   private isDuplicateEvent(err: unknown): boolean {

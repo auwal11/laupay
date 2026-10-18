@@ -1,0 +1,91 @@
+import { createHmac } from 'crypto';
+import { WebhooksController } from './webhooks.controller';
+
+function signature(body: Buffer, secret: string): string {
+  return createHmac('sha512', secret).update(body).digest('hex');
+}
+
+describe('WebhooksController provider callbacks', () => {
+  const paystackSecret = 'paystack-test-webhook-secret';
+  const config = {
+    nodeEnv: 'production',
+    paystackWebhookSecret: paystackSecret,
+    monnifySecretKey: '',
+  } as any;
+
+  it('accepts a documented Paystack payload signed over the exact raw bytes', async () => {
+    const body = Buffer.from('{"event":"charge.success","data":{"id":123,"reference":"LAU_123","status":"success"}}');
+    const payment = { id: 'payment-1', providerReference: 'LAU_123' };
+    const prisma = {
+      payment: { findUnique: jest.fn().mockResolvedValue(payment) },
+      paymentEvent: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const payments = { requeryPayment: jest.fn().mockResolvedValue(undefined) };
+    const controller = new WebhooksController(config, prisma as any, payments as any, {} as any);
+
+    await expect(controller.handlePaymentWebhook(
+      { rawBody: body } as any,
+      signature(body, paystackSecret),
+      undefined,
+      undefined,
+      JSON.parse(body.toString()),
+    )).resolves.toEqual({ status: 'accepted' });
+    expect(payments.requeryPayment).toHaveBeenCalledWith(payment.id);
+  });
+
+  it('rejects a Paystack signature made from altered bytes', async () => {
+    const body = Buffer.from('{"event":"charge.success","data":{"id":123,"reference":"LAU_123"}}');
+    const controller = new WebhooksController(config, {} as any, {} as any, {} as any);
+    await expect(controller.handlePaymentWebhook(
+      { rawBody: Buffer.from('{ "event":"charge.success","data":{"id":123,"reference":"LAU_123"}}') } as any,
+      signature(body, paystackSecret),
+      undefined,
+      undefined,
+      JSON.parse(body.toString()),
+    )).rejects.toThrow('Invalid webhook signature');
+  });
+
+  it('ignores a duplicate Paystack event without reprocessing it', async () => {
+    const body = Buffer.from('{"event":"charge.success","data":{"id":456,"reference":"LAU_DUP"}}');
+    const prisma = {
+      payment: { findUnique: jest.fn().mockResolvedValue({ id: 'payment-2' }) },
+      paymentEvent: { create: jest.fn().mockRejectedValue({ code: 'P2002' }) },
+    };
+    const payments = { requeryPayment: jest.fn() };
+    const controller = new WebhooksController(config, prisma as any, payments as any, {} as any);
+    await expect(controller.handlePaymentWebhook(
+      { rawBody: body } as any,
+      signature(body, paystackSecret),
+      undefined,
+      undefined,
+      JSON.parse(body.toString()),
+    )).resolves.toEqual({ status: 'ignored_duplicate' });
+    expect(payments.requeryPayment).not.toHaveBeenCalled();
+  });
+
+  it('accepts the documented VTpass transaction-update payload and re-queries server-side', async () => {
+    const prisma = {
+      vtuTransaction: { findUnique: jest.fn().mockResolvedValue({ id: 'vtu-1', providerReference: 'VT-123' }) },
+    };
+    const orders = { reconcileVtuTransaction: jest.fn().mockResolvedValue(undefined) };
+    const controller = new WebhooksController(config, prisma as any, {} as any, orders as any);
+    const payload = {
+      type: 'transaction-update',
+      data: {
+        code: '000',
+        content: { transactions: { status: 'delivered', transactionId: 'VT-123' } },
+        requestId: 'LAU_REQUEST_123',
+        response_description: 'TRANSACTION DELIVERED',
+      },
+    };
+
+    await expect(controller.handleVtuWebhook(payload)).resolves.toEqual({ response: 'success' });
+    expect(orders.reconcileVtuTransaction).toHaveBeenCalledWith('vtu-1');
+  });
+
+  it('rejects a VTpass callback without the documented transaction id', async () => {
+    const controller = new WebhooksController(config, { vtuTransaction: { findUnique: jest.fn() } } as any, {} as any, {} as any);
+    await expect(controller.handleVtuWebhook({ type: 'transaction-update', data: { content: { transactions: { status: 'delivered' } } } }))
+      .rejects.toThrow('Missing VTpass transactionId');
+  });
+});
