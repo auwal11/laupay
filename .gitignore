@@ -48,3 +48,4 @@ apps/mobile/.packages
 *.key
 .vercel
 .env*
+.vite
