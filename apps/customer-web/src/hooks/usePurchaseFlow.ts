@@ -30,6 +30,11 @@ interface PurchaseFlowState {
 
 const AIRTIME_AMOUNTS = ["100", "200", "500", "1000", "2000"];
 
+const unexpectedPurchaseError: ApiError = {
+  code: "PURCHASE_FAILED",
+  message: "We could not complete this purchase. Please try again.",
+};
+
 function initialState(): PurchaseFlowState {
   return {
     step: "select_network",
@@ -110,7 +115,8 @@ export function usePurchaseFlow(kind: PurchaseKind) {
         } else {
           setState((prev) => ({ ...prev, error: result.error, step: "result" }));
         }
-      });
+      })
+      .catch(() => setState((prev) => ({ ...prev, error: unexpectedPurchaseError, step: "result" })));
   }, [kind, state.networkId, state.phoneNumber, state.amount, state.planId, state.idempotencyKey, state.pin, routeOrderResult]);
 
   /** Submits the PIN/OTP the backend's VERIFY decision asked for. Same idempotency key resolves the same order. */
@@ -140,7 +146,8 @@ export function usePurchaseFlow(kind: PurchaseKind) {
           } else {
             setState((prev) => ({ ...prev, error: result.error, step: "result" }));
           }
-        });
+        })
+        .catch(() => setState((prev) => ({ ...prev, error: unexpectedPurchaseError, step: "result" })));
     },
     [kind, state.networkId, state.phoneNumber, state.amount, state.planId, state.idempotencyKey],
   );
