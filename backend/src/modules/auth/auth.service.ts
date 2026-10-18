@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AuditAction, UserRole, WalletOwnerType } from '@prisma/client';
+import { AuditAction, Prisma, User, UserRole, WalletOwnerType } from '@prisma/client';
 import { randomUUID, randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
@@ -73,6 +73,14 @@ export class AuthService {
     if (existing) {
       throw new ConflictException('An account with this email already exists');
     }
+    if (dto.phone) {
+      // phone is @unique in the schema; check up-front for a friendly error
+      // rather than letting the insert fail with a raw constraint error.
+      const existingPhone = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+      if (existingPhone) {
+        throw new ConflictException('An account with this phone number already exists');
+      }
+    }
 
     const passwordHash = await this.passwordHasher.hash(dto.password);
     const profilePhotoUrl = dto.profilePhotoData
@@ -81,40 +89,54 @@ export class AuthService {
 
     // User creation + wallet provisioning happen in one transaction: a user
     // must never exist without a corresponding wallet account, and vice versa.
-    const user = await this.prisma.$transaction(
-      async (tx) => {
-        const created = await tx.user.create({
-          data: {
-            email: dto.email,
-            phone: dto.phone,
-            passwordHash,
-            fullName: dto.fullName,
-            role: dto.role === 'AGENT' ? UserRole.AGENT : UserRole.CUSTOMER,
-            profilePhotoUrl,
-          },
-        });
-        await tx.walletAccount.create({
-          data: {
-            ownerId: created.id,
-            ownerType: WalletOwnerType.USER,
-          },
-        });
-        await tx.auditLog.create({
-          data: {
-            actorId: created.id,
-            action: AuditAction.CREATE,
-            entityType: 'User',
-            entityId: created.id,
-          },
-        });
-        return created;
-      },
-      // Interactive transactions default to 5s, which is fine on localhost but
-      // too short for a WAN round-trip to a managed Postgres (Supabase pooler).
-      // The password hash above is computed BEFORE the transaction opens, so
-      // argon2's CPU cost never counts against this budget.
-      PrismaService.txOptions(),
-    );
+    let user: User;
+    try {
+      user = await this.prisma.$transaction(
+        async (tx) => {
+          const created = await tx.user.create({
+            data: {
+              email: dto.email,
+              phone: dto.phone,
+              passwordHash,
+              fullName: dto.fullName,
+              role: dto.role === 'AGENT' ? UserRole.AGENT : UserRole.CUSTOMER,
+              profilePhotoUrl,
+            },
+          });
+          await tx.walletAccount.create({
+            data: {
+              ownerId: created.id,
+              ownerType: WalletOwnerType.USER,
+            },
+          });
+          await tx.auditLog.create({
+            data: {
+              actorId: created.id,
+              action: AuditAction.CREATE,
+              entityType: 'User',
+              entityId: created.id,
+            },
+          });
+          return created;
+        },
+        // Interactive transactions default to 5s, which is fine on localhost but
+        // too short for a WAN round-trip to a managed Postgres (Supabase pooler).
+        // The password hash above is computed BEFORE the transaction opens, so
+        // argon2's CPU cost never counts against this budget.
+        PrismaService.txOptions(),
+      );
+    } catch (err) {
+      // A race between the pre-checks above and the insert still surfaces as a
+      // raw unique-constraint (P2002); map it to a 409 instead of a 500.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException(
+          String(err.meta?.target ?? '').includes('phone')
+            ? 'An account with this phone number already exists'
+            : 'An account with this email already exists',
+        );
+      }
+      throw err;
+    }
 
     this.logger.log(`New user registered: ${user.id}`);
 
