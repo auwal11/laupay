@@ -83,9 +83,18 @@ export class AuthService {
     }
 
     const passwordHash = await this.passwordHasher.hash(dto.password);
-    const profilePhotoUrl = dto.profilePhotoData
-      ? await this.profileStorage.save(dto.profilePhotoData)
-      : undefined;
+
+    // A profile photo is optional. Storage being unavailable (misconfigured
+    // bucket, outage) must never block account creation — log it and continue
+    // without the photo rather than failing the whole registration.
+    let profilePhotoUrl: string | undefined;
+    if (dto.profilePhotoData) {
+      try {
+        profilePhotoUrl = await this.profileStorage.save(dto.profilePhotoData);
+      } catch (err) {
+        this.logger.warn(`Profile photo upload skipped during registration: ${String(err)}`);
+      }
+    }
 
     // User creation + wallet provisioning happen in one transaction: a user
     // must never exist without a corresponding wallet account, and vice versa.
