@@ -18,10 +18,9 @@ class CreateAirtimeOrderDto {
   @IsString()
   idempotencyKey!: string;
 
-  @IsOptional()
   @IsString()
   @Matches(/^\d{4}$/)
-  pin?: string;
+  pin!: string;
 }
 
 class CreateDataOrderDto {
@@ -37,10 +36,9 @@ class CreateDataOrderDto {
   @IsString()
   idempotencyKey!: string;
 
-  @IsOptional()
   @IsString()
   @Matches(/^\d{4}$/)
-  pin?: string;
+  pin!: string;
 }
 
 @UseGuards(JwtAuthGuard)
