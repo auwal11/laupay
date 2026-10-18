@@ -772,8 +772,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
             readable in both light and dark. Opens in a new tab and is safe
             to follow (noopener/noreferrer). */}
         <div className="border-t border-white/[.08]">
-          <div className="section-shell flex flex-col items-center justify-between gap-2 py-4 text-[10px] font-semibold text-white/35 sm:flex-row">
-            <span>Digital services, simply connected.</span>
+          <div className="section-shell flex items-center justify-center py-4 text-[10px] font-semibold text-white/35">
             <a
               href="https://auwalbussines.vercel.app"
               target="_blank"
