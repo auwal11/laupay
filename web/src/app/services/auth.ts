@@ -5,22 +5,28 @@ import type {
   AuthUser,
   ForgotPasswordPayload,
   LoginPayload,
+  OtpPayload,
   RegisterPayload,
+  RegistrationReceipt,
 } from "@app/types/auth";
 
+const REFRESH_KEY = "laupay_refresh_token";
+
 /**
- * Real adapter for POST /auth/register, POST /auth/login, GET /me.
- * Expected backend endpoints — confirm exact shapes with the backend agent
- * before wiring this up for real; response field names below are assumptions.
+ * Real adapter for the backend auth module. Paths are relative to
+ * VITE_API_BASE_URL (which includes the `/api` prefix).
+ *
+ * Registration does NOT issue tokens — the account stays PENDING_VERIFICATION
+ * until POST /auth/verify-otp succeeds, then the user logs in.
  */
 export const authService = {
-  async register(payload: RegisterPayload): Promise<ApiResult<AuthSession>> {
-    const result = await request<AuthSession>("/auth/register", {
+  async register(payload: RegisterPayload): Promise<ApiResult<RegistrationReceipt>> {
+    // confirmPassword is a UI-only concern; the backend never receives it.
+    const { confirmPassword: _confirmPassword, role, ...rest } = payload;
+    return request<RegistrationReceipt>("/auth/register", {
       method: "POST",
-      body: payload,
+      body: { ...rest, role: role.toUpperCase() },
     });
-    if (result.ok) setAccessToken(result.data.tokens.accessToken);
-    return result;
   },
 
   async login(payload: LoginPayload): Promise<ApiResult<AuthSession>> {
@@ -28,12 +34,42 @@ export const authService = {
       method: "POST",
       body: payload,
     });
-    if (result.ok) setAccessToken(result.data.tokens.accessToken);
+    if (result.ok) {
+      setAccessToken(result.data.accessToken);
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(REFRESH_KEY, result.data.refreshToken);
+      }
+    }
     return result;
   },
 
   async me(): Promise<ApiResult<AuthUser>> {
-    return request<AuthUser>("/me");
+    return request<AuthUser>("/auth/me");
+  },
+
+  async verifyOtp(payload: OtpPayload): Promise<ApiResult<AuthSession>> {
+    const result = await request<AuthSession>("/auth/verify-otp", {
+      method: "POST",
+      body: payload,
+    });
+    // Verification only activates the account; the product flow logs in next,
+    // so we deliberately do not create an authenticated session here.
+    if (result.ok) {
+      setAccessToken(null);
+      if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(REFRESH_KEY);
+    }
+    return result;
+  },
+
+  async resendOtp(email: string): Promise<ApiResult<{ sent: true }>> {
+    return request<{ sent: true }>("/auth/resend-otp", { method: "POST", body: { email } });
+  },
+
+  async resetPassword(token: string, password: string): Promise<ApiResult<{ reset: true }>> {
+    return request<{ reset: true }>("/auth/reset-password", {
+      method: "POST",
+      body: { token, password },
+    });
   },
 
   async forgotPassword(payload: ForgotPasswordPayload): Promise<ApiResult<{ sent: true }>> {
@@ -45,5 +81,6 @@ export const authService = {
 
   logout(): void {
     setAccessToken(null);
+    if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(REFRESH_KEY);
   },
 };

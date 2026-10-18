@@ -11,12 +11,18 @@ import type { ApiError, ApiResult } from "@app/types/common";
  * a real security decision the integrating team should make on purpose.
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
-let accessToken: string | null = null;
+// Persisted so a page reload keeps the session; the refresh token lives
+// separately (see services/auth.ts) and the backend remains authoritative.
+let accessToken: string | null =
+  typeof sessionStorage !== "undefined" ? sessionStorage.getItem("laupay_access_token") : null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+  if (typeof sessionStorage === "undefined") return;
+  if (token) sessionStorage.setItem("laupay_access_token", token);
+  else sessionStorage.removeItem("laupay_access_token");
 }
 
 /**
@@ -45,7 +51,7 @@ export async function request<T>(
     const res = await fetch(`${BASE_URL}${path}`, {
       method: options.method ?? "GET",
       headers: {
-        "Content-Type": "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,

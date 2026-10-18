@@ -46,3 +46,5 @@ apps/mobile/.packages
 # Never commit secrets
 *.pem
 *.key
+.vercel
+.env*

@@ -12,6 +12,7 @@ interface AuthContextValue {
   login: (payload: LoginPayload) => Promise<ApiError | null>;
   register: (payload: RegisterPayload) => Promise<ApiError | null>;
   logout: () => void;
+  refreshUser: () => Promise<ApiError | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -49,19 +50,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (payload: LoginPayload) => {
     const result = await auth.login(payload);
-    if (result.ok) {
-      setUser(result.data.user);
-      setStatus("authenticated");
-      return null;
-    }
-    return result.error;
+    if (!result.ok) return result.error;
+    // Login returns tokens only — fetch the profile to populate the session.
+    const profile = await auth.me();
+    if (!profile.ok) return profile.error;
+    setUser(profile.data);
+    setStatus("authenticated");
+    return null;
   }, []);
 
   const register = useCallback(async (payload: RegisterPayload) => {
     const result = await auth.register(payload);
     if (result.ok) {
-      setUser(result.data.user);
-      setStatus("authenticated");
+      // Account is created PENDING_VERIFICATION and is NOT signed in yet —
+      // the caller must route the user through email verification + login.
+      setStatus("anonymous");
       return null;
     }
     return result.error;
@@ -73,9 +76,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("anonymous");
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const result = await auth.me();
+    if (result.ok) {
+      setUser(result.data);
+      return null;
+    }
+    return result.error;
+  }, []);
+
   const value = useMemo(
-    () => ({ user, status, login, register, logout }),
-    [user, status, login, register, logout],
+    () => ({ user, status, login, register, logout, refreshUser }),
+    [user, status, login, register, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -86,4 +98,3 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
 }
-

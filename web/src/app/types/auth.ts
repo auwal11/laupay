@@ -6,12 +6,14 @@ export interface AuthUser {
   email: string;
   phone: string;
   role: Role;
-  createdAt: string; // ISO 8601, backend-authoritative
+  status: "ACTIVE" | "SUSPENDED" | "PENDING_VERIFICATION";
+  profilePhotoUrl?: string | null;
+  /** ISO 8601. Backend-authoritative; omitted by GET /auth/me. */
+  createdAt?: string;
 }
 
 export interface AuthTokens {
   accessToken: string;
-  /** Present once the backend implements refresh-token support. */
   refreshToken?: string;
 }
 
@@ -25,7 +27,10 @@ export interface RegisterPayload {
   email: string;
   phone: string;
   password: string;
+  /** Confirmation only — never sent to the backend (stripped in the adapter). */
+  confirmPassword?: string;
   role: Role;
+  profilePhotoData?: string;
 }
 
 export interface ForgotPasswordPayload {
@@ -33,6 +38,20 @@ export interface ForgotPasswordPayload {
 }
 
 export interface AuthSession {
-  user: AuthUser;
-  tokens: AuthTokens;
+  user?: AuthUser;
+  accessToken: string;
+  refreshToken: string;
+  tokens?: AuthTokens;
+}
+
+/** Response to POST /auth/register — no tokens until the email code is verified. */
+export interface RegistrationReceipt {
+  requiresVerification: true;
+  email: string;
+  message: string;
+}
+
+export interface OtpPayload {
+  email: string;
+  code: string;
 }
