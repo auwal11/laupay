@@ -24,6 +24,7 @@ function PinSection() {
   const [currentPin, setCurrentPin] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     security.getPinStatus().then((result) => {
@@ -32,7 +33,9 @@ function PinSection() {
   }, []);
 
   async function handleCreate(pin: string) {
+    setBusy(true);
     const result = await security.createPin(pin);
+    setBusy(false);
     if (result.ok) {
       setStatus(result.data.status);
       setMode("idle");
@@ -49,7 +52,9 @@ function PinSection() {
 
   async function handleNewPinEntered(newPin: string) {
     if (!currentPin) return;
+    setBusy(true);
     const result = await security.changePin(currentPin, newPin);
+    setBusy(false);
     if (result.ok) {
       setStatus(result.data.status);
       setMode("idle");
@@ -97,21 +102,21 @@ function PinSection() {
 
       {mode === "create" && (
         <div className="mt-4">
-          <PinPad label="Choose a 4-digit PIN" onComplete={handleCreate} />
+          <PinPad label="Choose a 4-digit PIN" onComplete={handleCreate} disabled={busy} />
           <CancelLink onClick={cancel} />
         </div>
       )}
 
       {mode === "change_current" && (
         <div className="mt-4">
-          <PinPad label="Enter your current PIN" onComplete={handleCurrentPinEntered} />
+          <PinPad label="Enter your current PIN" onComplete={handleCurrentPinEntered} disabled={busy} />
           <CancelLink onClick={cancel} />
         </div>
       )}
 
       {mode === "change_new" && (
         <div className="mt-4">
-          <PinPad label="Choose your new PIN" onComplete={handleNewPinEntered} />
+          <PinPad label={busy ? "Saving PIN…" : "Choose your new PIN"} onComplete={handleNewPinEntered} disabled={busy} />
           <CancelLink onClick={cancel} />
         </div>
       )}

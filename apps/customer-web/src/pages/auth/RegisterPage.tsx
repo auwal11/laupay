@@ -16,17 +16,19 @@ export function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [profilePhotoData, setProfilePhotoData] = useState<string | undefined>();
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [role, setRole] = useState<Role>("customer");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!termsAccepted) { setError("Please agree to the Terms of Service and Privacy Policy to continue."); return; }
     if (password !== confirmPassword) { setError("Passwords do not match."); return; }
     if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
     setSubmitting(true);
     setError(null);
-    const failure = await register({ fullName, email, phone, password, confirmPassword, role, profilePhotoData });
+    const failure = await register({ fullName, email, phone, password, confirmPassword, role, profilePhotoData, termsAccepted: true, termsVersion: "2026-10-15" });
     setSubmitting(false);
     if (failure) {
       setError(failure.message);
@@ -41,6 +43,7 @@ export function RegisterPage() {
       <p className="mt-1 text-sm text-laupay-ink-muted">Set up LAUPAY in a couple of minutes.</p>
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+        <fieldset disabled={submitting} className="contents">
         <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-laupay-border p-3"><span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-laupay-surface-muted text-xs">{profilePhotoData ? <img src={profilePhotoData} alt="Profile preview" className="h-full w-full object-cover" /> : "Photo"}</span><span className="text-sm text-laupay-ink-muted">Add profile photo <span className="block text-xs">Optional · JPG, PNG or WebP up to 2MB</span></span><input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 2 * 1024 * 1024) { setError("Profile photo must be 2MB or smaller."); return; } const reader = new FileReader(); reader.onload = () => setProfilePhotoData(String(reader.result)); reader.readAsDataURL(file); }} /></label>
         <div className="flex gap-2" role="radiogroup" aria-label="Account type">
           {(["customer", "agent"] as const).map((r) => (
@@ -86,14 +89,17 @@ export function RegisterPage() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-        {error && (
+        <label className="flex items-start gap-2 text-sm text-laupay-ink-muted"><input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 accent-laupay-indigo" /> <span>I agree to the <Link to="/terms" className="font-medium text-laupay-indigo underline">Terms of Service</Link> and <Link to="/privacy" className="font-medium text-laupay-indigo underline">Privacy Policy</Link>.</span></label>
+        {!termsAccepted && error?.includes("Terms") && <p role="alert" className="text-sm font-medium text-laupay-danger">{error}</p>}
+        {error && !error.includes("Terms") && (
           <p role="alert" className="text-sm font-medium text-laupay-danger">
             {error}
           </p>
         )}
-        <Button type="submit" fullWidth loading={submitting}>
+        <Button type="submit" fullWidth loading={submitting} loadingLabel="Creating account…">
           {submitting ? "Creating account…" : "Create account"}
         </Button>
+        </fieldset>
       </form>
 
       <p className="mt-5 text-center text-sm text-laupay-ink-muted">

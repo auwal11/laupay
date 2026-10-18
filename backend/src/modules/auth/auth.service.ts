@@ -118,7 +118,9 @@ export class AuthService {
               passwordHash,
               fullName: normalizeFullName(dto.fullName),
               role: dto.role === 'AGENT' ? UserRole.AGENT : UserRole.CUSTOMER,
-              profilePhotoUrl,
+            profilePhotoUrl,
+            termsAcceptedAt: dto.termsAccepted ? new Date() : undefined,
+            termsVersion: dto.termsAccepted ? (dto.termsVersion ?? '2026-10-15') : undefined,
             },
           });
           await tx.walletAccount.create({

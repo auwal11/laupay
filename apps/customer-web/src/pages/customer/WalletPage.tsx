@@ -61,19 +61,19 @@ function FundWalletForm({ onDone }: { onDone: () => void }) {
 
   return (
     <Card>
-      <Input
+      <fieldset disabled={submitting} className="contents"><Input
         label="Amount (₦)"
         type="number"
         inputMode="decimal"
         min={1}
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-      />
+      /></fieldset>
       <div className="mt-4 flex gap-2">
         <Button variant="ghost" onClick={onDone}>
           Cancel
         </Button>
-        <Button onClick={handleFund} loading={submitting} disabled={!amount}>
+        <Button onClick={handleFund} loading={submitting} loadingLabel="Processing…" disabled={!amount}>
           {submitting ? "Submitting…" : "Submit"}
         </Button>
       </div>

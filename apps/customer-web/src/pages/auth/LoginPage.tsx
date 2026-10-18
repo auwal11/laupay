@@ -47,6 +47,7 @@ export function LoginPage() {
       )}
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+        <fieldset disabled={submitting} className="contents">
         <Input
           label="Email"
           type="email"
@@ -68,9 +69,10 @@ export function LoginPage() {
             {error}
           </p>
         )}
-        <Button type="submit" fullWidth loading={submitting}>
+        <Button type="submit" fullWidth loading={submitting} loadingLabel="Signing in…">
           {submitting ? "Logging in…" : "Log in"}
         </Button>
+        </fieldset>
       </form>
 
       <div className="mt-5 flex justify-between text-sm">

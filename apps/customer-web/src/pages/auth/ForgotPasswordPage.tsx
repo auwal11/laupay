@@ -50,6 +50,7 @@ export function ForgotPasswordPage() {
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+        <fieldset disabled={submitting} className="contents">
         <Input
           label="Email"
           type="email"
@@ -63,9 +64,10 @@ export function ForgotPasswordPage() {
             {error}
           </p>
         )}
-        <Button type="submit" fullWidth loading={submitting}>
+        <Button type="submit" fullWidth loading={submitting} loadingLabel="Sending…">
           {submitting ? "Sending…" : "Send reset link"}
         </Button>
+        </fieldset>
       </form>
 
       <Link to="/login" className="mt-5 inline-block text-sm font-medium text-laupay-indigo hover:underline">

@@ -30,6 +30,8 @@ export interface RegisterPayload {
   confirmPassword: string;
   role: Role;
   profilePhotoData?: string;
+  termsAccepted: boolean;
+  termsVersion: string;
 }
 
 export interface ForgotPasswordPayload {

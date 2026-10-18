@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsIn, IsOptional, IsString, Length, Matches, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, Length, Matches, MinLength } from 'class-validator';
 
 /** Trims and collapses whitespace so stored names are always clean. */
 const cleanName = ({ value }: { value: unknown }): unknown =>
@@ -30,6 +30,14 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   profilePhotoData?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  termsAccepted?: boolean;
+
+  @IsOptional()
+  @IsString()
+  termsVersion?: string;
 }
 
 export class LoginDto {

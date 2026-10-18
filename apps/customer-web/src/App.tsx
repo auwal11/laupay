@@ -6,6 +6,7 @@ import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { VerifyOtpPage } from "@/pages/auth/VerifyOtpPage";
 import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
+import { LegalPage } from "@/pages/legal/LegalPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { DashboardPage } from "@/pages/customer/DashboardPage";
 import { AgentDashboardPage } from "@/pages/agent/AgentDashboardPage";
@@ -35,6 +36,8 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify-otp" element={<VerifyOtpPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/terms" element={<LegalPage />} />
+          <Route path="/privacy" element={<LegalPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           <Route

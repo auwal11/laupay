@@ -7,6 +7,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
   /** Shows the animated LAUPAY mark and blocks repeat submissions. */
   loading?: boolean;
+  loadingLabel?: ReactNode;
   children: ReactNode;
 }
 
@@ -23,6 +24,7 @@ export function Button({
   className,
   disabled,
   loading = false,
+  loadingLabel,
   children,
   ...rest
 }: ButtonProps) {
@@ -48,7 +50,7 @@ export function Button({
           className="laupay-loader-mark"
         />
       )}
-      {children}
+      {loadingLabel && loading ? loadingLabel : children}
     </button>
   );
 }
