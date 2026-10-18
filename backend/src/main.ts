@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
@@ -27,9 +28,22 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
+  // Lightweight health endpoint for Railway's health check. Registered as
+  // Express middleware before the Nest router so it answers on the root path
+  // (which the /api global prefix would otherwise 404) as well as /health and
+  // /api/health. Without a 200 here, Railway's health check fails, it restarts
+  // the container, and clients see a 502.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path === '/' || req.path === '/health' || req.path === '/api/health') {
+      res.status(200).json({ status: 'ok' });
+      return;
+    }
+    next();
+  });
+
   await app.listen(config.port, '0.0.0.0');
   // eslint-disable-next-line no-console
-  console.log(`LAUPAY backend listening on port ${config.port} (${config.nodeEnv})`);
+  console.log(`LAUPAY backend listening on http://0.0.0.0:${config.port} (${config.nodeEnv})`);
 }
 
 bootstrap();
