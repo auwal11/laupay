@@ -31,6 +31,7 @@ export interface CreateOrderPayload {
   idempotencyKey: string;
   /** Present only when responding to a VERIFY risk decision (step-up). */
   verificationCode?: string;
+  pin?: string;
 }
 
 /** Alias kept for readability at call sites; same state machine as TransactionState. */
@@ -54,4 +55,3 @@ export interface Order {
   riskDecision?: RiskDecision;
   requiredChallenge?: VerificationChallenge;
 }
-

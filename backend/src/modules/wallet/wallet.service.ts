@@ -24,6 +24,13 @@ export class WalletService {
     });
   }
 
+  async getMyTransaction(userId: string, id: string) {
+    const wallet = await this.getMyWallet(userId);
+    const entry = await this.prisma.ledgerEntry.findFirst({ where: { id, walletAccountId: wallet.id } });
+    if (!entry) throw new NotFoundException('Transaction not found');
+    return entry;
+  }
+
   /**
    * Object-level ownership check (IDOR/BOLA prevention) — used by any
    * endpoint that accepts a walletAccountId and must verify the requester

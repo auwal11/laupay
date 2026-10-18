@@ -19,7 +19,7 @@ export const walletService = {
   },
 
   async getTransaction(id: string): Promise<ApiResult<TransactionDetail>> {
-    return request<TransactionDetail>(`/api/wallet/transactions/${id}`);
+    return request<any>(`/api/wallet/transactions/${id}`).then((result) => result.ok ? { ok: true, data: mapLedgerEntry(result.data) } : result);
   },
 
   async fundWallet(payload: WalletFundingPayload): Promise<ApiResult<Transaction>> {
@@ -28,3 +28,7 @@ export const walletService = {
     return request<Transaction>("/api/payments/initialize", { method: "POST", body: { amount: Number(payload.amount), idempotencyKey: payload.idempotencyKey } });
   },
 };
+
+function mapLedgerEntry(entry: any): TransactionDetail {
+  return { id: entry.id, reference: entry.referenceId ?? entry.id, type: entry.direction === "CREDIT" ? "wallet_funding" : "wallet_debit", status: "success", amount: String(entry.amount), description: entry.reason === "ORDER_PAYMENT" ? "Service purchase" : entry.direction === "CREDIT" ? "Wallet credit" : "Wallet debit", createdAt: entry.createdAt, providerReference: entry.providerReference };
+}

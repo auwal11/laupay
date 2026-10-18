@@ -15,10 +15,10 @@ import type {
  */
 export const authService = {
   async register(payload: RegisterPayload): Promise<ApiResult<RegistrationReceipt>> {
-    const { confirmPassword: _confirmPassword, role, ...rest } = payload;
+    const { confirmPassword: _confirmPassword, ...rest } = payload;
     const result = await request<RegistrationReceipt>("/api/auth/register", {
       method: "POST",
-      body: { ...rest, role: role.toUpperCase() },
+      body: rest,
     });
     return result;
   },
@@ -39,9 +39,7 @@ export const authService = {
 
   async verifyOtp(payload: OtpPayload): Promise<ApiResult<AuthSession>> {
     const result = await request<AuthSession>("/api/auth/verify-otp", { method: "POST", body: payload });
-    // The backend returns tokens after verification, but product flow requires
-    // an explicit login next; do not create an authenticated frontend session here.
-    if (result.ok) { setAccessToken(null); sessionStorage.removeItem("laupay_refresh_token"); }
+    if (result.ok) { setAccessToken(result.data.accessToken); sessionStorage.setItem("laupay_refresh_token", result.data.refreshToken); }
     return result;
   },
 

@@ -8,19 +8,19 @@ import type { DeviceInfo, PinStatus, SecurityNotification } from "@/types/securi
  * are never hashed/verified in the browser and never logged.
  */
 export const securityService = {
-  async getPinStatus(): Promise<ApiResult<{ status: PinStatus; attemptsRemaining: number }>> {
-    return request<{ status: PinStatus; attemptsRemaining: number }>("/api/security/pin/status");
+  async getPinStatus(): Promise<ApiResult<{ hasPin: boolean; status: PinStatus; attemptsRemaining: number }>> {
+    return request<{ hasPin: boolean; locked: boolean; lockedUntil: string | null }>("/api/security/pin/status").then((result) => result.ok ? { ok: true, data: { hasPin: result.data.hasPin, status: result.data.locked ? "locked" : result.data.hasPin ? "active" : "not_set", attemptsRemaining: 0 } } : result);
   },
 
   async createPin(pin: string): Promise<ApiResult<{ status: PinStatus }>> {
-    return request<{ status: PinStatus }>("/api/security/pin", { method: "POST", body: { pin } });
+    return request<{ hasPin: boolean }>("/api/security/pin", { method: "POST", body: { pin } }).then((result) => result.ok ? { ok: true, data: { status: "active" } } : result);
   },
 
   async changePin(currentPin: string, newPin: string): Promise<ApiResult<{ status: PinStatus }>> {
-    return request<{ status: PinStatus }>("/api/security/pin/change", {
+    return request<{ hasPin: boolean }>("/api/security/pin/change", {
       method: "POST",
       body: { currentPin, newPin },
-    });
+    }).then((result) => result.ok ? { ok: true, data: { status: "active" } } : result);
   },
 
   async forgotPin(): Promise<ApiResult<{ sent: true }>> {

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
@@ -16,5 +16,10 @@ export class WalletController {
   @Get('transactions')
   getMyTransactions(@CurrentUser() user: AuthenticatedUser) {
     return this.walletService.getMyTransactions(user.userId);
+  }
+
+  @Get('transactions/:id')
+  getMyTransaction(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.walletService.getMyTransaction(user.userId, id);
   }
 }

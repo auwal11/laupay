@@ -117,7 +117,7 @@ export class AuthService {
               phone: dto.phone,
               passwordHash,
               fullName: normalizeFullName(dto.fullName),
-              role: dto.role === 'AGENT' ? UserRole.AGENT : UserRole.CUSTOMER,
+            role: UserRole.CUSTOMER,
             profilePhotoUrl,
             termsAcceptedAt: dto.termsAccepted ? new Date() : undefined,
             termsVersion: dto.termsAccepted ? (dto.termsVersion ?? '2026-10-15') : undefined,

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { auth } from "@/services";
+import { security } from "@/services";
 import { setSessionInvalidHandler } from "@/services/api";
 import type { AuthUser, LoginPayload, RegisterPayload } from "@/types/auth";
 import type { ApiError } from "@/types/common";
@@ -13,6 +14,9 @@ interface AuthContextValue {
   register: (payload: RegisterPayload) => Promise<ApiError | null>;
   logout: () => void;
   refreshUser: () => Promise<ApiError | null>;
+  verifyOtp: (payload: { email: string; code: string }) => Promise<ApiError | null>;
+  pinReady: boolean | null;
+  refreshPin: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -20,6 +24,14 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<SessionStatus>("checking");
+  const [pinReady, setPinReady] = useState<boolean | null>(null);
+
+  const refreshPin = useCallback(async () => {
+    const result = await security.getPinStatus();
+    const ready = result.ok && result.data.hasPin;
+    setPinReady(ready);
+    return ready;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.ok) {
         setUser(result.data);
         setStatus("authenticated");
+        void refreshPin();
       } else {
         setStatus("anonymous");
       }
@@ -35,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshPin]);
 
   // Any 401 from any request (not just login) routes through here — this is
   // what makes "session revoked mid-session" a real, handled UI state
@@ -55,9 +68,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!profile.ok) return profile.error;
       setUser(profile.data);
       setStatus("authenticated");
+      await refreshPin();
       return null;
     }
     return result.error;
+  }, [refreshPin]);
+
+  const verifyOtp = useCallback(async (payload: { email: string; code: string }) => {
+    const result = await auth.verifyOtp(payload);
+    if (!result.ok) return result.error;
+    const profile = await auth.me();
+    if (!profile.ok) return profile.error;
+    setUser(profile.data); setStatus("authenticated"); setPinReady(false);
+    return null;
   }, []);
 
   const register = useCallback(async (payload: RegisterPayload) => {
@@ -82,8 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, status, login, register, logout, refreshUser }),
-    [user, status, login, register, logout, refreshUser],
+    () => ({ user, status, login, register, logout, refreshUser, verifyOtp, pinReady, refreshPin }),
+    [user, status, login, register, logout, refreshUser, verifyOtp, pinReady, refreshPin],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, Length, Matches, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, Length, Matches, MinLength } from 'class-validator';
 
 /** Trims and collapses whitespace so stored names are always clean. */
 const cleanName = ({ value }: { value: unknown }): unknown =>
@@ -21,10 +21,6 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   phone?: string;
-
-  @IsOptional()
-  @IsIn(['CUSTOMER', 'AGENT'])
-  role?: 'CUSTOMER' | 'AGENT';
 
   /** A validated image data URL. It is stored by the application, never sent to email. */
   @IsOptional()

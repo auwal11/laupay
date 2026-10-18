@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Wallet, Smartphone, Wifi, Receipt, User, ShieldCheck, Menu, X, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Home, Wallet, Smartphone, Wifi, Receipt, User, ShieldCheck, Settings, Menu, X, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { Role } from "@/types/common";
 import { useAuth } from "@/context/AuthContext";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 
-const ITEMS = [["/app", "Home", Home], ["/app/airtime", "Airtime", Smartphone], ["/app/data", "Data", Wifi], ["/app/wallet", "Wallet", Wallet], ["/app/transactions", "Transactions", Receipt], ["/app/security", "Security", ShieldCheck], ["/app/profile", "Profile", User]] as const;
+const ITEMS = [["/app", "Home", Home], ["/app/airtime", "Airtime", Smartphone], ["/app/data", "Data", Wifi], ["/app/wallet", "Wallet", Wallet], ["/app/transactions", "Transactions", Receipt], ["/app/security", "Security", ShieldCheck], ["/app/profile", "Profile", User], ["/app/settings", "Settings", Settings]] as const;
 
 export function AppNav({ role: _role }: { role: Role }) {
   const { user, logout } = useAuth(); const navigate = useNavigate(); const [collapsed, setCollapsed] = useState(false); const [open, setOpen] = useState(false); const [loggingOut, setLoggingOut] = useState(false);

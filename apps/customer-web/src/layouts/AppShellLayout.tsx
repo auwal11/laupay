@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 import { AppNav } from "@/components/nav/AppNav";
 import { useAuth } from "@/context/AuthContext";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export function AppShellLayout() {
   const { user, logout } = useAuth();
@@ -18,6 +19,7 @@ export function AppShellLayout() {
       <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-laupay-border bg-white px-5 py-3.5">
           <div className="flex items-center gap-2"><UserAvatar user={user} size="sm" /><span className="font-display text-base font-semibold text-laupay-indigo">LAUPAY</span></div>
+          <div className="flex items-center gap-2"><NotificationBell />
           <button
             onClick={() => { setLoggingOut(true); window.setTimeout(() => { logout(); navigate("/login", { replace: true }); }, 250); }}
             disabled={loggingOut}
@@ -25,7 +27,7 @@ export function AppShellLayout() {
           >
             <LogOut size={16} aria-hidden="true" />
             {loggingOut ? "Signing out…" : "Log out"}
-          </button>
+          </button></div>
         </header>
 
         <main className="flex-1 px-5 py-6 pb-20 md:pb-6">

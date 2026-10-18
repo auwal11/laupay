@@ -37,7 +37,9 @@ export class OrdersService {
     phoneNumber: string,
     amount: number,
     idempotencyKey: string,
+    pin?: string,
   ) {
+    if (pin) await this.security.verifyPin(userId, pin);
     const existing = await this.prisma.order.findUnique({ where: { idempotencyKey } });
     if (existing) return existing;
 
@@ -78,7 +80,9 @@ export class OrdersService {
     phoneNumber: string,
     dataPlanId: string,
     idempotencyKey: string,
+    pin?: string,
   ) {
+    if (pin) await this.security.verifyPin(userId, pin);
     const existing = await this.prisma.order.findUnique({ where: { idempotencyKey } });
     if (existing) return existing;
 

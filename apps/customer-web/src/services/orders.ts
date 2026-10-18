@@ -20,8 +20,8 @@ export const ordersService = {
   async createOrder(payload: CreateOrderPayload): Promise<ApiResult<Order>> {
     const path = payload.kind === "airtime" ? "/api/orders/airtime" : "/api/orders/data";
     const body = payload.kind === "airtime"
-      ? { network: payload.networkId, phoneNumber: payload.phoneNumber, amount: Number(payload.amount), idempotencyKey: payload.idempotencyKey }
-      : { network: payload.networkId, phoneNumber: payload.phoneNumber, dataPlanId: payload.planId, idempotencyKey: payload.idempotencyKey };
+      ? { network: payload.networkId, phoneNumber: payload.phoneNumber, amount: Number(payload.amount), idempotencyKey: payload.idempotencyKey, pin: payload.pin }
+      : { network: payload.networkId, phoneNumber: payload.phoneNumber, dataPlanId: payload.planId, idempotencyKey: payload.idempotencyKey, pin: payload.pin };
     return request<any>(path, { method: "POST", body }).then((result) => result.ok ? { ok: true, data: normalizeOrder(result.data, payload) } : result);
   },
 

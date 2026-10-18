@@ -5,6 +5,7 @@ import { AppShellLayout } from "@/layouts/AppShellLayout";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { VerifyOtpPage } from "@/pages/auth/VerifyOtpPage";
+import { SetupPinPage } from "@/pages/auth/SetupPinPage";
 import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { LegalPage } from "@/pages/legal/LegalPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
@@ -18,6 +19,7 @@ import { TransactionDetailPage } from "@/pages/customer/TransactionDetailPage";
 import { ReceiptPage } from "@/pages/customer/ReceiptPage";
 import { ProfilePage } from "@/pages/customer/ProfilePage";
 import { SecurityPage } from "@/pages/customer/SecurityPage";
+import { SettingsPage } from "@/pages/customer/SettingsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 /**
@@ -35,6 +37,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify-otp" element={<VerifyOtpPage />} />
+          <Route path="/setup-pin" element={<ProtectedRoute><SetupPinPage /></ProtectedRoute>} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/terms" element={<LegalPage />} />
           <Route path="/privacy" element={<LegalPage />} />
@@ -57,6 +60,7 @@ export default function App() {
             <Route path="receipt/:id" element={<ReceiptPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="security" element={<SecurityPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
 
           {/* Placeholder root: real repo should keep its existing landing page here. */}

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
-import { IsNumber, IsPositive, IsString, IsUUID } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches } from 'class-validator';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
@@ -17,6 +17,11 @@ class CreateAirtimeOrderDto {
 
   @IsString()
   idempotencyKey!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}$/)
+  pin?: string;
 }
 
 class CreateDataOrderDto {
@@ -31,6 +36,11 @@ class CreateDataOrderDto {
 
   @IsString()
   idempotencyKey!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}$/)
+  pin?: string;
 }
 
 @UseGuards(JwtAuthGuard)
@@ -46,6 +56,7 @@ export class OrdersController {
       dto.phoneNumber,
       dto.amount,
       dto.idempotencyKey,
+      dto.pin,
     );
   }
 
@@ -57,6 +68,7 @@ export class OrdersController {
       dto.phoneNumber,
       dto.dataPlanId,
       dto.idempotencyKey,
+      dto.pin,
     );
   }
 

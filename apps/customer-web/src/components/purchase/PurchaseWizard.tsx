@@ -125,7 +125,8 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
               <p className="mt-4 text-xs text-laupay-ink-muted">
                 LAUPAY determines the final price, fees, and whether extra verification is needed once you confirm.
               </p>
-              <Button fullWidth className="mt-4" onClick={flow.confirm}>
+              <PinPad label="Enter your 4-digit transaction PIN" onComplete={flow.setPin} />
+              <Button fullWidth className="mt-4" onClick={flow.confirm} disabled={!state.pin}>
                 Confirm purchase
               </Button>
             </StepCard>

@@ -25,6 +25,7 @@ interface PurchaseFlowState {
   order: Order | null;
   error: ApiError | null;
   verifyError: string | null;
+  pin?: string;
 }
 
 const AIRTIME_AMOUNTS = ["100", "200", "500", "1000", "2000"];
@@ -42,11 +43,13 @@ function initialState(): PurchaseFlowState {
     order: null,
     error: null,
     verifyError: null,
+    pin: undefined,
   };
 }
 
 export function usePurchaseFlow(kind: PurchaseKind) {
   const [state, setState] = useState<PurchaseFlowState>(initialState);
+  const setPin = useCallback((pin: string) => setState((s) => ({ ...s, pin })), []);
 
   useEffect(() => {
     orders.getNetworks().then((result) => {
@@ -99,6 +102,7 @@ export function usePurchaseFlow(kind: PurchaseKind) {
         amount: state.amount ?? undefined,
         planId: state.planId ?? undefined,
         idempotencyKey: state.idempotencyKey,
+        pin: state.pin,
       })
       .then((result) => {
         if (result.ok) {
@@ -107,7 +111,7 @@ export function usePurchaseFlow(kind: PurchaseKind) {
           setState((prev) => ({ ...prev, error: result.error, step: "result" }));
         }
       });
-  }, [kind, state.networkId, state.phoneNumber, state.amount, state.planId, state.idempotencyKey, routeOrderResult]);
+  }, [kind, state.networkId, state.phoneNumber, state.amount, state.planId, state.idempotencyKey, state.pin, routeOrderResult]);
 
   /** Submits the PIN/OTP the backend's VERIFY decision asked for. Same idempotency key resolves the same order. */
   const submitVerification = useCallback(
@@ -124,6 +128,7 @@ export function usePurchaseFlow(kind: PurchaseKind) {
           planId: state.planId ?? undefined,
           idempotencyKey: state.idempotencyKey,
           verificationCode: code,
+          pin: code,
         })
         .then((result) => {
           if (result.ok) {
@@ -165,6 +170,7 @@ export function usePurchaseFlow(kind: PurchaseKind) {
     selectPlan,
     confirm,
     submitVerification,
+    setPin,
     restart,
     goBack,
   };
