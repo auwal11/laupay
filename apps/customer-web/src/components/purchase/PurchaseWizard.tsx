@@ -57,17 +57,32 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
         >
           {state.step === "select_network" && (
             <StepCard title={STEP_LABELS.select_network}>
-              <div className="grid grid-cols-2 gap-2">
-                {state.networks.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => flow.selectNetwork(n.id)}
-                    className="rounded-md border border-laupay-border bg-white px-4 py-3 text-sm font-medium text-laupay-ink hover:border-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo"
-                  >
-                    {n.name}
-                  </button>
-                ))}
-              </div>
+              {state.networksLoading ? (
+                <div className="grid grid-cols-2 gap-2" role="status" aria-label="Loading networks">
+                  {[1, 2, 3, 4].map((item) => <span key={item} className="h-12 animate-pulse rounded-md bg-laupay-surface-muted" />)}
+                </div>
+              ) : state.networks.length > 0 ? (
+                <>
+                  {state.networkError && <p className="mb-3 text-xs text-laupay-ink-muted">Showing supported networks while the catalog reconnects.</p>}
+                  <div className="grid grid-cols-2 gap-2">
+                    {state.networks.map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => flow.selectNetwork(n.id)}
+                        className="min-h-12 rounded-md border border-laupay-border bg-white px-4 py-3 text-sm font-medium text-laupay-ink hover:border-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo"
+                      >
+                        {n.name}
+                      </button>
+                    ))}
+                  </div>
+                  {state.networkError && <button type="button" onClick={flow.loadNetworks} className="mt-3 text-xs font-medium text-laupay-indigo underline">Retry catalog</button>}
+                </>
+              ) : (
+                <div role="alert" className="text-sm text-laupay-danger">
+                  <p>Unable to load networks. Please try again.</p>
+                  <button type="button" onClick={flow.loadNetworks} className="mt-3 font-medium underline">Retry</button>
+                </div>
+              )}
             </StepCard>
           )}
 
@@ -92,7 +107,7 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col gap-2">
+                state.plansLoading ? <div role="status" aria-label="Loading data plans" className="flex flex-col gap-2">{[1, 2, 3].map((item) => <span key={item} className="h-12 animate-pulse rounded-md bg-laupay-surface-muted" />)}</div> : state.plansError ? <div role="alert" className="text-sm text-laupay-danger"><p>{state.plansError}</p><button type="button" onClick={flow.retryPlans} className="mt-3 font-medium underline">Retry</button></div> : <div className="flex flex-col gap-2">
                   {state.plans.map((plan) => (
                     <button
                       key={plan.id}

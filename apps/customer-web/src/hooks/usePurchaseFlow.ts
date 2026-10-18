@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { orders } from "@/services";
+import { SUPPORTED_NG_NETWORKS } from "@/services/orders";
 import { generateIdempotencyKey } from "@/lib/idempotency";
 import type { ApiError } from "@/types/common";
 import type { DataPlan, Network, Order, PurchaseKind } from "@/types/orders";
@@ -26,6 +27,10 @@ interface PurchaseFlowState {
   error: ApiError | null;
   verifyError: string | null;
   pin?: string;
+  networksLoading: boolean;
+  networkError: string | null;
+  plansLoading: boolean;
+  plansError: string | null;
 }
 
 const AIRTIME_AMOUNTS = ["100", "200", "500", "1000", "2000"];
@@ -49,6 +54,10 @@ function initialState(): PurchaseFlowState {
     error: null,
     verifyError: null,
     pin: undefined,
+    networksLoading: true,
+    networkError: null,
+    plansLoading: false,
+    plansError: null,
   };
 }
 
@@ -56,22 +65,35 @@ export function usePurchaseFlow(kind: PurchaseKind) {
   const [state, setState] = useState<PurchaseFlowState>(initialState);
   const setPin = useCallback((pin: string) => setState((s) => ({ ...s, pin })), []);
 
-  useEffect(() => {
+  const loadNetworks = useCallback(() => {
+    setState((s) => ({ ...s, networksLoading: true, networkError: null }));
     orders.getNetworks().then((result) => {
-      if (result.ok) setState((s) => ({ ...s, networks: result.data }));
+      if (result.ok && result.data.length > 0) {
+        setState((s) => ({ ...s, networks: result.data, networksLoading: false }));
+      } else {
+        setState((s) => ({ ...s, networks: SUPPORTED_NG_NETWORKS, networksLoading: false, networkError: "Unable to load networks. Please try again." }));
+      }
+    }).catch(() => {
+      setState((s) => ({ ...s, networks: SUPPORTED_NG_NETWORKS, networksLoading: false, networkError: "Unable to load networks. Please try again." }));
     });
+  }, []);
+
+  useEffect(() => { loadNetworks(); }, [loadNetworks]);
+
+  const loadPlans = useCallback((networkId: string) => {
+    setState((s) => ({ ...s, plansLoading: true, plansError: null }));
+    orders.getDataPlans(networkId).then((result) => {
+      if (result.ok && result.data.length > 0) setState((s) => ({ ...s, plans: result.data, plansLoading: false }));
+      else setState((s) => ({ ...s, plans: [], plansLoading: false, plansError: "Unable to load data plans. Please try again." }));
+    }).catch(() => setState((s) => ({ ...s, plans: [], plansLoading: false, plansError: "Unable to load data plans. Please try again." })));
   }, []);
 
   const selectNetwork = useCallback(
     (networkId: string) => {
       setState((s) => ({ ...s, networkId, step: "enter_phone" }));
-      if (kind === "data") {
-        orders.getDataPlans(networkId).then((result) => {
-          if (result.ok) setState((s) => ({ ...s, plans: result.data }));
-        });
-      }
+      if (kind === "data") loadPlans(networkId);
     },
-    [kind],
+    [kind, loadPlans],
   );
 
   const submitPhoneNumber = useCallback((phoneNumber: string) => {
@@ -170,6 +192,8 @@ export function usePurchaseFlow(kind: PurchaseKind) {
 
   return {
     state,
+    loadNetworks,
+    retryPlans: () => { if (state.networkId) loadPlans(state.networkId); },
     airtimeAmounts: AIRTIME_AMOUNTS,
     selectNetwork,
     submitPhoneNumber,
