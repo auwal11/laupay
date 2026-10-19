@@ -9,6 +9,7 @@ import { VerifyOtpPage } from '@app/pages/auth/VerifyOtpPage';
 import { ResetPasswordPage } from '@app/pages/auth/ResetPasswordPage';
 import { SetupPinPage } from '@app/pages/auth/SetupPinPage';
 import { RegisterSuccessPage } from '@app/pages/auth/RegisterSuccessPage';
+import { PrivacyPage, TermsPage } from '@app/pages/legal/LegalPage';
 import { DashboardPage } from '@app/pages/customer/DashboardPage';
 import { AgentDashboardPage } from '@app/pages/agent/AgentDashboardPage';
 import { WalletPage } from '@app/pages/customer/WalletPage';
@@ -49,6 +50,8 @@ export const appRoutes = (
     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
     <Route path="/verify-otp" element={<VerifyOtpPage />} />
     <Route path="/reset-password" element={<ResetPasswordPage />} />
+    <Route path="/terms" element={<TermsPage />} />
+    <Route path="/privacy" element={<PrivacyPage />} />
     <Route path="/register-success" element={<ProtectedRoute><RegisterSuccessPage /></ProtectedRoute>} />
     <Route path="/setup-pin" element={<ProtectedRoute><SetupPinPage /></ProtectedRoute>} />
     <Route
