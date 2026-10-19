@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
@@ -9,11 +9,11 @@ export class ProfileStorageService {
   constructor(private readonly config: AppConfigService) {}
   async save(dataUrl: string): Promise<string> {
     const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
-    if (!match) throw new ServiceUnavailableException('Invalid profile image');
+    if (!match) throw new BadRequestException('Invalid profile image');
     const buffer = Buffer.from(match[2], 'base64');
-    if (buffer.length > 2 * 1024 * 1024) throw new ServiceUnavailableException('Profile image is too large');
+    if (buffer.length > 2 * 1024 * 1024) throw new BadRequestException('Profile image is too large');
     const valid = buffer.subarray(0, 3).equals(Buffer.from([255, 216, 255])) || buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) || (buffer.subarray(0, 4).toString() === 'RIFF' && buffer.subarray(8, 12).toString() === 'WEBP');
-    if (!valid) throw new ServiceUnavailableException('Invalid profile image');
+    if (!valid) throw new BadRequestException('Invalid profile image');
     const extension = match[1] === 'image/jpeg' ? 'jpg' : match[1].slice(6); const filename = `${randomUUID()}.${extension}`;
     if (this.config.supabaseUrl && this.config.supabaseServiceRoleKey) {
       const path = `profile/${filename}`;

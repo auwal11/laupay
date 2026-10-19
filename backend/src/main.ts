@@ -15,6 +15,11 @@ async function bootstrap() {
   // Paystack signs the exact bytes received over HTTP. Capture them before
   // JSON parsing; re-serialising req.body can change whitespace/key order.
   app.use(bodyParser.json({
+    // Profile photos are compressed client-side, but their base64 JSON wrapper
+    // is still larger than body-parser's default 100kb limit on some phones.
+    // Keep an explicit bounded limit so uploads work without accepting huge
+    // request bodies.
+    limit: '2mb',
     verify: (req, _res, buffer) => {
       (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
     },
