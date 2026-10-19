@@ -494,7 +494,7 @@ function Home() {
                   {/* The source photo includes page chrome on its left; this frames
                       only the person + app cards (crop x 768-1616, y 170-919). */}
                   <img
-                    src="/images/landing/hero-ibrahim.png"
+                    src="/images/landing/features-ibrahim.png"
                     alt="LAUPAY user viewing wallet dashboard on phone"
                     width={1671}
                     height={941}
@@ -563,7 +563,7 @@ function Home() {
           <div className="section-shell py-20 sm:py-28">
             <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#0F1236]">
               <img
-                  src="/images/landing/features-ibrahim.png"
+                  src="/images/landing/hero-ibrahim.png"
                   alt="LAUPAY customer holding a phone with the LAUPAY dashboard, balance and recent activity"
                   width={1672}
                   height={941}
