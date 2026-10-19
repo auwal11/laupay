@@ -24,7 +24,12 @@ export type RiskDecision = "allow" | "verify" | "hold" | "reject";
 /** Step-up challenge the backend asks the frontend to render. */
 export type VerificationChallenge = "pin" | "otp" | "device";
 
-export type PinStatus = "not_set" | "active" | "locked";
+/** Backend PIN state for the signed-in account (see SecurityService.getPinStatus). */
+export interface PinStatusResponse {
+  hasPin: boolean;
+  locked: boolean;
+  lockedUntil: string | null;
+}
 
 export interface DeviceInfo {
   id: string;

@@ -15,15 +15,37 @@ interface AuthContextValue {
   refreshUser: () => Promise<ApiError | null>;
   verifyOtp: (payload: OtpPayload) => Promise<ApiError | null>;
   pinReady: boolean | null;
+  /** Whether the current session has already passed the PIN step-up challenge. */
+  pinVerified: boolean;
   refreshPin: () => Promise<boolean>;
+  markPinVerified: (value: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+const PIN_VERIFIED_KEY = "laupay.pin_verified";
+
+function readPinVerified(): boolean {
+  if (typeof sessionStorage === "undefined") return false;
+  return sessionStorage.getItem(PIN_VERIFIED_KEY) === "1";
+}
+
+function writePinVerified(value: boolean): void {
+  if (typeof sessionStorage === "undefined") return;
+  if (value) sessionStorage.setItem(PIN_VERIFIED_KEY, "1");
+  else sessionStorage.removeItem(PIN_VERIFIED_KEY);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<SessionStatus>("checking");
   const [pinReady, setPinReady] = useState<boolean | null>(null);
+  const [pinVerified, setPinVerifiedState] = useState<boolean>(() => readPinVerified());
+
+  const markPinVerified = useCallback((value: boolean) => {
+    writePinVerified(value);
+    setPinVerifiedState(value);
+  }, []);
 
   const refreshPin = useCallback(async () => {
     const result = await (await import("@app/services")).security.getPinStatus();
@@ -31,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPinReady(false);
       return false;
     }
-    const ready = result.data.status === "active";
+    const ready = result.data.hasPin && !result.data.locked;
     setPinReady(ready);
     return ready;
   }, []);
@@ -74,8 +96,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(profile.data);
     setStatus("authenticated");
     await refreshPin();
+    // A fresh login always re-arms the PIN step-up, even if a previous session
+    // on this tab had already verified it.
+    markPinVerified(false);
     return null;
-  }, [refreshPin]);
+  }, [refreshPin, markPinVerified]);
 
   const register = useCallback(async (payload: RegisterPayload) => {
     const result = await auth.register(payload);
@@ -93,7 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setStatus("anonymous");
     setPinReady(null);
-  }, []);
+    markPinVerified(false);
+  }, [markPinVerified]);
 
   const verifyOtp = useCallback(async (payload: OtpPayload) => {
     const result = await auth.verifyOtp(payload);
@@ -103,8 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(profile.data);
     setStatus("authenticated");
     setPinReady(false);
+    markPinVerified(false);
     return null;
-  }, []);
+  }, [markPinVerified]);
 
   const refreshUser = useCallback(async () => {
     const result = await auth.me();
@@ -116,8 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, status, login, register, logout, refreshUser, verifyOtp, pinReady, refreshPin }),
-    [user, status, login, register, logout, refreshUser, verifyOtp, pinReady, refreshPin],
+    () => ({ user, status, login, register, logout, refreshUser, verifyOtp, pinReady, pinVerified, refreshPin, markPinVerified }),
+    [user, status, login, register, logout, refreshUser, verifyOtp, pinReady, pinVerified, refreshPin, markPinVerified],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AuthShell } from "@app/components/auth/AuthShell";
 import { Button } from "@app/components/ui/Button";
 import { PinPad } from "@app/components/security/PinPad";
@@ -8,7 +8,8 @@ import { useAuth } from "@app/context/AuthContext";
 
 export function SetupPinPage() {
   const navigate = useNavigate();
-  const { refreshPin } = useAuth();
+  const location = useLocation();
+  const { refreshPin, markPinVerified } = useAuth();
   const [first, setFirst] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -23,8 +24,13 @@ export function SetupPinPage() {
     const result = await security.createPin(first);
     if (!result.ok) { setBusy(false); return setError(result.error.message); }
     await refreshPin();
+    // They just set the PIN, so this session has satisfied the step-up.
+    markPinVerified(true);
     setBusy(false);
-    navigate("/register-success", { replace: true });
+    // Existing users who came from a normal login go straight to the dashboard;
+    // the onboarding flow keeps its final "all set" confirmation step.
+    const fromLogin = (location.state as { from?: string } | null)?.from === "login";
+    navigate(fromLogin ? "/app" : "/register-success", { replace: true });
   }
 
   return <AuthShell variant="centered" eyebrow="Step 4 of 5" header={<><h1 className="mt-4 font-display text-2xl font-extrabold leading-[1.08] tracking-[-.045em] text-white">Create your transaction PIN</h1><p className="mt-2 text-sm leading-6 text-white/65">You’ll use this PIN to confirm purchases on LAUPAY.</p></>}>

@@ -1,23 +1,29 @@
 import { request } from "./api";
 import type { ApiResult } from "@app/types/common";
-import type { DeviceInfo, PinStatus, SecurityNotification } from "@app/types/security";
+import type { DeviceInfo, PinStatusResponse, SecurityNotification } from "@app/types/security";
 
 /**
- * Expected backend endpoints — confirm exact paths/shapes with the backend
- * agent. PIN values are only ever sent over this layer to the backend; they
- * are never hashed/verified in the browser and never logged.
+ * PIN endpoints speak to the backend's security module. Responses mirror the
+ * backend exactly: status is {hasPin, locked, lockedUntil}; set/change return
+ * {hasPin:true}; verify returns {verified:true}. PIN values are only ever sent
+ * over this layer to the backend — they are never hashed/verified in the
+ * browser and never logged.
  */
 export const securityService = {
-  async getPinStatus(): Promise<ApiResult<{ status: PinStatus; attemptsRemaining: number }>> {
-    return request<{ status: PinStatus; attemptsRemaining: number }>("/security/pin/status");
+  async getPinStatus(): Promise<ApiResult<PinStatusResponse>> {
+    return request<PinStatusResponse>("/security/pin/status");
   },
 
-  async createPin(pin: string): Promise<ApiResult<{ status: PinStatus }>> {
-    return request<{ status: PinStatus }>("/security/pin", { method: "POST", body: { pin } });
+  async createPin(pin: string): Promise<ApiResult<{ hasPin: true }>> {
+    return request<{ hasPin: true }>("/security/pin", { method: "POST", body: { pin } });
   },
 
-  async changePin(currentPin: string, newPin: string): Promise<ApiResult<{ status: PinStatus }>> {
-    return request<{ status: PinStatus }>("/security/pin/change", {
+  async verifyPin(pin: string): Promise<ApiResult<{ verified: true }>> {
+    return request<{ verified: true }>("/security/pin/verify", { method: "POST", body: { pin } });
+  },
+
+  async changePin(currentPin: string, newPin: string): Promise<ApiResult<{ hasPin: true }>> {
+    return request<{ hasPin: true }>("/security/pin/change", {
       method: "POST",
       body: { currentPin, newPin },
     });

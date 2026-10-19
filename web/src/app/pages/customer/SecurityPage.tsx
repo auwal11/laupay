@@ -5,7 +5,7 @@ import { Skeleton } from "@app/components/ui/Skeleton";
 import { PinPad } from "@app/components/security/PinPad";
 import { formatDateTime } from "@app/lib/format";
 import { security } from "@app/services";
-import type { DeviceInfo, PinStatus, SecurityNotification } from "@app/types/security";
+import type { DeviceInfo, PinStatusResponse, SecurityNotification } from "@app/types/security";
 
 export function SecurityPage() {
   return (
@@ -19,7 +19,7 @@ export function SecurityPage() {
 }
 
 function PinSection() {
-  const [status, setStatus] = useState<PinStatus | null>(null);
+  const [status, setStatus] = useState<PinStatusResponse | null>(null);
   const [mode, setMode] = useState<"idle" | "create" | "change_current" | "change_new">("idle");
   const [currentPin, setCurrentPin] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -27,14 +27,14 @@ function PinSection() {
 
   useEffect(() => {
     security.getPinStatus().then((result) => {
-      if (result.ok) setStatus(result.data.status);
+      if (result.ok) setStatus(result.data);
     });
   }, []);
 
   async function handleCreate(pin: string) {
     const result = await security.createPin(pin);
     if (result.ok) {
-      setStatus(result.data.status);
+      setStatus({ hasPin: true, locked: false, lockedUntil: null });
       setMode("idle");
       setMessage("Transaction PIN set.");
     } else {
@@ -51,7 +51,7 @@ function PinSection() {
     if (!currentPin) return;
     const result = await security.changePin(currentPin, newPin);
     if (result.ok) {
-      setStatus(result.data.status);
+      setStatus({ hasPin: true, locked: false, lockedUntil: null });
       setMode("idle");
       setCurrentPin(null);
       setMessage("Transaction PIN changed.");
@@ -74,7 +74,7 @@ function PinSection() {
         <h2 className="text-sm font-semibold text-laupay-ink">Transaction PIN</h2>
         {status && (
           <span className="text-xs font-medium text-laupay-ink-muted">
-            {status === "not_set" ? "Not set" : status === "locked" ? "Locked" : "Active"}
+            {status.locked ? "Locked" : status.hasPin ? "Active" : "Not set"}
           </span>
         )}
       </div>
@@ -89,9 +89,9 @@ function PinSection() {
         <Button
           variant="secondary"
           className="mt-4"
-          onClick={() => setMode(status === "not_set" ? "create" : "change_current")}
+          onClick={() => setMode(status.hasPin ? "change_current" : "create")}
         >
-          {status === "not_set" ? "Set PIN" : "Change PIN"}
+          {status.hasPin ? "Change PIN" : "Set PIN"}
         </Button>
       )}
 
