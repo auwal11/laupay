@@ -291,7 +291,13 @@ export class AuthService {
     const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash: this.hashToken(token) } });
     if (!record || record.usedAt || record.expiresAt < new Date()) throw new UnauthorizedException('Invalid or expired reset link');
     const passwordHash = await this.passwordHasher.hash(password);
-    await this.prisma.$transaction([this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash } }), this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }), this.prisma.refreshToken.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: new Date() } })]);
+    // Completing a password reset requires clicking a link sent to the
+    // account's email, which is the same proof of ownership as the OTP step.
+    // Activate an unverified account here so the user can actually log in with
+    // the password they just set (otherwise login keeps returning the generic
+    // "Invalid email or password" for PENDING_VERIFICATION accounts).
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: record.userId } });
+    await this.prisma.$transaction([this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash, ...(user.status === 'PENDING_VERIFICATION' ? { status: 'ACTIVE' } : {}) } }), this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }), this.prisma.refreshToken.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: new Date() } })]);
     return { reset: true };
   }
 
