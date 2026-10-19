@@ -9,7 +9,7 @@ import { useAuth } from "@app/context/AuthContext";
 export function SetupPinPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { refreshPin, markPinVerified } = useAuth();
+  const { refreshPin } = useAuth();
   const [first, setFirst] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,8 +24,6 @@ export function SetupPinPage() {
     const result = await security.createPin(first);
     if (!result.ok) { setBusy(false); return setError(result.error.message); }
     await refreshPin();
-    // They just set the PIN, so this session has satisfied the step-up.
-    markPinVerified(true);
     setBusy(false);
     // Existing users who came from a normal login go straight to the dashboard;
     // the onboarding flow keeps its final "all set" confirmation step.

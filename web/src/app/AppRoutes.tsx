@@ -8,7 +8,6 @@ import { ForgotPasswordPage } from '@app/pages/auth/ForgotPasswordPage';
 import { VerifyOtpPage } from '@app/pages/auth/VerifyOtpPage';
 import { ResetPasswordPage } from '@app/pages/auth/ResetPasswordPage';
 import { SetupPinPage } from '@app/pages/auth/SetupPinPage';
-import { VerifyPinPage } from '@app/pages/auth/VerifyPinPage';
 import { RegisterSuccessPage } from '@app/pages/auth/RegisterSuccessPage';
 import { PrivacyPage, TermsPage } from '@app/pages/legal/LegalPage';
 import { DashboardPage } from '@app/pages/customer/DashboardPage';
@@ -55,7 +54,6 @@ export const appRoutes = (
     <Route path="/privacy" element={<PrivacyPage />} />
     <Route path="/register-success" element={<ProtectedRoute><RegisterSuccessPage /></ProtectedRoute>} />
     <Route path="/setup-pin" element={<ProtectedRoute><SetupPinPage /></ProtectedRoute>} />
-    <Route path="/verify-pin" element={<ProtectedRoute><VerifyPinPage /></ProtectedRoute>} />
     <Route
       path="/app"
       element={

@@ -20,14 +20,13 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-7">
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-laupay-ink-muted">
-          Built for everyday payments
-        </p>
-        <h1 className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-laupay-ink">
-          Hi {firstNameFrom(user?.fullName)}
-        </h1>
-        <p className="text-sm text-laupay-ink-muted">Here's what's happening with your account.</p>
+      <div className="flex items-center gap-3">
+        <ProfileAvatar name={user?.fullName ?? "LAUPAY"} photo={user?.profilePhotoUrl} />
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-laupay-ink-muted">Built for everyday payments</p>
+          <h1 className="mt-1 font-display text-2xl font-semibold tracking-[-0.03em] text-laupay-ink">Hi {firstNameFrom(user?.fullName)}</h1>
+          <p className="text-sm text-laupay-ink-muted">Here's what's happening with your account.</p>
+        </div>
       </div>
 
       <BalanceCard />
@@ -52,6 +51,11 @@ export function DashboardPage() {
       </div>
     </div>
   );
+}
+
+function ProfileAvatar({ name, photo }: { name: string; photo?: string | null }) {
+  const initials = name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  return photo ? <img src={photo} alt={`${name} profile`} className="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-laupay-amber/40" /> : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-laupay-indigo text-sm font-extrabold text-white ring-2 ring-laupay-amber/40">{initials || "L"}</span>;
 }
 
 function QuickAction({

@@ -3,12 +3,13 @@ import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
+import { Share2 } from "lucide-react";
 import { Button } from "@app/components/ui/Button";
 import { Input } from "@app/components/ui/Input";
 import { Card } from "@app/components/ui/Card";
 import { StatusBadge } from "@app/components/ui/Badge";
 import { PinPad } from "@app/components/security/PinPad";
-import { formatNaira } from "@app/lib/format";
+import { formatDateTime, formatNaira } from "@app/lib/format";
 import { useReducedMotion } from "@app/hooks/useReducedMotion";
 import { usePurchaseFlow } from "@app/hooks/usePurchaseFlow";
 import type { PurchaseKind, Order } from "@app/types/orders";
@@ -167,7 +168,7 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
           )}
 
           {state.step === "result" && (
-            <ResultCard kind={kind} order={state.order} error={state.error} onRestart={flow.restart} />
+            <ResultCard kind={kind} order={state.order} networks={state.networks} error={state.error} onRestart={flow.restart} />
           )}
         </motion.div>
       </AnimatePresence>
@@ -277,11 +278,13 @@ const TERMINAL_MESSAGES: Partial<Record<Order["status"], { tone: "muted" | "dang
 function ResultCard({
   kind,
   order,
+  networks,
   error,
   onRestart,
 }: {
   kind: PurchaseKind;
   order: Order | null;
+  networks: { id: string; name: string }[];
   error: ApiError | null;
   onRestart: () => void;
 }) {
@@ -299,13 +302,24 @@ function ResultCard({
 
   if (!order) return null;
 
+  const networkName = networks.find((network) => network.id === order.networkId)?.name ?? order.networkId;
+  const shareText = `LAUPAY ${kind === "airtime" ? "airtime" : "data"} purchase — ${formatNaira(order.amount)} for ${maskPhone(order.phoneNumber)}. Reference: ${order.reference}`;
+  const share = async () => {
+    if (navigator.share) await navigator.share({ title: "LAUPAY receipt", text: shareText });
+    else await navigator.clipboard?.writeText(shareText);
+  };
+
   const insufficientFunds =
     order.status === "cancelled" && order.failureReason === "INSUFFICIENT_FUNDS";
   const terminalMessage = TERMINAL_MESSAGES[order.status];
 
   return (
-    <Card>
-      <div className="flex items-center justify-between">
+    <Card className="border-laupay-amber/40">
+      <div className="flex flex-col items-center gap-3 py-2 text-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-laupay-amber text-2xl font-bold text-laupay-indigo">✓</span>
+        <p className="font-display text-xl font-extrabold text-laupay-indigo">Purchase {order.status === "success" ? "successful" : "submitted"}</p>
+      </div>
+      <div className="mt-4 flex items-center justify-between">
         <p className="text-sm font-semibold text-laupay-ink">
           {kind === "airtime" ? "Airtime" : "Data"} purchase
         </p>
@@ -314,7 +328,7 @@ function ResultCard({
       <p className="mt-3 font-display text-2xl font-semibold text-laupay-ink">
         {formatNaira(order.total ?? order.amount)}
       </p>
-      <p className="mt-1 text-sm text-laupay-ink-muted">{order.phoneNumber}</p>
+      <dl className="mt-4 space-y-2 rounded-lg bg-laupay-surface-muted p-3 text-sm"><Row label="Network" value={networkName} /><Row label="Destination" value={maskPhone(order.phoneNumber)} /><Row label="Time" value={formatDateTime(order.createdAt)} /><Row label="Reference" value={order.reference} /></dl>
       {order.status === "failed" && order.failureReason && (
         <p className="mt-2 text-sm text-laupay-danger">{order.failureReason}</p>
       )}
@@ -340,6 +354,7 @@ function ResultCard({
         </p>
       )}
       <div className="mt-5 flex gap-2">
+        <Button variant="secondary" className="flex-1" onClick={() => void share()}><Share2 size={15} /> Share receipt</Button>
         {insufficientFunds ? (
           <Link
             to="/app/wallet"
@@ -362,3 +377,5 @@ function ResultCard({
     </Card>
   );
 }
+
+function maskPhone(value: string) { return value.length > 6 ? `${value.slice(0, 4)}••••${value.slice(-3)}` : value; }

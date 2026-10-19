@@ -39,7 +39,7 @@ export interface DeviceInfo {
   trusted: boolean;
 }
 
-export type NotificationCategory = "account" | "transaction" | "payment" | "device" | "verification";
+export type NotificationCategory = "account" | "transaction" | "payment" | "device" | "verification" | "order" | "wallet" | "system";
 
 export interface SecurityNotification {
   id: string;
