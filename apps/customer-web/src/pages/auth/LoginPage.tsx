@@ -5,6 +5,8 @@ import { AuthLayout } from "@/layouts/AuthLayout";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/context/AuthContext";
+import { LoginIllustration } from "@/components/auth/LoginIllustration";
+import { Eye, EyeOff, LockKeyhole } from "lucide-react";
 
 const SESSION_MESSAGES: Record<string, string> = {
   session_expired: "Your session expired. Please log in again.",
@@ -19,6 +21,7 @@ export function LoginPage() {
     SESSION_MESSAGES[(location.state as { sessionStatus?: string } | null)?.sessionStatus ?? ""];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,8 +39,8 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout>
-      <h1 className="font-display text-lg font-semibold text-laupay-ink">Log in</h1>
+    <AuthLayout visual={<LoginIllustration />}>
+      <h1 className="font-display text-2xl font-extrabold tracking-[-.045em] text-laupay-ink">Log in</h1>
       <p className="mt-1 text-sm text-laupay-ink-muted">Welcome back to your LAUPAY account.</p>
 
       {sessionNotice && (
@@ -46,24 +49,28 @@ export function LoginPage() {
         </p>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-3.5">
         <fieldset disabled={submitting} className="contents">
         <Input
           label="Email"
           type="email"
           autoComplete="email"
           value={email}
+          placeholder="you@example.com"
+          className="pl-10"
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-        <Input
+        <div className="relative"><LockKeyhole size={17} className="pointer-events-none absolute left-3 top-[2.15rem] z-10 text-laupay-ink-muted" /><Input
           label="Password"
-          type="password"
+          type={showPassword ? "text" : "password"}
           autoComplete="current-password"
           value={password}
+          placeholder="Enter your password"
+          className="px-10"
           onChange={(e) => setPassword(e.target.value)}
           required
-        />
+        /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-2.5 top-[2rem] z-10 rounded p-1 text-laupay-ink-muted">{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>
         {error && (
           <p role="alert" className="text-sm font-medium text-laupay-danger">
             {error}

@@ -36,10 +36,12 @@ export const securityService = {
   },
 
   async getNotifications(): Promise<ApiResult<SecurityNotification[]>> {
-    return request<SecurityNotification[]>("/api/security/notifications");
+    return request<BackendNotification[]>("/api/notifications").then((result) => result.ok ? { ok: true, data: result.data.map((item) => ({ id: item.id, category: item.category as SecurityNotification["category"], message: `${item.title}: ${item.body}`, createdAt: item.createdAt, read: Boolean(item.readAt) })) } : result);
   },
 
   async markNotificationRead(id: string): Promise<ApiResult<{ read: true }>> {
-    return request<{ read: true }>(`/api/security/notifications/${id}/read`, { method: "POST" });
+    return request<{ read: true }>(`/api/notifications/${id}/read`, { method: "POST" });
   },
 };
+
+interface BackendNotification { id: string; category: string; title: string; body: string; createdAt: string; readAt: string | null; }
