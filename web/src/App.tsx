@@ -489,10 +489,8 @@ function Home() {
                 </div>
               </div>
               <div className="reveal reveal-delay-2 lg:pl-8">
-                {/* Real LAUPAY photo, pre-cropped to the person + app cards. */}
+                {/* Real LAUPAY photo. Keep the complete subject visible in the frame. */}
                 <div className="relative mx-auto aspect-[848/749] w-full max-w-[560px] overflow-hidden rounded-[28px] border border-white/10 bg-[#11142A] shadow-[0_30px_80px_rgba(0,0,0,.35)]">
-                  {/* The source photo includes page chrome on its left; this frames
-                      only the person + app cards (crop x 768-1616, y 170-919). */}
                   <img
                     src="/images/landing/features-ibrahim.png"
                     alt="LAUPAY user viewing wallet dashboard on phone"
@@ -500,8 +498,7 @@ function Home() {
                     height={941}
                     fetchPriority="high"
                     decoding="async"
-                    className="absolute max-w-none"
-                    style={{ width: '197.05%', height: 'auto', left: '-90.57%', top: '-22.70%' }}
+                    className="absolute inset-0 h-full w-full object-cover object-[75%_center]"
                   />
                   <div className="pointer-events-none absolute inset-0 rounded-[28px] ring-1 ring-inset ring-[#F4B33F]/15" />
                 </div>
