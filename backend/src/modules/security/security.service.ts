@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PasswordHasher } from '../auth/password-hasher.service';
 import { CreditsService } from '../credits/credits.service';
@@ -92,7 +92,7 @@ export class SecurityService {
   private async assertPinCorrect(userId: string, pin: string): Promise<void> {
     const record = await this.prisma.userSecurity.findUnique({ where: { userId } });
     if (!record?.pinHash) {
-      throw new UnauthorizedException('No PIN has been set for this account');
+      throw new BadRequestException('No PIN has been set for this account');
     }
     if (record.pinLockedUntil && record.pinLockedUntil > new Date()) {
       throw new ForbiddenException('PIN is temporarily locked due to too many failed attempts');
@@ -106,7 +106,10 @@ export class SecurityService {
         where: { userId },
         data: { failedPinAttempts: attempts, pinLockedUntil: lockedUntil },
       });
-      throw new UnauthorizedException('Incorrect PIN');
+      // 403, not 401: the session is valid, the step-up credential was
+      // wrong. Returning 401 would make clients (rightly) treat it as an
+      // expired/revoked session and sign the user out.
+      throw new ForbiddenException('Incorrect PIN');
     }
 
     // Correct PIN — reset the failure counter.

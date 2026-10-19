@@ -25,6 +25,8 @@ interface PurchaseFlowState {
   order: Order | null;
   error: ApiError | null;
   verifyError: string | null;
+  /** Bumped on each rejected PIN so the pad remounts and clears its digits. */
+  verifyAttempt: number;
   networksLoading: boolean;
   networkError: string | null;
   plansLoading: boolean;
@@ -46,6 +48,7 @@ function initialState(): PurchaseFlowState {
     order: null,
     error: null,
     verifyError: null,
+    verifyAttempt: 0,
     networksLoading: true,
     networkError: null,
     plansLoading: false,
@@ -103,31 +106,19 @@ export function usePurchaseFlow(kind: PurchaseKind) {
     }
   }, []);
 
+  /**
+   * "Confirm purchase" on the review step no longer creates anything — it
+   * moves to the PIN step. Nothing is created or debited until the backend
+   * accepts the transaction PIN (see submitVerification).
+   */
   const confirm = useCallback(() => {
-    const networkId = state.networkId;
-    if (!networkId) return;
-    setState((s) => ({ ...s, step: "processing", error: null }));
-    orders
-      .createOrder({
-        kind,
-        networkId,
-        phoneNumber: state.phoneNumber,
-        amount: state.amount ?? undefined,
-        planId: state.planId ?? undefined,
-        idempotencyKey: state.idempotencyKey,
-      })
-      .then((result) => {
-        if (result.ok) {
-          routeOrderResult(result.data);
-        } else {
-          setState((prev) => ({ ...prev, error: result.error, step: "result" }));
-        }
-      });
-  }, [kind, state.networkId, state.phoneNumber, state.amount, state.planId, state.idempotencyKey, routeOrderResult]);
+    if (!state.networkId) return;
+    setState((s) => ({ ...s, step: "verify", verifyError: null, error: null }));
+  }, [state.networkId]);
 
-  /** Submits the PIN/OTP the backend's VERIFY decision asked for. Same idempotency key resolves the same order. */
+  /** Submits the transaction PIN; only on success is the order created/debited. */
   const submitVerification = useCallback(
-    (code: string) => {
+    (pin: string) => {
       const networkId = state.networkId;
       if (!networkId) return;
       setState((s) => ({ ...s, step: "processing", verifyError: null }));
@@ -139,21 +130,28 @@ export function usePurchaseFlow(kind: PurchaseKind) {
           amount: state.amount ?? undefined,
           planId: state.planId ?? undefined,
           idempotencyKey: state.idempotencyKey,
-          verificationCode: code,
+          pin,
         })
         .then((result) => {
           if (result.ok) {
-            if (result.data.status === "failed" && result.data.failureReason?.toLowerCase().includes("pin")) {
-              setState((prev) => ({ ...prev, step: "verify", verifyError: result.data.failureReason ?? null }));
-            } else {
-              setState((prev) => ({ ...prev, order: result.data, step: "result" }));
-            }
-          } else {
-            setState((prev) => ({ ...prev, error: result.error, step: "result" }));
+            routeOrderResult(result.data);
+            return;
           }
+          // A rejected PIN (wrong / locked / not set) is a step-up failure, not
+          // a failed purchase — stay on the PIN step so they can retry.
+          if (isPinRejection(result.error)) {
+            setState((prev) => ({
+              ...prev,
+              step: "verify",
+              verifyError: result.error.message,
+              verifyAttempt: prev.verifyAttempt + 1,
+            }));
+            return;
+          }
+          setState((prev) => ({ ...prev, error: result.error, step: "result" }));
         });
     },
-    [kind, state.networkId, state.phoneNumber, state.amount, state.planId, state.idempotencyKey],
+    [kind, state.networkId, state.phoneNumber, state.amount, state.planId, state.idempotencyKey, routeOrderResult],
   );
 
   const restart = useCallback(() => {
@@ -186,4 +184,14 @@ export function usePurchaseFlow(kind: PurchaseKind) {
     restart,
     goBack,
   };
+}
+
+/**
+ * True when the failure is the PIN step-up itself (wrong, locked, or not set),
+ * as opposed to a genuine purchase failure. The backend returns 403/400 with a
+ * message mentioning "PIN" for these, so the user is kept on the PIN step
+ * rather than being shown a "purchase failed" result.
+ */
+function isPinRejection(error: ApiError): boolean {
+  return /\bpin\b/i.test(error.message);
 }

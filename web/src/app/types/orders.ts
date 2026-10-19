@@ -29,8 +29,12 @@ export interface CreateOrderPayload {
    * frontend only supplies the key and disables the button meanwhile.
    */
   idempotencyKey: string;
-  /** Present only when responding to a VERIFY risk decision (step-up). */
-  verificationCode?: string;
+  /**
+   * The account's 4-digit transaction PIN. The backend verifies it (and
+   * enforces its lockout policy) before it creates or debits anything, so a
+   * purchase cannot be authorized without it. Never logged or persisted here.
+   */
+  pin: string;
 }
 
 /** Alias kept for readability at call sites; same state machine as TransactionState. */

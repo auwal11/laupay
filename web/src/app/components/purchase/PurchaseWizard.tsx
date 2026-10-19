@@ -157,8 +157,10 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
                 For your security, enter your transaction PIN to finish this purchase.
               </p>
               <PinPad
+                key={state.verifyAttempt}
                 label="Transaction PIN"
                 error={state.verifyError}
+                disabled={false}
                 onComplete={flow.submitVerification}
               />
             </StepCard>
