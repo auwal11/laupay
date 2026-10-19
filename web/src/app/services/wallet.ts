@@ -82,6 +82,11 @@ interface BackendLedgerEntry {
   direction: string; // "CREDIT" | "DEBIT"
   referenceId?: string | null;
   createdAt: string;
+  status?: string;
+  description?: string;
+  network?: string;
+  counterparty?: string;
+  orderType?: string;
 }
 
 interface BackendPayment {
@@ -93,14 +98,17 @@ interface BackendPayment {
 }
 
 function normalizeTransaction(entry: BackendLedgerEntry): Transaction {
-  const isCredit = entry.direction === "CREDIT";
+  const isCredit = entry.direction.toUpperCase() === "CREDIT";
   return {
     id: entry.id,
     reference: entry.referenceId ?? entry.id,
-    type: isCredit ? "wallet_funding" : "wallet_debit",
-    status: "success",
+    type: entry.orderType === "airtime" ? "airtime" : entry.orderType === "data" ? "data" : isCredit ? "wallet_funding" : "wallet_debit",
+    status: (entry.status ?? "success") as Transaction["status"],
     amount: String(entry.amount),
-    description: isCredit ? "Wallet credit" : "Wallet debit",
+    description: entry.description ?? (isCredit ? "Wallet credit" : "Wallet debit"),
     createdAt: entry.createdAt,
+    direction: isCredit ? "credit" : "debit",
+    network: entry.network,
+    counterparty: entry.counterparty,
   };
 }

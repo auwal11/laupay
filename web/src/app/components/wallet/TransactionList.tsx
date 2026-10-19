@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDownLeft, ArrowUpRight, CircleAlert, Receipt, Search, Smartphone, Wifi } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StatusBadge } from "@app/components/ui/Badge";
 import { Skeleton } from "@app/components/ui/Skeleton";
@@ -5,58 +7,23 @@ import { ErrorState } from "@app/components/ui/ErrorState";
 import { EmptyState } from "@app/components/ui/EmptyState";
 import { formatDateTime, formatNaira } from "@app/lib/format";
 import { useTransactions } from "@app/hooks/useTransactions";
+import { disputesService } from "@app/services/disputes";
+import { DisputeDialog } from "@app/components/transactions/DisputeDialog";
+import type { TransactionDispute } from "@app/types/disputes";
+import type { Transaction } from "@app/types/wallet";
+
+type Filter = "all" | "success" | "pending" | "failed" | "airtime" | "data" | "wallet";
 
 export function TransactionList({ limit }: { limit?: number }) {
-  const state = useTransactions();
-
-  if (state.status === "loading") {
-    return (
-      <div className="flex flex-col gap-2">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
-      </div>
-    );
-  }
-
-  if (state.status === "error") {
-    return <ErrorState error={state.error} />;
-  }
-
-  if (state.status === "empty") {
-    return (
-      <EmptyState
-        title="No transactions yet"
-        description="Your airtime, data, and wallet activity will show up here once you make your first purchase."
-      />
-    );
-  }
-
+  const state = useTransactions(); const [query, setQuery] = useState(""); const [filter, setFilter] = useState<Filter>("all"); const [range, setRange] = useState("all"); const [selected, setSelected] = useState<Transaction | null>(null); const [disputes, setDisputes] = useState<TransactionDispute[]>([]);
+  useEffect(() => { disputesService.list().then((result) => { if (result.ok) setDisputes(result.data); }); }, []);
+  const rows = useMemo(() => { if (state.status !== "success") return []; const normalized = query.trim().toLowerCase(); const cutoff = range === "all" ? 0 : Date.now() - Number(range) * 86400000; return state.data.filter((txn) => { const text = `${txn.reference} ${txn.description} ${txn.network ?? ""} ${txn.counterparty ?? ""}`.toLowerCase(); const matchesFilter = filter === "all" || filter === txn.status || (filter === "wallet" && ["wallet_funding", "wallet_debit", "reversal"].includes(txn.type)) || filter === txn.type; return (!normalized || text.includes(normalized)) && matchesFilter && new Date(txn.createdAt).getTime() >= cutoff; }).slice(0, limit ?? state.data.length); }, [filter, limit, query, range, state]);
+  if (state.status === "loading") return <div className="flex flex-col gap-3">{Array.from({ length: limit ? 3 : 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>;
+  if (state.status === "error") return <ErrorState error={state.error} />;
+  if (state.status === "empty") return <EmptyState title="No transactions yet" description="Your airtime, data, and wallet activity will show up here once you make your first purchase." />;
   if (state.status !== "success") return null;
-
-  const rows = limit ? state.data.slice(0, limit) : state.data;
-
-  return (
-    <ul className="flex flex-col divide-y divide-laupay-border rounded-lg border border-laupay-border bg-white">
-      {rows.map((txn) => (
-        <li key={txn.id}>
-          <Link
-            to={`/app/transactions/${txn.id}`}
-            className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-laupay-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-laupay-indigo"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-laupay-ink">{txn.description}</p>
-              <p className="text-xs text-laupay-ink-muted">{formatDateTime(txn.createdAt)}</p>
-            </div>
-            <div className="flex shrink-0 flex-col items-end gap-1">
-              <span className="text-sm font-semibold tabular-nums text-laupay-ink">
-                {formatNaira(txn.amount)}
-              </span>
-              <StatusBadge status={txn.status} />
-            </div>
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
+  const credit = state.data.filter((txn) => txn.status === "success" && txn.direction === "credit").reduce((sum, txn) => sum + Number(txn.amount), 0); const debit = state.data.filter((txn) => txn.status === "success" && txn.direction !== "credit").reduce((sum, txn) => sum + Number(txn.amount), 0);
+  return <div className="flex flex-col gap-5">{!limit && <><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Summary label="Transactions" value={String(state.data.length)} /><Summary label="Total credited" value={formatNaira(String(credit))} tone="credit" /><Summary label="Total debited" value={formatNaira(String(debit))} tone="debit" /></div><div className="flex flex-col gap-3 rounded-xl border border-laupay-border bg-white p-3 sm:flex-row"><label className="relative flex-1"><Search size={17} className="absolute left-3 top-3 text-laupay-ink-muted" /><span className="sr-only">Search transactions</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search reference, type, recipient…" className="w-full rounded-lg border border-laupay-border py-2.5 pl-9 pr-3 text-sm outline-none focus:border-laupay-indigo" /></label><select aria-label="Filter transactions" value={filter} onChange={(event) => setFilter(event.target.value as Filter)} className="rounded-lg border border-laupay-border bg-white px-3 py-2.5 text-sm"><option value="all">All transactions</option><option value="success">Successful</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="airtime">Airtime</option><option value="data">Data</option><option value="wallet">Wallet</option></select><select aria-label="Date range" value={range} onChange={(event) => setRange(event.target.value)} className="rounded-lg border border-laupay-border bg-white px-3 py-2.5 text-sm"><option value="all">All dates</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select></div></>}{rows.length === 0 ? <EmptyState title="No matching transactions" description="Try a different search or filter." /> : <div className="overflow-hidden rounded-xl border border-laupay-border bg-white shadow-card"><ul className="divide-y divide-laupay-border">{rows.map((txn) => <Row key={txn.id} txn={txn} dispute={disputes.find((item) => item.ledgerEntryId === txn.id)} onDispute={() => setSelected(txn)} />)}</ul></div>}{selected && <DisputeDialog transaction={selected} onClose={() => setSelected(null)} onCreated={(dispute) => { setDisputes((current) => [...current, dispute]); setSelected(null); }} />}</div>;
 }
+function Summary({ label, value, tone }: { label: string; value: string; tone?: "credit" | "debit" }) { return <div className="rounded-xl border border-laupay-border bg-white p-4 shadow-card"><p className="text-xs font-medium uppercase tracking-wide text-laupay-ink-muted">{label}</p><p className={`mt-2 font-display text-xl font-semibold ${tone === "credit" ? "text-laupay-success" : tone === "debit" ? "text-laupay-ink" : "text-laupay-indigo"}`}>{value}</p></div>; }
+function Row({ txn, dispute, onDispute }: { txn: Transaction; dispute?: TransactionDispute; onDispute: () => void }) { const isCredit = txn.direction === "credit"; const Icon = txn.type === "airtime" ? Smartphone : txn.type === "data" ? Wifi : isCredit ? ArrowDownLeft : ArrowUpRight; return <li className="p-4"><div className="flex items-start gap-3"><div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isCredit ? "bg-laupay-success/10 text-laupay-success" : "bg-laupay-indigo/10 text-laupay-indigo"}`}><Icon size={18} /></div><div className="min-w-0 flex-1"><div className="flex flex-col gap-1 sm:flex-row sm:justify-between"><div className="min-w-0"><Link to={`/app/transactions/${txn.id}`} className="font-medium text-laupay-ink hover:text-laupay-indigo">{txn.description}</Link><p className="truncate text-xs text-laupay-ink-muted">{[txn.network, txn.counterparty].filter(Boolean).join(" · ") || "LAUPAY wallet"} · {formatDateTime(txn.createdAt)}</p></div><div className="flex shrink-0 items-center gap-2"><span className={`font-semibold tabular-nums ${isCredit ? "text-laupay-success" : "text-laupay-ink"}`}>{isCredit ? "+" : "-"}{formatNaira(txn.amount)}</span><StatusBadge status={txn.status} /></div></div><div className="mt-2 flex flex-wrap items-center gap-3 text-xs"><span className="break-all text-laupay-ink-muted">{txn.reference}</span><Link to={`/app/receipt/${txn.id}`} className="inline-flex items-center gap-1 font-medium text-laupay-indigo"><Receipt size={13} />Receipt</Link><button type="button" onClick={onDispute} className="inline-flex items-center gap-1 font-medium text-laupay-danger hover:underline"><CircleAlert size={13} />{dispute ? `Case ${dispute.caseReference}` : "Dispute Transaction"}</button></div></div></div></li>; }

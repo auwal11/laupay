@@ -5,6 +5,7 @@ import { StatusBadge } from "@app/components/ui/Badge";
 import { Skeleton } from "@app/components/ui/Skeleton";
 import { ErrorState } from "@app/components/ui/ErrorState";
 import { formatDateTime, formatNaira } from "@app/lib/format";
+import { DisputeDialog } from "@app/components/transactions/DisputeDialog";
 import { wallet } from "@app/services";
 import type { AsyncState } from "@app/types/common";
 import type { TransactionDetail } from "@app/types/wallet";
@@ -12,6 +13,7 @@ import type { TransactionDetail } from "@app/types/wallet";
 export function TransactionDetailPage() {
   const { id = "" } = useParams();
   const [state, setState] = useState<AsyncState<TransactionDetail>>({ status: "loading" });
+  const [disputeOpen, setDisputeOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,7 +71,9 @@ export function TransactionDetailPage() {
         >
           View receipt
         </Link>
+        <button type="button" onClick={() => setDisputeOpen(true)} className="mt-4 block text-sm font-medium text-laupay-danger hover:underline">Dispute Transaction</button>
       </Card>
+      {disputeOpen && <DisputeDialog transaction={txn} onClose={() => setDisputeOpen(false)} onCreated={() => setDisputeOpen(false)} />}
     </div>
   );
 }
