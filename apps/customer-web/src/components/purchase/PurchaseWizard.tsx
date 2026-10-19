@@ -292,22 +292,29 @@ function ResultCard({
 }) {
   if (error) {
     return (
-      <Card>
+      <>
+        <LiveTransactionNotice tone="error" title="Transaction failed" message={error.message} />
+        <Card>
         <p className="text-sm font-semibold text-laupay-danger">Couldn't complete this purchase</p>
         <p className="mt-2 text-sm text-laupay-ink-muted">{error.message}</p>
         <Button className="mt-4" fullWidth onClick={onRestart}>
           Try again
         </Button>
-      </Card>
+        </Card>
+      </>
     );
   }
 
   if (!order) return null;
 
   const terminalMessage = TERMINAL_MESSAGES[order.status];
+  const insufficient = order.failureReason === "INSUFFICIENT_FUNDS";
+  const successful = order.status === "success" || String(order.status) === "fulfilled";
 
   return (
-    <Card>
+    <>
+      <LiveTransactionNotice tone={successful ? "success" : "error"} title={successful ? "Transaction successful" : insufficient ? "Insufficient funds" : "Transaction update"} message={successful ? "Your purchase was completed successfully." : insufficient ? "Your wallet balance was not enough for this purchase." : terminalMessage?.text ?? "Your transaction could not be completed."} />
+      <Card>
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-laupay-ink">
           {kind === "airtime" ? "Airtime" : "Data"} purchase
@@ -341,6 +348,11 @@ function ResultCard({
           New purchase
         </Button>
       </div>
-    </Card>
+      </Card>
+    </>
   );
+}
+
+function LiveTransactionNotice({ tone, title, message }: { tone: "success" | "error"; title: string; message: string }) {
+  return <div role="status" className={`fixed inset-x-4 top-4 z-[60] mx-auto max-w-sm rounded-xl border px-4 py-3 shadow-[0_16px_40px_rgba(23,29,80,.2)] ${tone === "success" ? "border-laupay-success/30 bg-white" : "border-laupay-danger/30 bg-white"}`}><div className="flex items-start gap-3"><span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${tone === "success" ? "bg-laupay-success/15 text-laupay-success" : "bg-laupay-danger/10 text-laupay-danger"}`}>{tone === "success" ? "✓" : "!"}</span><div><p className="text-sm font-bold text-laupay-ink">{title}</p><p className="mt-0.5 text-xs leading-5 text-laupay-ink-muted">{message}</p></div></div></div>;
 }

@@ -197,7 +197,7 @@ export class OrdersService {
    */
   private async cancelledForInsufficientFunds(orderId: string) {
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-    await this.notifications.create({ userId: order.userId, category: 'order', title: 'Purchase not completed', body: 'Your wallet balance was not enough for this purchase.', metadata: { orderId: order.id, status: order.status } });
+    await this.createOrderNotification(order.userId, 'Purchase not completed', 'Your wallet balance was not enough for this purchase.', order.id, order.status);
     return { ...order, failureReason: INSUFFICIENT_FUNDS };
   }
 
@@ -256,15 +256,25 @@ export class OrdersService {
         );
       }
       const updated = await this.prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.REFUNDED } });
-      await this.notifications.create({ userId: updated.userId, category: 'order', title: 'Purchase failed', body: 'Your purchase could not be fulfilled and the debit was reversed.', metadata: { orderId: updated.id, status: updated.status } });
+      await this.createOrderNotification(updated.userId, 'Purchase failed', 'Your purchase could not be fulfilled and the debit was reversed.', updated.id, updated.status);
       return updated;
     }
 
     const updated = await this.prisma.order.update({ where: { id: orderId }, data: { status: finalStatus } });
     if (finalStatus === OrderStatus.FULFILLED) {
-      await this.notifications.create({ userId: updated.userId, category: 'order', title: 'Purchase successful', body: 'Your digital service purchase was completed successfully.', metadata: { orderId: updated.id, status: updated.status } });
+      await this.createOrderNotification(updated.userId, 'Purchase successful', 'Your digital service purchase was completed successfully.', updated.id, updated.status);
     }
     return updated;
+  }
+
+  private async createOrderNotification(userId: string, title: string, body: string, orderId: string, status: OrderStatus): Promise<void> {
+    try {
+      await this.notifications.create({ userId, category: 'order', title, body, metadata: { orderId, status } });
+    } catch (error) {
+      // Notification delivery must never turn an already-booked order into a
+      // client-visible failure. The order/ledger remains authoritative.
+      this.logger.warn(`Could not create notification for order ${orderId}: ${String(error)}`);
+    }
   }
 
   private mapVtuStatusToOrderStatus(vtuStatus: string): OrderStatus {

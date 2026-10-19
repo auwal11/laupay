@@ -290,13 +290,16 @@ function ResultCard({
 }) {
   if (error) {
     return (
-      <Card>
+      <>
+        <LiveTransactionNotice tone="error" title="Transaction failed" message={error.message} />
+        <Card>
         <p className="text-sm font-semibold text-laupay-danger">Couldn't complete this purchase</p>
         <p className="mt-2 text-sm text-laupay-ink-muted">{error.message}</p>
         <Button className="mt-4" fullWidth onClick={onRestart}>
           Try again
         </Button>
-      </Card>
+        </Card>
+      </>
     );
   }
 
@@ -312,8 +315,11 @@ function ResultCard({
   const insufficientFunds =
     order.status === "cancelled" && order.failureReason === "INSUFFICIENT_FUNDS";
   const terminalMessage = TERMINAL_MESSAGES[order.status];
+  const successful = order.status === "success" || String(order.status) === "fulfilled";
 
   return (
+    <>
+    <LiveTransactionNotice tone={successful ? "success" : "error"} title={successful ? "Transaction successful" : insufficientFunds ? "Insufficient funds" : "Transaction update"} message={successful ? "Your purchase was completed successfully." : insufficientFunds ? "Your wallet balance was not enough for this purchase." : terminalMessage?.text ?? "Your transaction could not be completed."} />
     <Card className="border-laupay-amber/40">
       <div className="flex flex-col items-center gap-3 py-2 text-center">
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-laupay-amber text-2xl font-bold text-laupay-indigo">✓</span>
@@ -375,7 +381,12 @@ function ResultCard({
         </Button>
       </div>
     </Card>
+    </>
   );
+}
+
+function LiveTransactionNotice({ tone, title, message }: { tone: "success" | "error"; title: string; message: string }) {
+  return <div role="status" className={`fixed inset-x-4 top-4 z-[60] mx-auto max-w-sm rounded-xl border px-4 py-3 shadow-[0_16px_40px_rgba(23,29,80,.2)] ${tone === "success" ? "border-laupay-success/30 bg-white" : "border-laupay-danger/30 bg-white"}`}><div className="flex items-start gap-3"><span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${tone === "success" ? "bg-laupay-success/15 text-laupay-success" : "bg-laupay-danger/10 text-laupay-danger"}`}>{tone === "success" ? "✓" : "!"}</span><div><p className="text-sm font-bold text-laupay-ink">{title}</p><p className="mt-0.5 text-xs leading-5 text-laupay-ink-muted">{message}</p></div></div></div>;
 }
 
 function maskPhone(value: string) { return value.length > 6 ? `${value.slice(0, 4)}••••${value.slice(-3)}` : value; }
