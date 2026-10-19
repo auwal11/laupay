@@ -15,6 +15,13 @@ const TERMINAL_STATUSES: OrderStatus[] = [
   OrderStatus.CANCELLED,
 ];
 
+/**
+ * Machine-readable cancellation reason returned when an order is cancelled
+ * because the wallet could not cover it. Clients render a dedicated
+ * "insufficient funds" warning from this instead of a generic cancellation.
+ */
+const INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS';
+
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
@@ -59,7 +66,9 @@ export class OrdersService {
     });
 
     const debited = await this.debitForOrder(order.id, userId, amount);
-    if (!debited) return this.prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    if (!debited) {
+      return this.cancelledForInsufficientFunds(order.id);
+    }
 
     await this.prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.PAID } });
 
@@ -112,7 +121,9 @@ export class OrdersService {
     });
 
     const debited = await this.debitForOrder(order.id, userId, amount);
-    if (!debited) return this.prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    if (!debited) {
+      return this.cancelledForInsufficientFunds(order.id);
+    }
 
     await this.prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.PAID } });
 
@@ -174,6 +185,17 @@ export class OrdersService {
 
   async listMyOrders(userId: string) {
     return this.prisma.order.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
+  }
+
+  /**
+   * Returned when debitForOrder found insufficient balance. The order is
+   * already persisted as CANCELLED; we attach the machine-readable reason so
+   * the client can render an "insufficient funds" warning rather than a
+   * generic cancellation.
+   */
+  private async cancelledForInsufficientFunds(orderId: string) {
+    const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    return { ...order, failureReason: INSUFFICIENT_FUNDS };
   }
 
   /**

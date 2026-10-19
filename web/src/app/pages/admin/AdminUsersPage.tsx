@@ -17,6 +17,7 @@ import { Button } from "@app/components/ui/Button";
 import { Card } from "@app/components/ui/Card";
 import { EmptyState } from "@app/components/ui/EmptyState";
 import { ErrorState } from "@app/components/ui/ErrorState";
+import { Input } from "@app/components/ui/Input";
 import { formatNaira } from "@app/lib/format";
 
 export function AdminUsersPage() {
@@ -25,6 +26,12 @@ export function AdminUsersPage() {
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+
+  const [fundUser, setFundUser] = useState<{ id: string; name: string } | null>(null);
+  const [fundAmount, setFundAmount] = useState("5000");
+  const [fundBusy, setFundBusy] = useState(false);
+  const [fundNotice, setFundNotice] = useState<string | null>(null);
+  const [fundError, setFundError] = useState<string | null>(null);
 
   const state = useAsync(
     () => adminService.users({ search: search || undefined, role: role || undefined, status: status || undefined, page }),
@@ -37,9 +44,86 @@ export function AdminUsersPage() {
     setSearch(searchInput.trim());
   };
 
+  function openFund(user: { id: string; fullName: string }) {
+    setFundUser({ id: user.id, name: user.fullName });
+    setFundAmount("5000");
+    setFundNotice(null);
+    setFundError(null);
+  }
+
+  async function submitFund(e: FormEvent) {
+    e.preventDefault();
+    if (!fundUser) return;
+    setFundBusy(true);
+    setFundNotice(null);
+    setFundError(null);
+    const value = Number(fundAmount);
+    const result = await adminService.creditTestFunds({
+      userId: fundUser.id,
+      amount: value,
+      idempotencyKey: crypto.randomUUID(),
+    });
+    setFundBusy(false);
+    if (!result.ok) {
+      setFundError(result.error.message);
+      return;
+    }
+    setFundNotice(
+      result.data.wasAlreadyApplied
+        ? "This credit was already applied."
+        : `Funded ${fundUser.name} ${formatNaira(String(value))}. New balance: ${formatNaira(result.data.balanceAfter)}.`,
+    );
+    state.reload();
+  }
+
   return (
     <div>
       <PageHeader title="Users" description="Every registered account and its wallet." />
+
+      {fundUser && (
+        <Card className="mb-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-laupay-ink">Fund {fundUser.name}</h2>
+            <button
+              type="button"
+              onClick={() => setFundUser(null)}
+              className="text-xs font-medium text-laupay-ink-muted hover:underline"
+            >
+              Close
+            </button>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-laupay-ink-muted">
+            Adds funds to this user's wallet and records an audit entry. Visible to the user as a
+            test credit from Ibrahim Lau Provision Shop.
+          </p>
+          <form onSubmit={submitFund} className="mt-3 flex flex-wrap items-end gap-3">
+            <div className="w-40">
+              <Input
+                label="Amount (NGN)"
+                type="number"
+                min="1"
+                step="0.01"
+                value={fundAmount}
+                onChange={(e) => setFundAmount(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" loading={fundBusy}>
+              Credit test funds
+            </Button>
+          </form>
+          {fundNotice && (
+            <p role="status" className="mt-3 rounded-md bg-green-50 px-3 py-2 text-xs font-medium text-laupay-success">
+              {fundNotice}
+            </p>
+          )}
+          {fundError && (
+            <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-laupay-danger">
+              {fundError}
+            </p>
+          )}
+        </Card>
+      )}
 
       <form onSubmit={onSearch} className="mb-4 flex flex-wrap items-end gap-3">
         <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
@@ -133,12 +217,21 @@ export function AdminUsersPage() {
                       </Td>
                       <Td className="text-xs text-laupay-ink-muted">{u.hasPin ? "Set" : "Not set"}</Td>
                       <Td className="text-right">
-                        <Link
-                          to={`/admin/users/${u.id}`}
-                          className="text-xs font-medium text-laupay-indigo hover:underline"
-                        >
-                          View
-                        </Link>
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => openFund(u)}
+                            className="text-xs font-medium text-laupay-indigo hover:underline"
+                          >
+                            Fund
+                          </button>
+                          <Link
+                            to={`/admin/users/${u.id}`}
+                            className="text-xs font-medium text-laupay-indigo hover:underline"
+                          >
+                            View
+                          </Link>
+                        </div>
                       </Td>
                     </tr>
                   ))}

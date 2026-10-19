@@ -299,6 +299,8 @@ function ResultCard({
 
   if (!order) return null;
 
+  const insufficientFunds =
+    order.status === "cancelled" && order.failureReason === "INSUFFICIENT_FUNDS";
   const terminalMessage = TERMINAL_MESSAGES[order.status];
 
   return (
@@ -316,7 +318,19 @@ function ResultCard({
       {order.status === "failed" && order.failureReason && (
         <p className="mt-2 text-sm text-laupay-danger">{order.failureReason}</p>
       )}
-      {terminalMessage && (
+      {insufficientFunds && (
+        <div
+          role="alert"
+          className="mt-3 rounded-md border border-laupay-amber bg-amber-50 px-3 py-2.5 text-sm"
+        >
+          <p className="font-semibold text-laupay-pending">Insufficient wallet balance</p>
+          <p className="mt-0.5 text-laupay-ink-muted">
+            Your wallet doesn't have enough to cover this purchase. Top up your wallet and try
+            again — you have not been charged.
+          </p>
+        </div>
+      )}
+      {terminalMessage && !insufficientFunds && (
         <p
           className={
             "mt-2 text-sm " + (terminalMessage.tone === "danger" ? "text-laupay-danger" : "text-laupay-pending")
@@ -326,12 +340,21 @@ function ResultCard({
         </p>
       )}
       <div className="mt-5 flex gap-2">
-        <Link
-          to={`/app/transactions/${order.id}`}
-          className="flex-1 rounded-md border border-laupay-border px-4 py-2.5 text-center text-sm font-medium text-laupay-ink hover:bg-laupay-surface-muted"
-        >
-          View details
-        </Link>
+        {insufficientFunds ? (
+          <Link
+            to="/app/wallet"
+            className="flex-1 rounded-md bg-laupay-amber px-4 py-2.5 text-center text-sm font-semibold text-laupay-ink hover:opacity-90"
+          >
+            Fund wallet
+          </Link>
+        ) : (
+          <Link
+            to={`/app/transactions/${order.id}`}
+            className="flex-1 rounded-md border border-laupay-border px-4 py-2.5 text-center text-sm font-medium text-laupay-ink hover:bg-laupay-surface-muted"
+          >
+            View details
+          </Link>
+        )}
         <Button className="flex-1" onClick={onRestart}>
           New purchase
         </Button>

@@ -94,6 +94,7 @@ interface BackendOrder {
   status: string;
   amount?: string | number;
   totalAmount?: string | number;
+  failureReason?: string;
   createdAt: string;
 }
 
@@ -107,6 +108,7 @@ function normalizeOrder(value: BackendOrder, input: CreateOrderPayload): Order {
     networkId: input.networkId,
     phoneNumber: input.phoneNumber,
     amount: String(value.amount ?? value.totalAmount ?? input.amount ?? "0"),
+    failureReason: value.failureReason,
     createdAt: value.createdAt,
   };
 }
