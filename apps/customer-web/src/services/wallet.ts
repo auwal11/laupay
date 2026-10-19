@@ -14,7 +14,7 @@ export const walletService = {
   async getTransactions(): Promise<ApiResult<Transaction[]>> {
     return request<unknown[]>("/api/wallet/transactions").then((result) => result.ok ? {
       ok: true,
-      data: result.data.map((entry: any): Transaction => ({ id: entry.id, reference: entry.referenceId ?? entry.id, type: "wallet_debit", status: "success", amount: String(entry.amount), description: `${entry.direction === "CREDIT" ? "Wallet credit" : "Wallet debit"}`, createdAt: entry.createdAt })),
+      data: result.data.map((entry: any): Transaction => ({ id: entry.id, reference: entry.referenceId ?? entry.id, type: entry.orderType === "airtime" ? "airtime" : entry.orderType === "data" ? "data" : entry.reason === "WALLET_FUNDING" ? "wallet_funding" : "wallet_debit", status: entry.status ?? "success", amount: String(entry.amount), description: entry.description ?? `${entry.direction === "credit" ? "Wallet credit" : "Wallet debit"}`, createdAt: entry.createdAt, direction: entry.direction, counterparty: entry.counterparty, network: entry.network })),
     } : result);
   },
 
@@ -30,5 +30,5 @@ export const walletService = {
 };
 
 function mapLedgerEntry(entry: any): TransactionDetail {
-  return { id: entry.id, reference: entry.referenceId ?? entry.id, type: entry.direction === "CREDIT" ? "wallet_funding" : "wallet_debit", status: "success", amount: String(entry.amount), description: entry.reason === "ORDER_PAYMENT" ? "Service purchase" : entry.direction === "CREDIT" ? "Wallet credit" : "Wallet debit", createdAt: entry.createdAt, providerReference: entry.providerReference };
+  return { id: entry.id, reference: entry.referenceId ?? entry.id, type: entry.orderType === "airtime" ? "airtime" : entry.orderType === "data" ? "data" : entry.direction?.toLowerCase() === "credit" ? "wallet_funding" : "wallet_debit", status: entry.status ?? "success", amount: String(entry.amount), description: entry.description ?? (entry.reason === "ORDER_PAYMENT" ? "Service purchase" : entry.direction?.toLowerCase() === "credit" ? "Wallet credit" : "Wallet debit"), createdAt: entry.createdAt, providerReference: entry.providerReference, direction: entry.direction?.toLowerCase(), counterparty: entry.counterparty, network: entry.network, failureReason: entry.failureReason };
 }

@@ -133,6 +133,14 @@ enum AuditAction {
   WALLET_ADJUSTMENT
 }
 
+enum DisputeStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+  CLOSED
+}
+
 // ============================================================
 // USERS & AUTH
 // ============================================================
@@ -165,8 +173,10 @@ model User {
   auditLogs     AuditLog[]     @relation("AuditActor")
   security      UserSecurity?
   notifications Notification[]
+  disputes      TransactionDispute[]
 
   createdAt DateTime @default(now())
+
   updatedAt DateTime @updatedAt
 
   @@index([role])
@@ -314,9 +324,30 @@ model LedgerEntry {
 
   createdAt DateTime @default(now())
 
+  disputes TransactionDispute[]
+
   @@index([walletAccountId, createdAt])
   @@index([referenceType, referenceId])
   @@index([source])
+}
+
+model TransactionDispute {
+  id            String        @id @default(uuid())
+  caseReference String        @unique
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntryId String
+  ledgerEntry   LedgerEntry   @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+  reason        String
+  details       String?
+  status        DisputeStatus @default(OPEN)
+  resolvedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([userId, ledgerEntryId])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 // ============================================================

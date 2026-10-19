@@ -8,10 +8,12 @@ import { formatDateTime, formatNaira } from "@/lib/format";
 import { wallet } from "@/services";
 import type { AsyncState } from "@/types/common";
 import type { TransactionDetail } from "@/types/wallet";
+import { DisputeDialog } from "@/components/transactions/DisputeDialog";
 
 export function TransactionDetailPage() {
   const { id = "" } = useParams();
   const [state, setState] = useState<AsyncState<TransactionDetail>>({ status: "loading" });
+  const [disputeOpen, setDisputeOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +38,6 @@ export function TransactionDetailPage() {
   if (state.status !== "success") return null;
 
   const txn = state.data;
-
   return (
     <div className="mx-auto flex max-w-md flex-col gap-4">
       <h1 className="font-display text-xl font-semibold text-laupay-ink">Transaction details</h1>
@@ -69,7 +70,9 @@ export function TransactionDetailPage() {
         >
           View receipt
         </Link>
+        <button type="button" onClick={() => setDisputeOpen(true)} className="mt-4 block text-sm font-medium text-laupay-danger hover:underline">Dispute Transaction</button>
       </Card>
+      {disputeOpen && <DisputeDialog transaction={txn} onClose={() => setDisputeOpen(false)} onCreated={() => setDisputeOpen(false)} />}
     </div>
   );
 }

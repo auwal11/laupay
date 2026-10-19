@@ -18,6 +18,7 @@ import { ReconciliationModule } from './modules/reconciliation/reconciliation.mo
 import { SecurityModule } from './modules/security/security.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CreditsModule } from './modules/credits/credits.module';
+import { DisputesModule } from './modules/disputes/disputes.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 @Module({
@@ -42,6 +43,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     SecurityModule,
     NotificationsModule,
     CreditsModule,
+    DisputesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -30,6 +30,12 @@ export interface Transaction {
   amount: string;
   description: string;
   createdAt: string;
+  direction?: "credit" | "debit";
+  counterparty?: string;
+  network?: string;
+  providerReference?: string;
+  failureReason?: string;
+  disputeStatus?: string;
 }
 
 export interface TransactionDetail extends Transaction {
