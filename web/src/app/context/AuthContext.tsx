@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 import { auth } from "@app/services";
 import { setSessionInvalidHandler } from "@app/services/api";
-import type { AuthUser, LoginPayload, RegisterPayload } from "@app/types/auth";
+import type { AuthUser, LoginPayload, OtpPayload, RegisterPayload } from "@app/types/auth";
 import type { ApiError } from "@app/types/common";
 import type { SessionStatus } from "@app/types/security";
 
@@ -13,6 +13,9 @@ interface AuthContextValue {
   register: (payload: RegisterPayload) => Promise<ApiError | null>;
   logout: () => void;
   refreshUser: () => Promise<ApiError | null>;
+  verifyOtp: (payload: OtpPayload) => Promise<ApiError | null>;
+  pinReady: boolean | null;
+  refreshPin: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -20,6 +23,18 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<SessionStatus>("checking");
+  const [pinReady, setPinReady] = useState<boolean | null>(null);
+
+  const refreshPin = useCallback(async () => {
+    const result = await (await import("@app/services")).security.getPinStatus();
+    if (!result.ok) {
+      setPinReady(false);
+      return false;
+    }
+    const ready = result.data.status === "active";
+    setPinReady(ready);
+    return ready;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,14 +43,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.ok) {
         setUser(result.data);
         setStatus("authenticated");
+        void refreshPin();
       } else {
         setStatus("anonymous");
+        setPinReady(null);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshPin]);
 
   // Any 401 from any request (not just login) routes through here — this is
   // what makes "session revoked mid-session" a real, handled UI state
@@ -56,8 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!profile.ok) return profile.error;
     setUser(profile.data);
     setStatus("authenticated");
+    await refreshPin();
     return null;
-  }, []);
+  }, [refreshPin]);
 
   const register = useCallback(async (payload: RegisterPayload) => {
     const result = await auth.register(payload);
@@ -74,6 +92,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     auth.logout();
     setUser(null);
     setStatus("anonymous");
+    setPinReady(null);
+  }, []);
+
+  const verifyOtp = useCallback(async (payload: OtpPayload) => {
+    const result = await auth.verifyOtp(payload);
+    if (!result.ok) return result.error;
+    const profile = await auth.me();
+    if (!profile.ok) return profile.error;
+    setUser(profile.data);
+    setStatus("authenticated");
+    setPinReady(false);
+    return null;
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -86,8 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, status, login, register, logout, refreshUser }),
-    [user, status, login, register, logout, refreshUser],
+    () => ({ user, status, login, register, logout, refreshUser, verifyOtp, pinReady, refreshPin }),
+    [user, status, login, register, logout, refreshUser, verifyOtp, pinReady, refreshPin],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

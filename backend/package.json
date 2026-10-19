@@ -54,5 +54,12 @@
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
-  }
+  },
+  "allowScripts": [
+    "@nestjs/core",
+    "@prisma/client",
+    "@prisma/engines",
+    "argon2",
+    "prisma"
+  ]
 }

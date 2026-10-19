@@ -18,22 +18,21 @@ export class RegisterDto {
   @MinLength(2)
   fullName!: string;
 
-  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.replace(/[\s()-]/g, '') : value)
   @IsString()
-  phone?: string;
+  @Matches(/^(?:\+234|0)[789]\d{9}$/, { message: 'phone must be a valid Nigerian phone number' })
+  phone!: string;
 
   /** A validated image data URL. It is stored by the application, never sent to email. */
   @IsOptional()
   @IsString()
   profilePhotoData?: string;
 
-  @IsOptional()
   @IsBoolean()
-  termsAccepted?: boolean;
+  termsAccepted!: boolean;
 
-  @IsOptional()
   @IsString()
-  termsVersion?: string;
+  termsVersion!: string;
 }
 
 export class LoginDto {

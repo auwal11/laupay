@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
@@ -30,8 +31,8 @@ export class AuthController {
    */
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('verify-otp')
-  verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.authService.verifyEmail(dto);
+  verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
+    return this.authService.verifyEmail(dto, req.ip);
   }
 
   /**
@@ -41,7 +42,8 @@ export class AuthController {
    */
   @Throttle({ default: { limit: 3, ttl: 300_000 } })
   @Post('resend-otp')
-  async resendOtp(@Body() dto: ResendOtpDto) {
+  async resendOtp(@Body() dto: ResendOtpDto, @Req() req: Request) {
+    await this.otpService.assertResendAllowed(dto.email, req.ip ?? 'unknown');
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (user && user.status === 'PENDING_VERIFICATION') {
       await this.otpService.issue(user.id);

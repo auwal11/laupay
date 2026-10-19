@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomInt } from 'crypto';
 import { AppConfigService } from '../../config/app-config.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -7,6 +7,8 @@ import { Inject } from '@nestjs/common';
 
 const OTP_TTL_MINUTES = 10;
 const OTP_LENGTH = 6;
+const RESEND_COOLDOWN_MS = 60_000;
+const RESEND_WINDOW_MS = 60 * 60_000;
 
 /**
  * Email OTP verification (requirements 3 + 4): a new user must verify their
@@ -69,16 +71,27 @@ export class OtpService {
     });
 
     if (!otp) throw invalid;
+    if (otp.lockedUntil && otp.lockedUntil > new Date()) {
+      throw new HttpException('Too many attempts. Please request a new code later.', HttpStatus.TOO_MANY_REQUESTS);
+    }
 
     // Conditional increment first — never trust a stale in-memory count.
     const updated = await this.prisma.emailOtp.updateMany({
       where: { id: otp.id, consumedAt: null, attempts: { lt: otp.maxAttempts } },
       data: { attempts: { increment: 1 } },
     });
-    if (updated.count === 0) throw invalid; // exhausted or consumed concurrently
+    if (updated.count === 0) throw new HttpException('Code no longer valid. Request a new one.', HttpStatus.TOO_MANY_REQUESTS);
 
     if (otp.expiresAt.getTime() < Date.now()) throw invalid;
-    if (OtpService.hash(code) !== otp.codeHash) throw invalid;
+    if (OtpService.hash(code) !== otp.codeHash) {
+      const nextAttempts = otp.attempts + 1;
+      await this.prisma.auditLog.create({ data: { actorId: userId, action: 'LOGIN_FAILED', entityType: 'EmailOtp', entityId: otp.id, metadata: { reason: 'invalid_otp' } } });
+      if (nextAttempts >= otp.maxAttempts) {
+        await this.prisma.emailOtp.update({ where: { id: otp.id }, data: { consumedAt: new Date(), lockedUntil: new Date(Date.now() + 15 * 60_000) } });
+        throw new HttpException('Code no longer valid. Request a new one.', HttpStatus.TOO_MANY_REQUESTS);
+      }
+      throw invalid;
+    }
 
     // Atomic single-use claim: only one of two racing requests can win.
     const claimed = await this.prisma.emailOtp.updateMany({
@@ -88,6 +101,30 @@ export class OtpService {
     if (claimed.count === 0) throw invalid;
 
     this.logger.log(`OTP verified for user ${userId}`);
+  }
+
+  async assertResendAllowed(email: string, ip: string): Promise<void> {
+    await this.checkRate(`resend:email:${email.trim().toLowerCase()}`, 'otp_resend_email', 5, RESEND_WINDOW_MS, RESEND_COOLDOWN_MS);
+    await this.checkRate(`resend:ip:${ip}`, 'otp_resend_ip', 10, RESEND_WINDOW_MS, 0);
+  }
+
+  private async checkRate(key: string, category: string, max: number, windowMs: number, cooldownMs: number) {
+    const now = new Date();
+    const existing = await this.prisma.otpRateLimit.findUnique({ where: { key } });
+    if (existing?.blockedUntil && existing.blockedUntil > now) throw new HttpException('Too many attempts. Please try again later.', HttpStatus.TOO_MANY_REQUESTS);
+    const windowExpired = !existing || now.getTime() - existing.windowStartedAt.getTime() >= windowMs;
+    if (existing && !windowExpired && cooldownMs > 0 && existing.lastAttemptAt && now.getTime() - existing.lastAttemptAt.getTime() < cooldownMs) {
+      throw new HttpException('Too many attempts. Please try again later.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    if (existing && !windowExpired && existing.count >= max) {
+      await this.prisma.otpRateLimit.update({ where: { key }, data: { blockedUntil: new Date(existing.windowStartedAt.getTime() + windowMs) } });
+      throw new HttpException('Too many attempts. Please try again later.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    if (windowExpired) {
+      await this.prisma.otpRateLimit.upsert({ where: { key }, create: { key, category, count: 1, windowStartedAt: now, lastAttemptAt: now }, update: { category, count: 1, windowStartedAt: now, lastAttemptAt: now, blockedUntil: null } });
+    } else {
+      await this.prisma.otpRateLimit.update({ where: { key }, data: { count: { increment: 1 }, lastAttemptAt: now } });
+    }
   }
 
   /** Sends the 6-digit code through the configured MAIL_PROVIDER. */

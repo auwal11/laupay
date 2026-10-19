@@ -43,7 +43,7 @@ export class AuthService {
    * Verifies the emailed code, flips PENDING_VERIFICATION -> ACTIVE and only
    * then issues tokens (requirements 3 + 4). No code, no tokens.
    */
-  async verifyEmail(dto: VerifyOtpDto) {
+  async verifyEmail(dto: VerifyOtpDto, _ip?: string) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     // Same message whether the email exists or the code is wrong.
     if (!user) throw new UnauthorizedException('Invalid or expired verification code');
@@ -97,6 +97,7 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
+    if (dto.termsAccepted !== true) throw new ForbiddenException('Terms acceptance is required');
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new ConflictException('An account with this email already exists');

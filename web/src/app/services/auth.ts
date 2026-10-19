@@ -22,10 +22,10 @@ const REFRESH_KEY = "laupay_refresh_token";
 export const authService = {
   async register(payload: RegisterPayload): Promise<ApiResult<RegistrationReceipt>> {
     // confirmPassword is a UI-only concern; the backend never receives it.
-    const { confirmPassword: _confirmPassword, role, ...rest } = payload;
+    const { confirmPassword: _confirmPassword, ...rest } = payload;
     return request<RegistrationReceipt>("/auth/register", {
       method: "POST",
-      body: { ...rest, role: role.toUpperCase() },
+      body: rest,
     });
   },
 
@@ -52,11 +52,9 @@ export const authService = {
       method: "POST",
       body: payload,
     });
-    // Verification only activates the account; the product flow logs in next,
-    // so we deliberately do not create an authenticated session here.
     if (result.ok) {
-      setAccessToken(null);
-      if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(REFRESH_KEY);
+      setAccessToken(result.data.accessToken);
+      if (typeof sessionStorage !== "undefined") sessionStorage.setItem(REFRESH_KEY, result.data.refreshToken);
     }
     return result;
   },
