@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
@@ -6,6 +6,7 @@ import { AppConfigService } from '../../config/app-config.service';
 
 @Injectable()
 export class ProfileStorageService {
+  private readonly logger = new Logger(ProfileStorageService.name);
   private bucketReady = false;
   private bucketSetup?: Promise<void>;
 
@@ -16,13 +17,24 @@ export class ProfileStorageService {
     if (!this.bucketSetup) {
       this.bucketSetup = (async () => {
         const baseUrl = this.config.supabaseUrl.replace(/\/$/, '');
-        const response = await fetch(`${baseUrl}/storage/v1/bucket`, {
+        const bucketUrl = `${baseUrl}/storage/v1/bucket/${encodeURIComponent(this.config.supabaseStorageBucket)}`;
+        const headers = {
+          Authorization: `Bearer ${this.config.supabaseServiceRoleKey}`,
+          apikey: this.config.supabaseServiceRoleKey,
+          'Content-Type': 'application/json',
+        };
+        const existing = await fetch(bucketUrl, { method: 'GET', headers });
+        if (existing.ok) {
+          this.bucketReady = true;
+          return;
+        }
+        if (existing.status !== 404) {
+          throw new Error(`Supabase bucket check failed (${existing.status})`);
+        }
+
+        const created = await fetch(`${baseUrl}/storage/v1/bucket`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.config.supabaseServiceRoleKey}`,
-            apikey: this.config.supabaseServiceRoleKey,
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({
             id: this.config.supabaseStorageBucket,
             name: this.config.supabaseStorageBucket,
@@ -32,11 +44,14 @@ export class ProfileStorageService {
           }),
         });
 
-        // Supabase returns a conflict when the bucket already exists. That is
-        // the normal case after the first successful upload.
-        if (!response.ok && response.status !== 409) {
-          throw new Error(`Supabase bucket setup failed (${response.status})`);
+        // Different Supabase Storage versions use 400 or 409 for a concurrent
+        // create/already-exists response. Verify the bucket instead of
+        // treating either response as a permanent outage.
+        if (!created.ok && created.status !== 400 && created.status !== 409) {
+          throw new Error(`Supabase bucket setup failed (${created.status})`);
         }
+        const verified = await fetch(bucketUrl, { method: 'GET', headers });
+        if (!verified.ok) throw new Error(`Supabase bucket verification failed (${verified.status})`);
         this.bucketReady = true;
       })().catch((error) => {
         this.bucketSetup = undefined;
@@ -65,7 +80,10 @@ export class ProfileStorageService {
         // Never let a transport failure escape as an opaque 500.
         throw new ServiceUnavailableException('Profile image storage is unavailable');
       }
-      if (!response.ok) throw new ServiceUnavailableException('Profile image storage is unavailable');
+      if (!response.ok) {
+        this.logger.warn(`Profile image upload failed with storage status ${response.status}`);
+        throw new ServiceUnavailableException('Profile image storage is unavailable');
+      }
       return `${baseUrl}/storage/v1/object/public/${this.config.supabaseStorageBucket}/${path}`;
     }
     try {
