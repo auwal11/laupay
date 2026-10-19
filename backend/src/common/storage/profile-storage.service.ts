@@ -6,7 +6,46 @@ import { AppConfigService } from '../../config/app-config.service';
 
 @Injectable()
 export class ProfileStorageService {
+  private bucketReady = false;
+  private bucketSetup?: Promise<void>;
+
   constructor(private readonly config: AppConfigService) {}
+
+  private async ensureSupabaseBucket(): Promise<void> {
+    if (this.bucketReady) return;
+    if (!this.bucketSetup) {
+      this.bucketSetup = (async () => {
+        const baseUrl = this.config.supabaseUrl.replace(/\/$/, '');
+        const response = await fetch(`${baseUrl}/storage/v1/bucket`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.config.supabaseServiceRoleKey}`,
+            apikey: this.config.supabaseServiceRoleKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: this.config.supabaseStorageBucket,
+            name: this.config.supabaseStorageBucket,
+            public: true,
+            file_size_limit: 2 * 1024 * 1024,
+            allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp'],
+          }),
+        });
+
+        // Supabase returns a conflict when the bucket already exists. That is
+        // the normal case after the first successful upload.
+        if (!response.ok && response.status !== 409) {
+          throw new Error(`Supabase bucket setup failed (${response.status})`);
+        }
+        this.bucketReady = true;
+      })().catch((error) => {
+        this.bucketSetup = undefined;
+        throw error;
+      });
+    }
+    await this.bucketSetup;
+  }
+
   async save(dataUrl: string): Promise<string> {
     const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
     if (!match) throw new BadRequestException('Invalid profile image');
@@ -16,16 +55,18 @@ export class ProfileStorageService {
     if (!valid) throw new BadRequestException('Invalid profile image');
     const extension = match[1] === 'image/jpeg' ? 'jpg' : match[1].slice(6); const filename = `${randomUUID()}.${extension}`;
     if (this.config.supabaseUrl && this.config.supabaseServiceRoleKey) {
+      const baseUrl = this.config.supabaseUrl.replace(/\/$/, '');
       const path = `profile/${filename}`;
       let response: Response;
       try {
-        response = await fetch(`${this.config.supabaseUrl}/storage/v1/object/${this.config.supabaseStorageBucket}/${path}`, { method: 'POST', headers: { Authorization: `Bearer ${this.config.supabaseServiceRoleKey}`, apikey: this.config.supabaseServiceRoleKey, 'Content-Type': match[1], 'x-upsert': 'false' }, body: buffer });
+        await this.ensureSupabaseBucket();
+        response = await fetch(`${baseUrl}/storage/v1/object/${this.config.supabaseStorageBucket}/${path}`, { method: 'POST', headers: { Authorization: `Bearer ${this.config.supabaseServiceRoleKey}`, apikey: this.config.supabaseServiceRoleKey, 'Content-Type': match[1], 'x-upsert': 'false' }, body: buffer });
       } catch (err) {
         // Never let a transport failure escape as an opaque 500.
-        throw new ServiceUnavailableException(`Profile image storage is unavailable: ${String(err)}`);
+        throw new ServiceUnavailableException('Profile image storage is unavailable');
       }
       if (!response.ok) throw new ServiceUnavailableException('Profile image storage is unavailable');
-      return `${this.config.supabaseUrl}/storage/v1/object/public/${this.config.supabaseStorageBucket}/${path}`;
+      return `${baseUrl}/storage/v1/object/public/${this.config.supabaseStorageBucket}/${path}`;
     }
     try {
       const directory = join(process.cwd(), 'uploads', 'profile'); await mkdir(directory, { recursive: true }); await writeFile(join(directory, filename), buffer, { flag: 'wx' }); return `/uploads/profile/${filename}`;
