@@ -5,6 +5,8 @@ import { AuthShell } from "@app/components/auth/AuthShell";
 import { Input } from "@app/components/ui/Input";
 import { Button } from "@app/components/ui/Button";
 import { useAuth } from "@app/context/AuthContext";
+import { LoginIllustration } from "@app/components/auth/LoginIllustration";
+import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 
 const SESSION_MESSAGES: Record<string, string> = {
   session_expired: "Your session expired. Please log in again.",
@@ -19,6 +21,7 @@ export function LoginPage() {
     SESSION_MESSAGES[(location.state as { sessionStatus?: string } | null)?.sessionStatus ?? ""];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,7 +39,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell variant="split" eyebrow="Welcome back">
+    <AuthShell variant="centered" visual={<LoginIllustration />}>
       <h1 className="font-display text-2xl font-extrabold tracking-[-.045em] text-laupay-ink">
         Log in
       </h1>
@@ -57,23 +60,22 @@ export function LoginPage() {
         </p>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-        <Input
-          label="Email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <Input
-          label="Password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-3.5">
+        <div className="flex flex-col gap-1.5">
+          <div className="relative">
+            <Mail aria-hidden="true" size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-laupay-ink-muted" />
+            <Input id="login-email" label="Email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10" required />
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div className="relative">
+            <LockKeyhole aria-hidden="true" size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-laupay-ink-muted" />
+            <Input id="login-password" label="Password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-10" required />
+            <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-laupay-ink-muted hover:text-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-laupay-indigo">
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
+        </div>
         {error && (
           <p
             role="alert"

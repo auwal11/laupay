@@ -96,22 +96,24 @@ export function AuthShell({
   variant = "split",
   eyebrow,
   header,
+  visual,
   children,
   footer,
 }: {
   variant?: AuthShellVariant;
   eyebrow?: string;
   header?: ReactNode;
+  visual?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
 }) {
   if (variant === "centered") {
     return (
-      <div className="grain relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-laupay-surface-muted px-4 py-10 sm:px-6 sm:py-14">
+      <div className="grain relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-laupay-surface-muted px-4 py-5 sm:px-6 sm:py-8">
         <CenteredStage />
 
         <main className="relative w-full max-w-[460px]">
-          <div className="mb-6 flex justify-center">
+          <div className="mb-4 flex justify-center sm:mb-5">
             <Link
               to="/"
               className="inline-flex rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-laupay-indigo"
@@ -120,6 +122,8 @@ export function AuthShell({
               <BrandLockup />
             </Link>
           </div>
+
+          {visual && <div className="mb-3">{visual}</div>}
 
           <div className="overflow-hidden rounded-2xl border border-laupay-border bg-white shadow-[0_24px_60px_-24px_rgba(23,26,74,.28)]">
             {header && (

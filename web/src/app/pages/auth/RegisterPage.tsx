@@ -43,7 +43,12 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthShell variant="centered" eyebrow={`Step ${step} of 5`} header={<><h1 className="mt-4 font-display text-2xl font-extrabold leading-[1.08] tracking-[-.045em] text-white">Create your LAUPAY account</h1><p className="mt-2 text-sm leading-6 text-white/65">A few steps to get you set up securely.</p></>}>
+    <AuthShell variant="centered">
+      <div className="mb-5">
+        <p className="text-[10px] font-extrabold uppercase tracking-[.16em] text-laupay-indigo">Step {step} of 5</p>
+        <h1 className="mt-2 font-display text-2xl font-extrabold leading-[1.08] tracking-[-.045em] text-laupay-ink">Create your LAUPAY account</h1>
+        <p className="mt-2 text-sm leading-6 text-laupay-ink-muted">A few steps to get you set up securely.</p>
+      </div>
       <Progress step={step} />
       {step === 1 ? <div className="flex flex-col gap-4">
         <Input label="Full name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} required autoFocus />
