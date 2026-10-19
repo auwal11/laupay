@@ -1,3 +1,5 @@
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { adminService } from "@app/admin/services";
 import {
@@ -10,8 +12,10 @@ import {
   Th,
   useAsync,
 } from "@app/admin/ui";
+import { Button } from "@app/components/ui/Button";
 import { Card } from "@app/components/ui/Card";
 import { ErrorState } from "@app/components/ui/ErrorState";
+import { Input } from "@app/components/ui/Input";
 import { formatNaira, formatDateTime } from "@app/lib/format";
 
 export function AdminOverviewPage() {
@@ -42,6 +46,8 @@ export function AdminOverviewPage() {
           </span>
         }
       />
+
+      <FundUserCard />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Users" value={data.users.total.toLocaleString()} hint={`${data.users.active} active`} />
@@ -138,5 +144,152 @@ export function AdminOverviewPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * Quick action on the dashboard: search for an account, select it, and credit
+ * its wallet. Delegates to the audited, ledger-backed test-credit endpoint.
+ */
+function FundUserCard() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<{ id: string; fullName: string; email: string }[]>([]);
+  const [searched, setSearched] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [amount, setAmount] = useState("5000");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function search(e: FormEvent) {
+    e.preventDefault();
+    setSearching(true);
+    setError(null);
+    setNotice(null);
+    const result = await adminService.users({ search: query.trim() || undefined, pageSize: 6 });
+    setSearching(false);
+    setSearched(true);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setResults(result.data.items.map((u) => ({ id: u.id, fullName: u.fullName, email: u.email })));
+  }
+
+  async function credit() {
+    if (!selected) {
+      setError("Pick a user first.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const value = Number(amount);
+    const result = await adminService.creditTestFunds({
+      userId: selected.id,
+      amount: value,
+      idempotencyKey: crypto.randomUUID(),
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setNotice(
+      result.data.wasAlreadyApplied
+        ? "This credit was already applied."
+        : `Funded ${selected.name} ${formatNaira(String(value))}. New balance: ${formatNaira(result.data.balanceAfter)}.`,
+    );
+  }
+
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold text-laupay-ink">Fund a user</h2>
+      <p className="mt-1 text-xs leading-5 text-laupay-ink-muted">
+        Search for an account, select it, and credit its wallet. Recorded in the ledger and audit
+        log; the user sees it as a test credit from Ibrahim Lau Provision Shop.
+      </p>
+
+      <form onSubmit={search} className="mt-3 flex flex-wrap items-end gap-3">
+        <div className="min-w-[220px] flex-1">
+          <Input
+            label="Search user"
+            value={query}
+            placeholder="Email, name or phone"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        <Button type="submit" loading={searching}>
+          Search
+        </Button>
+      </form>
+
+      {selected ? (
+        <div className="mt-4 rounded-md border border-laupay-border p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-laupay-ink">{selected.name}</p>
+              <p className="text-xs text-laupay-ink-muted">{selected.email}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="text-xs font-medium text-laupay-ink-muted hover:underline"
+            >
+              Change
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <div className="w-40">
+              <Input
+                label="Amount (NGN)"
+                type="number"
+                min="1"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="button" loading={busy} onClick={() => void credit()}>
+              Credit funds
+            </Button>
+          </div>
+        </div>
+      ) : (
+        results.length > 0 && (
+          <ul className="mt-3 flex flex-col divide-y divide-laupay-border overflow-hidden rounded-md border border-laupay-border">
+            {results.map((u) => (
+              <li key={u.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelected({ id: u.id, name: u.fullName, email: u.email })}
+                  className="flex w-full flex-col px-3 py-2 text-left hover:bg-laupay-surface-muted"
+                >
+                  <span className="text-sm font-medium text-laupay-ink">{u.fullName}</span>
+                  <span className="text-xs text-laupay-ink-muted">{u.email}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      )}
+
+      {searched && !searching && results.length === 0 && !selected && (
+        <p className="mt-3 text-xs text-laupay-ink-muted">No users found. Try a different search.</p>
+      )}
+
+      {notice && (
+        <p role="status" className="mt-3 rounded-md bg-green-50 px-3 py-2 text-xs font-medium text-laupay-success">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-laupay-danger">
+          {error}
+        </p>
+      )}
+    </Card>
   );
 }
