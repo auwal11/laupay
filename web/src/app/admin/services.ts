@@ -2,6 +2,7 @@ import { adminRequest, buildQuery } from "./api";
 import type { ApiResult } from "@app/types/common";
 import type {
   AdminAuditEntry,
+  AdminDispute,
   AdminLoginResponse,
   AdminOrder,
   AdminOverview,
@@ -82,5 +83,13 @@ export const adminService = {
     action: "freeze" | "unfreeze",
   ): Promise<ApiResult<AdminWallet>> {
     return adminRequest<AdminWallet>(`/admin/wallets/${id}/${action}`, { method: "POST" });
+  },
+
+  disputes(params: ListParams = {}): Promise<ApiResult<Paged<AdminDispute>>> {
+    return adminRequest<Paged<AdminDispute>>(`/admin/disputes${buildQuery(params)}`);
+  },
+
+  updateDispute(id: string, status: string): Promise<ApiResult<AdminDispute>> {
+    return adminRequest<AdminDispute>(`/admin/disputes/${id}`, { method: "PATCH", body: { status } });
   },
 };

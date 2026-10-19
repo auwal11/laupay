@@ -89,3 +89,15 @@ export class AuditListQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize?: number;
 }
+
+export class DisputeListQueryDto {
+  @IsOptional() @IsIn(['OPEN', 'IN_REVIEW', 'RESOLVED', 'REJECTED', 'CLOSED']) status?: string;
+  @IsOptional() @IsString() search?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize?: number;
+}
+
+export class UpdateDisputeDto {
+  @IsIn(['OPEN', 'IN_REVIEW', 'RESOLVED', 'REJECTED', 'CLOSED'])
+  status!: string;
+}

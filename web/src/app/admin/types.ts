@@ -125,3 +125,24 @@ export interface AdminSettings {
   mailProvider: string;
   adminWebOrigin: string;
 }
+
+export interface AdminDispute {
+  id: string;
+  caseReference: string;
+  userId: string;
+  ledgerEntryId: string;
+  reason: string;
+  details: string | null;
+  status: string;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  userName: string;
+  userEmail: string;
+  userPhone: string | null;
+  amount: string;
+  direction: string;
+  ledgerReason: string;
+  referenceId: string | null;
+  transactionCreatedAt: string;
+}

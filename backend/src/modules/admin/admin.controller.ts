@@ -22,6 +22,8 @@ import {
   UpdateSettingsDto,
   UserListQueryDto,
   WalletListQueryDto,
+  DisputeListQueryDto,
+  UpdateDisputeDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -118,6 +120,21 @@ export class AdminController {
   @Get('audit')
   listAudit(@Query() q: AuditListQueryDto) {
     return this.admin.listAudit(q);
+  }
+
+  @Get('disputes')
+  listDisputes(@Query() q: DisputeListQueryDto) {
+    return this.admin.listDisputes(q);
+  }
+
+  @Patch('disputes/:id')
+  updateDispute(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateDisputeDto,
+    @Req() req: Request,
+  ) {
+    return this.admin.updateDispute(id, dto.status, user.userId, req.ip);
   }
 
   // ---- Settings ----

@@ -30,6 +30,7 @@ import { AdminWalletsPage } from '@app/pages/admin/AdminWalletsPage';
 import { AdminOrdersPage } from '@app/pages/admin/AdminOrdersPage';
 import { AdminAuditPage } from '@app/pages/admin/AdminAuditPage';
 import { AdminSettingsPage } from '@app/pages/admin/AdminSettingsPage';
+import { AdminDisputesPage } from '@app/pages/admin/AdminDisputesPage';
 import { AdminLayout } from '@app/admin/AdminLayout';
 import { AdminProtectedRoute } from '@app/admin/AdminProtectedRoute';
 
@@ -90,6 +91,7 @@ export const appRoutes = (
       <Route path="transactions/:id" element={<AdminTransactionDetailPage />} />
       <Route path="wallets" element={<AdminWalletsPage />} />
       <Route path="orders" element={<AdminOrdersPage />} />
+      <Route path="disputes" element={<AdminDisputesPage />} />
       <Route path="audit" element={<AdminAuditPage />} />
       <Route path="settings" element={<AdminSettingsPage />} />
     </Route>

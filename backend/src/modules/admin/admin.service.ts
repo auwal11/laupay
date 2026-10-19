@@ -407,6 +407,46 @@ export class AdminService {
     return { total, page: q.page ?? 1, pageSize: take, items: rows };
   }
 
+  async listDisputes(q: { status?: string; search?: string; page?: number; pageSize?: number }) {
+    const { skip, take } = paginate(q.page, q.pageSize);
+    const status = q.status ?? null;
+    const search = q.search ? `%${q.search}%` : null;
+    const [countRows, items] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS count FROM "TransactionDispute" d
+        INNER JOIN "User" u ON u."id" = d."userId"
+        WHERE (${status}::text IS NULL OR d."status"::text = ${status})
+          AND (${search}::text IS NULL OR d."caseReference" ILIKE ${search} OR d."reason" ILIKE ${search} OR u."email" ILIKE ${search} OR u."fullName" ILIKE ${search})
+      `),
+      this.prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+        SELECT d.*, u."fullName" AS "userName", u."email" AS "userEmail", u."phone" AS "userPhone",
+          l."amount", l."direction", l."reason" AS "ledgerReason", l."referenceId", l."createdAt" AS "transactionCreatedAt"
+        FROM "TransactionDispute" d
+        INNER JOIN "User" u ON u."id" = d."userId"
+        INNER JOIN "LedgerEntry" l ON l."id" = d."ledgerEntryId"
+        WHERE (${status}::text IS NULL OR d."status"::text = ${status})
+          AND (${search}::text IS NULL OR d."caseReference" ILIKE ${search} OR d."reason" ILIKE ${search} OR u."email" ILIKE ${search} OR u."fullName" ILIKE ${search})
+        ORDER BY d."createdAt" DESC OFFSET ${skip} LIMIT ${take}
+      `),
+    ]);
+    return { total: Number(countRows[0]?.count ?? 0), page: q.page ?? 1, pageSize: take, items };
+  }
+
+  async updateDispute(id: string, status: string, adminId: string, ipAddress?: string) {
+    const allowed = ['OPEN', 'IN_REVIEW', 'RESOLVED', 'REJECTED', 'CLOSED'];
+    if (!allowed.includes(status)) throw new NotFoundException('Invalid dispute status');
+    const existing = await this.prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT * FROM "TransactionDispute" WHERE "id" = ${id} LIMIT 1`);
+    if (!existing[0]) throw new NotFoundException('Dispute not found');
+    const resolvedAt = ['RESOLVED', 'REJECTED', 'CLOSED'].includes(status) ? new Date() : null;
+    const updated = await this.prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      UPDATE "TransactionDispute" SET "status" = ${status}::"DisputeStatus", "resolvedAt" = ${resolvedAt}, "updatedAt" = NOW()
+      WHERE "id" = ${id}
+      RETURNING *
+    `);
+    await this.prisma.auditLog.create({ data: { actorId: adminId, action: AuditAction.ADMIN_ACTION, entityType: 'TransactionDispute', entityId: id, ipAddress, metadata: { from: String(existing[0].status ?? ''), to: status, caseReference: String(existing[0].caseReference ?? '') } } });
+    return updated[0];
+  }
+
   // -----------------------------------------------------------------
   // Audit log
   // -----------------------------------------------------------------
