@@ -6,6 +6,7 @@ import { VtuService } from '../vtu/vtu.service';
 import { SecurityService } from '../security/security.service';
 import { InsufficientBalanceError } from '../ledger/ledger.errors';
 import { AppConfigService } from '../../config/app-config.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /** Orders that have already reached a terminal state — never re-touched by
  * async resolution once here (see reconcileVtuTransaction below). */
@@ -32,6 +33,7 @@ export class OrdersService {
     private readonly vtu: VtuService,
     private readonly security: SecurityService,
     private readonly config: AppConfigService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -195,6 +197,7 @@ export class OrdersService {
    */
   private async cancelledForInsufficientFunds(orderId: string) {
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    await this.notifications.create({ userId: order.userId, category: 'order', title: 'Purchase not completed', body: 'Your wallet balance was not enough for this purchase.', metadata: { orderId: order.id, status: order.status } });
     return { ...order, failureReason: INSUFFICIENT_FUNDS };
   }
 
@@ -252,10 +255,16 @@ export class OrdersService {
           `Order ${orderId} resolved FULFILLMENT_FAILED but no original debit ledger entry was found — wallet was never reversed`,
         );
       }
-      return this.prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.REFUNDED } });
+      const updated = await this.prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.REFUNDED } });
+      await this.notifications.create({ userId: updated.userId, category: 'order', title: 'Purchase failed', body: 'Your purchase could not be fulfilled and the debit was reversed.', metadata: { orderId: updated.id, status: updated.status } });
+      return updated;
     }
 
-    return this.prisma.order.update({ where: { id: orderId }, data: { status: finalStatus } });
+    const updated = await this.prisma.order.update({ where: { id: orderId }, data: { status: finalStatus } });
+    if (finalStatus === OrderStatus.FULFILLED) {
+      await this.notifications.create({ userId: updated.userId, category: 'order', title: 'Purchase successful', body: 'Your digital service purchase was completed successfully.', metadata: { orderId: updated.id, status: updated.status } });
+    }
+    return updated;
   }
 
   private mapVtuStatusToOrderStatus(vtuStatus: string): OrderStatus {
