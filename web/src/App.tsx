@@ -489,7 +489,22 @@ function Home() {
                 </div>
               </div>
               <div className="reveal reveal-delay-2 lg:pl-8">
-                    <BridgeArtwork activeService={activeService} />
+                {/* Real LAUPAY photo, pre-cropped to the person + app cards. */}
+                <div className="relative mx-auto aspect-[848/749] w-full max-w-[560px] overflow-hidden rounded-[28px] border border-white/10 bg-[#11142A] shadow-[0_30px_80px_rgba(0,0,0,.35)]">
+                  {/* The source photo includes page chrome on its left; this frames
+                      only the person + app cards (crop x 768-1616, y 170-919). */}
+                  <img
+                    src="/images/landing/hero-ibrahim.png"
+                    alt="LAUPAY user viewing wallet dashboard on phone"
+                    width={1671}
+                    height={941}
+                    fetchPriority="high"
+                    decoding="async"
+                    className="absolute max-w-none"
+                    style={{ width: '197.05%', height: 'auto', left: '-90.57%', top: '-22.70%' }}
+                  />
+                  <div className="pointer-events-none absolute inset-0 rounded-[28px] ring-1 ring-inset ring-[#F4B33F]/15" />
+                </div>
               </div>
             </div>
           </div>
@@ -539,6 +554,41 @@ function Home() {
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">One platform</p>
                 <h3 className="mt-5 font-display text-2xl font-extrabold leading-[1.05] tracking-[-.05em]">Simple for customers. Powerful for agents.</h3>
                 <p className="mt-4 text-sm leading-6 text-muted-foreground">Different needs, one clear flow.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="product" className="bg-[#171A4A] text-white">
+          <div className="section-shell py-20 sm:py-28">
+            <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#0F1236]">
+              <img
+                  src="/images/landing/features-ibrahim.png"
+                  alt="LAUPAY customer holding a phone with the LAUPAY dashboard, balance and recent activity"
+                  width={1672}
+                  height={941}
+                  loading="lazy"
+                  decoding="async"
+                  className="block aspect-[4/3] w-full object-cover object-[72%_50%] sm:aspect-[16/9] lg:aspect-[1672/941]"
+                />
+              <div className="relative p-7 sm:p-10 lg:absolute lg:inset-y-0 lg:left-0 lg:flex lg:w-[46%] lg:flex-col lg:justify-center lg:p-14">
+                <p className="eyebrow text-[#F4B33F]">Your LAUPAY dashboard</p>
+                <h2 className="mt-5 max-w-[440px] font-display text-[1.75rem] font-extrabold leading-[1.06] tracking-[-.055em] sm:text-5xl sm:leading-[1.02] sm:tracking-[-.065em]">
+                  Your dashboard, in your <span className="text-[#F4B33F]">hand.</span>
+                </h2>
+                <p className="mt-5 max-w-[400px] text-[15px] leading-7 text-white/65">
+                  Check your wallet, buy airtime and data, and follow every payment from one calm screen.
+                </p>
+                <ul className="mt-6 grid gap-3 text-sm text-white/75">
+                  <li className="flex items-center gap-2"><Check size={15} className="text-[#F4B33F]" /> Wallet balance at a glance</li>
+                  <li className="flex items-center gap-2"><Check size={15} className="text-[#F4B33F]" /> Airtime and data in a few taps</li>
+                  <li className="flex items-center gap-2"><Check size={15} className="text-[#F4B33F]" /> Clear status for every transaction</li>
+                </ul>
+                <div className="mt-8">
+                  <a href={`${CUSTOMER_APP_ORIGIN}/register`} className="group inline-flex items-center gap-3 rounded-full bg-[#F4B33F] px-5 py-3.5 text-xs font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1">
+                    Get Started <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
+                  </a>
+                </div>
               </div>
             </div>
           </div>
