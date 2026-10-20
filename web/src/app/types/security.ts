@@ -45,9 +45,18 @@ export type NotificationCategory = "account" | "transaction" | "payment" | "devi
 export interface SecurityNotification {
   id: string;
   category: NotificationCategory;
+  title: string;
+  body: string;
   message: string;
   createdAt: string;
   read: boolean;
+  metadata?: {
+    orderId?: string;
+    entryId?: string;
+    paymentId?: string;
+    disputeId?: string;
+    status?: string;
+  } | null;
 }
 
 /** Session lifecycle, distinct from "no session yet" (anonymous). */

@@ -1,11 +1,13 @@
-import { Link } from "react-router-dom";
-import { CreditCard, Receipt, Smartphone, Store, Wallet, Wifi } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { CheckCircle2, CreditCard, Receipt, Smartphone, Store, Wallet, Wifi, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { BalanceCard } from "@app/components/wallet/BalanceCard";
 import { TransactionList } from "@app/components/wallet/TransactionList";
 import { useAuth } from "@app/context/AuthContext";
 import { firstNameFrom } from "@app/lib/name";
 import { assetUrl } from "@app/lib/assets";
+import type { PurchaseNotice } from "@app/types/orders";
 
 const QUICK_ACTIONS: { to: string; icon: LucideIcon; label: string; ready: boolean }[] = [
   { to: "/app/airtime", icon: Smartphone, label: "Airtime", ready: true },
@@ -18,6 +20,18 @@ const QUICK_ACTIONS: { to: string; icon: LucideIcon; label: string; ready: boole
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [notice] = useState<PurchaseNotice | null>(
+    () => (location.state as { purchaseNotice?: PurchaseNotice } | null)?.purchaseNotice ?? null,
+  );
+  const [noticeVisible, setNoticeVisible] = useState(Boolean(notice));
+
+  // Consume the one-shot banner so a refresh or later visit doesn't repeat it.
+  useEffect(() => {
+    if (notice) navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-col gap-7">
@@ -29,6 +43,10 @@ export function DashboardPage() {
           <p className="text-sm text-laupay-ink-muted">Here's what's happening with your account.</p>
         </div>
       </div>
+
+      {notice && noticeVisible && (
+        <PurchaseNoticeBanner notice={notice} onDismiss={() => setNoticeVisible(false)} />
+      )}
 
       <BalanceCard />
 
@@ -50,6 +68,25 @@ export function DashboardPage() {
         </div>
         <TransactionList limit={5} />
       </div>
+    </div>
+  );
+}
+
+function PurchaseNoticeBanner({ notice, onDismiss }: { notice: PurchaseNotice; onDismiss: () => void }) {
+  const success = notice.tone === "success";
+  return (
+    <div
+      role="status"
+      className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${success ? "border-laupay-success/30 bg-laupay-success/10" : notice.tone === "pending" ? "border-laupay-amber/40 bg-laupay-amber/10" : "border-laupay-danger/30 bg-laupay-danger/5"}`}
+    >
+      <CheckCircle2 size={18} className={success ? "mt-0.5 shrink-0 text-laupay-success" : "mt-0.5 shrink-0 text-laupay-danger"} aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-laupay-ink">{notice.title}</p>
+        <p className="mt-0.5 text-sm text-laupay-ink-muted">{notice.body}</p>
+      </div>
+      <button type="button" onClick={onDismiss} aria-label="Dismiss notification" className="rounded p-1 text-laupay-ink-muted hover:bg-white/60">
+        <X size={15} />
+      </button>
     </div>
   );
 }

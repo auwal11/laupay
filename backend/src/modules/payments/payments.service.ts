@@ -6,6 +6,11 @@ import { LedgerService } from '../ledger/ledger.service';
 import { PAYMENT_PROVIDER, PaymentProvider } from './providers/payment-provider.interface';
 import { SettingsService } from '../settings/settings.service';
 import { RiskService } from '../risk/risk.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+function formatNaira(amount: number): string {
+  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 @Injectable()
 export class PaymentsService {
@@ -15,6 +20,7 @@ export class PaymentsService {
     private readonly config: AppConfigService,
     private readonly settings: SettingsService,
     private readonly risk: RiskService,
+    private readonly notifications: NotificationsService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
   ) {}
 
@@ -199,7 +205,7 @@ export class PaymentsService {
 
   private async creditWalletForPayment(paymentId: string, userId: string, amount: number) {
     const wallet = await this.prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: userId } });
-    await this.ledger.credit({
+    const entry = await this.ledger.credit({
       walletAccountId: wallet.id,
       amount,
       reason: LedgerReason.WALLET_FUNDING,
@@ -207,6 +213,19 @@ export class PaymentsService {
       referenceId: paymentId,
       idempotencyKey: `ledger:payment:${paymentId}`,
     });
+    // Re-queries/webhooks can re-confirm the same payment; the ledger already
+    // deduplicates, and the notification must not stack duplicates either.
+    if (!entry.wasAlreadyApplied) {
+      await this.notifications
+        .create({
+          userId,
+          category: 'wallet',
+          title: 'Wallet funded',
+          body: `${formatNaira(amount)} was added to your LAUPAY wallet.`,
+          metadata: { paymentId, entryId: entry.entryId, amount },
+        })
+        .catch(() => undefined);
+    }
   }
 
   private mapProviderStatus(status: string): PaymentStatus {

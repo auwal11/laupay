@@ -43,7 +43,19 @@ export const securityService = {
 
   async getNotifications(): Promise<ApiResult<SecurityNotification[]>> {
     return request<BackendNotification[]>("/notifications").then((result) => result.ok
-      ? { ok: true, data: result.data.map((n) => ({ id: n.id, category: n.category as SecurityNotification["category"], message: `${n.title}: ${n.body}`, createdAt: n.createdAt, read: Boolean(n.readAt) })) }
+      ? {
+          ok: true,
+          data: result.data.map((n) => ({
+            id: n.id,
+            category: n.category as SecurityNotification["category"],
+            title: n.title,
+            body: n.body,
+            message: n.body || n.title,
+            createdAt: n.createdAt,
+            read: Boolean(n.readAt),
+            metadata: n.metadata ?? null,
+          })),
+        }
       : result);
   },
 
@@ -54,6 +66,10 @@ export const securityService = {
   async markNotificationRead(id: string): Promise<ApiResult<{ read: true }>> {
     return request<{ read: true }>(`/notifications/${id}/read`, { method: "POST" });
   },
+
+  async markAllNotificationsRead(): Promise<ApiResult<{ read: number }>> {
+    return request<{ read: number }>("/notifications/read-all", { method: "POST" });
+  },
 };
 
 interface BackendNotification {
@@ -63,4 +79,5 @@ interface BackendNotification {
   body: string;
   createdAt: string;
   readAt: string | null;
+  metadata?: SecurityNotification["metadata"];
 }

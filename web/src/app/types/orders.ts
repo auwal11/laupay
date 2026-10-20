@@ -59,3 +59,9 @@ export interface Order {
   requiredChallenge?: VerificationChallenge;
 }
 
+/** One-shot banner shown on /app after leaving a purchase result screen. */
+export interface PurchaseNotice {
+  tone: "success" | "error" | "pending";
+  title: string;
+  body: string;
+}

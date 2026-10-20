@@ -13,6 +13,7 @@ import { AppConfigService } from '../../config/app-config.service';
 import { CreditsService } from '../credits/credits.service';
 import { SettingsService } from '../settings/settings.service';
 import { RiskService } from '../risk/risk.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 function startOfToday(): Date {
   const d = new Date();
@@ -42,6 +43,7 @@ export class AdminService {
     private readonly credits: CreditsService,
     private readonly settings: SettingsService,
     private readonly risk: RiskService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // -----------------------------------------------------------------
@@ -579,6 +581,25 @@ export class AdminService {
         metadata: { action: 'dispute.set_status', caseReference: String(existing[0].caseReference ?? '') },
       },
     });
+    const userId = String(existing[0].userId ?? '');
+    const caseReference = String(existing[0].caseReference ?? '');
+    if (userId && String(existing[0].status ?? '') !== status) {
+      const labels: Record<string, string> = {
+        IN_REVIEW: 'is now under review',
+        RESOLVED: 'has been resolved',
+        REJECTED: 'could not be approved',
+        CLOSED: 'has been closed',
+      };
+      await this.notifications
+        .create({
+          userId,
+          category: 'system',
+          title: 'Dispute status updated',
+          body: `Your dispute ${caseReference} ${labels[status] ?? 'was updated'}.`,
+          metadata: { disputeId: id, caseReference, status },
+        })
+        .catch(() => undefined);
+    }
     return updated[0];
   }
 

@@ -2,7 +2,7 @@ import { FlowMark } from "@/components/laupay/FlowMark";
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Share2 } from "lucide-react";
 import { Button } from "@app/components/ui/Button";
 import { Input } from "@app/components/ui/Input";
@@ -14,7 +14,7 @@ import { useReducedMotion } from "@app/hooks/useReducedMotion";
 import { usePurchaseFlow } from "@app/hooks/usePurchaseFlow";
 import { beneficiaries } from "@app/services";
 import type { Beneficiary, BeneficiaryNetwork } from "@app/types/beneficiaries";
-import type { PurchaseKind, Order } from "@app/types/orders";
+import type { PurchaseKind, Order, PurchaseNotice } from "@app/types/orders";
 import type { PurchaseStep } from "@app/hooks/usePurchaseFlow";
 import type { ApiError } from "@app/types/common";
 
@@ -31,7 +31,48 @@ const STEP_LABELS: Record<PurchaseStep, string> = {
 export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
   const flow = usePurchaseFlow(kind);
   const reduceMotion = useReducedMotion();
+  const navigate = useNavigate();
   const { state } = flow;
+  const productName = kind === "airtime" ? "Airtime" : "Data";
+
+  /** Done = primary exit: reset the wizard and return home with a one-shot banner. */
+  function handleDone() {
+    const order = state.order;
+    let notice: PurchaseNotice;
+    if (order?.status === "success") {
+      notice = {
+        tone: "success",
+        title: `${productName} purchase successful`,
+        body: `${formatNaira(order.total ?? order.amount)} sent to ${order.phoneNumber}.`,
+      };
+    } else if (order?.status === "refunded") {
+      notice = {
+        tone: "error",
+        title: "Purchase could not be completed",
+        body: "The amount debited was returned to your wallet.",
+      };
+    } else if (order && ["pending", "processing", "unknown"].includes(order.status)) {
+      notice = {
+        tone: "pending",
+        title: "Purchase is still processing",
+        body: "We'll update Transactions as soon as LAUPAY confirms the result.",
+      };
+    } else if (order) {
+      notice = {
+        tone: "error",
+        title: "Purchase could not be completed",
+        body: order.failureReason ?? "The provider could not complete this purchase.",
+      };
+    } else {
+      notice = {
+        tone: "error",
+        title: "Purchase could not be completed",
+        body: state.error?.message ?? "Please try again.",
+      };
+    }
+    flow.restart();
+    navigate("/app", { replace: true, state: { purchaseNotice: notice } });
+  }
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-5">
@@ -164,7 +205,7 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
           )}
 
           {state.step === "result" && (
-            <ResultCard kind={kind} order={state.order} networks={state.networks} error={state.error} onRestart={flow.restart} />
+            <ResultCard kind={kind} order={state.order} networks={state.networks} error={state.error} onRestart={flow.restart} onDone={handleDone} />
           )}
         </motion.div>
       </AnimatePresence>
@@ -351,13 +392,24 @@ function ResultCard({
   networks,
   error,
   onRestart,
+  onDone,
 }: {
   kind: PurchaseKind;
   order: Order | null;
   networks: { id: string; name: string }[];
   error: ApiError | null;
   onRestart: () => void;
+  onDone: () => void;
 }) {
+  const orderId = order?.id;
+  const orderStatus = order?.status;
+  useEffect(() => {
+    if (!orderId || !orderStatus) return;
+    // The backend writes the notification as the order settles; ask the shell
+    // to refetch now instead of waiting for the next navigation.
+    window.dispatchEvent(new Event("laupay:notifications-changed"));
+  }, [orderId, orderStatus]);
+
   if (error) {
     return (
       <>
@@ -365,9 +417,10 @@ function ResultCard({
         <Card>
         <p className="text-sm font-semibold text-laupay-danger">Couldn't complete this purchase</p>
         <p className="mt-2 text-sm text-laupay-ink-muted">{error.message}</p>
-        <Button className="mt-4" fullWidth onClick={onRestart}>
-          Try again
-        </Button>
+        <div className="mt-4 flex flex-col gap-2">
+          <Button fullWidth onClick={onDone}>Done</Button>
+          <Button variant="secondary" fullWidth onClick={onRestart}>Try again</Button>
+        </div>
         </Card>
       </>
     );
@@ -439,26 +492,27 @@ function ResultCard({
           {terminalMessage.text}
         </p>
       )}
-      <div className="mt-5 flex gap-2">
-        <Button variant="secondary" className="flex-1" onClick={() => void share()}><Share2 size={15} /> Share receipt</Button>
-        {insufficientFunds ? (
-          <Link
-            to="/app/wallet"
-            className="flex-1 rounded-md bg-laupay-amber px-4 py-2.5 text-center text-sm font-semibold text-laupay-ink hover:opacity-90"
-          >
-            Fund wallet
-          </Link>
-        ) : (
-          <Link
-            to={`/app/transactions/${order.id}`}
-            className="flex-1 rounded-md border border-laupay-border px-4 py-2.5 text-center text-sm font-medium text-laupay-ink hover:bg-laupay-surface-muted"
-          >
-            View details
-          </Link>
-        )}
-        <Button className="flex-1" onClick={onRestart}>
-          New purchase
-        </Button>
+      <div className="mt-5 flex flex-col gap-2">
+        <Button fullWidth onClick={onDone}>Done</Button>
+        <Button variant="secondary" fullWidth onClick={onRestart}>New purchase</Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" className="flex-1" onClick={() => void share()}><Share2 size={15} /> Share receipt</Button>
+          {insufficientFunds ? (
+            <Link
+              to="/app/wallet"
+              className="flex flex-1 items-center justify-center rounded-md border border-laupay-border px-4 py-2.5 text-center text-sm font-medium text-laupay-ink hover:bg-laupay-surface-muted"
+            >
+              Fund wallet
+            </Link>
+          ) : (
+            <Link
+              to={`/app/transactions/${order.id}`}
+              className="flex flex-1 items-center justify-center rounded-md border border-laupay-border px-4 py-2.5 text-center text-sm font-medium text-laupay-ink hover:bg-laupay-surface-muted"
+            >
+              View details
+            </Link>
+          )}
+        </div>
       </div>
     </Card>
     </>
