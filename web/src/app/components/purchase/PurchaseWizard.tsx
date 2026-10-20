@@ -1,5 +1,5 @@
 import { FlowMark } from "@/components/laupay/FlowMark";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -12,6 +12,8 @@ import { PinPad } from "@app/components/security/PinPad";
 import { formatDateTime, formatNaira } from "@app/lib/format";
 import { useReducedMotion } from "@app/hooks/useReducedMotion";
 import { usePurchaseFlow } from "@app/hooks/usePurchaseFlow";
+import { beneficiaries } from "@app/services";
+import type { Beneficiary, BeneficiaryNetwork } from "@app/types/beneficiaries";
 import type { PurchaseKind, Order } from "@app/types/orders";
 import type { PurchaseStep } from "@app/hooks/usePurchaseFlow";
 import type { ApiError } from "@app/types/common";
@@ -74,7 +76,7 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
 
           {state.step === "enter_phone" && (
             <StepCard title={STEP_LABELS.enter_phone} onBack={flow.goBack}>
-              <PhoneForm onSubmit={flow.submitPhoneNumber} initialValue={state.phoneNumber} />
+              <PhoneForm onSubmit={flow.submitPhoneNumber} initialValue={state.phoneNumber} network={state.networkId} />
             </StepCard>
           )}
 
@@ -214,9 +216,29 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PhoneForm({ onSubmit, initialValue }: { onSubmit: (v: string) => void; initialValue: string }) {
+function PhoneForm({
+  onSubmit,
+  initialValue,
+  network,
+}: {
+  onSubmit: (v: string) => void;
+  initialValue: string;
+  network: string | null;
+}) {
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState<string | undefined>();
+  const [saved, setSaved] = useState<Beneficiary[]>([]);
+  const [saveNumber, setSaveNumber] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    beneficiaries.list().then((result) => {
+      if (!cancelled && result.ok) {
+        setSaved(result.data.filter((item) => item.network === network));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [network]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -225,11 +247,33 @@ function PhoneForm({ onSubmit, initialValue }: { onSubmit: (v: string) => void; 
       setError("Enter a valid Nigerian phone number, e.g. 08012345678.");
       return;
     }
+    setError(undefined);
+    if (saveNumber && isBeneficiaryNetwork(network)) {
+      void beneficiaries.save({ phoneNumber: normalized, network });
+    }
     onSubmit(normalized);
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {saved.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-laupay-ink-muted">Saved beneficiaries</p>
+          <div className="flex flex-wrap gap-2">
+            {saved.map((beneficiary) => (
+              <button
+                key={beneficiary.id}
+                type="button"
+                onClick={() => setValue(beneficiary.phoneNumber)}
+                className="flex flex-col items-start rounded-lg border border-laupay-border bg-laupay-surface-muted/60 px-3 py-2 text-left hover:border-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-laupay-indigo"
+              >
+                <span className="text-xs font-semibold text-laupay-ink">{beneficiary.label}</span>
+                <span className="text-[11px] tabular-nums text-laupay-ink-muted">{beneficiary.phoneNumber}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <Input
         label="Phone number"
         type="tel"
@@ -240,11 +284,19 @@ function PhoneForm({ onSubmit, initialValue }: { onSubmit: (v: string) => void; 
         onChange={(e) => setValue(e.target.value)}
         autoFocus
       />
+      <label className="flex items-center gap-2 text-sm text-laupay-ink">
+        <input type="checkbox" checked={saveNumber} onChange={(event) => setSaveNumber(event.target.checked)} className="h-4 w-4 rounded border-laupay-border text-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-laupay-indigo" />
+        Save this number for next time
+      </label>
       <Button type="submit" fullWidth>
         Continue
       </Button>
     </form>
   );
+}
+
+function isBeneficiaryNetwork(value: string | null): value is BeneficiaryNetwork {
+  return value === "MTN" || value === "AIRTEL" || value === "GLO" || value === "9MOBILE";
 }
 
 function AirtimeAmountPicker({ amounts, onSelect }: { amounts: string[]; onSelect: (amount: string) => void }) {

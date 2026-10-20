@@ -77,6 +77,15 @@ export const authService = {
     });
   },
 
+  /**
+   * Changes the account password. The backend revokes every refresh token on
+   * success, so the caller must clear the local session and send the user
+   * back to the login screen afterwards.
+   */
+  changePassword(payload: { currentPassword: string; newPassword: string }): Promise<ApiResult<{ changed: true }>> {
+    return request<{ changed: true }>("/auth/change-password", { method: "POST", body: payload });
+  },
+
   logout(): void {
     setAccessToken(null);
     if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(REFRESH_KEY);

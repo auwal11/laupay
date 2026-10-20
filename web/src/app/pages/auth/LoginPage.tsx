@@ -17,8 +17,8 @@ export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const sessionNotice =
-    SESSION_MESSAGES[(location.state as { sessionStatus?: string } | null)?.sessionStatus ?? ""];
+  const loginState = location.state as { sessionStatus?: string; notice?: string } | null;
+  const sessionNotice = loginState?.notice ?? SESSION_MESSAGES[loginState?.sessionStatus ?? ""];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -304,6 +305,45 @@ export class AuthService {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: record.userId } });
     await this.prisma.$transaction([this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash, ...(user.status === 'PENDING_VERIFICATION' ? { status: 'ACTIVE' } : {}) } }), this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }), this.prisma.refreshToken.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: new Date() } })]);
     return { reset: true };
+  }
+
+  /**
+   * Changes the password for an authenticated user. Deliberately returns 400
+   * (not 401) for a wrong current password: the web client treats any 401 as a
+   * dead session and would log the user out of a form they just mistyped.
+   * All refresh tokens are revoked on success, so a stolen session cannot
+   * outlive the password it was created with.
+   */
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('Invalid session');
+
+    const currentOk = await this.passwordHasher.verify(user.passwordHash, currentPassword);
+    if (!currentOk) throw new BadRequestException('Current password is incorrect');
+
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('New password must be different from the current password');
+    }
+
+    const passwordHash = await this.passwordHasher.hash(newPassword);
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      this.prisma.auditLog.create({
+        data: {
+          actorId: userId,
+          action: AuditAction.UPDATE,
+          entityType: 'User',
+          entityId: userId,
+          metadata: { event: 'password.change' },
+        },
+      }),
+    ]);
+
+    return { changed: true };
   }
 
   async refresh(refreshToken: string): Promise<AuthTokens> {

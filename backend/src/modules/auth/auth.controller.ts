@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
 import { LoginDto, RefreshDto, RegisterDto, ResendOtpDto, VerifyOtpDto } from './dto/auth.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -62,6 +63,13 @@ export class AuthController {
 
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) { return this.authService.resetPassword(dto.token, dto.password); }
+
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('change-password')
+  changePassword(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(user.userId, dto.currentPassword, dto.newPassword);
+  }
 
   @Post('refresh')
   refresh(@Body() dto: RefreshDto) {

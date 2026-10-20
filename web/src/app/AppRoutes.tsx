@@ -20,6 +20,7 @@ import { TransactionDetailPage } from '@app/pages/customer/TransactionDetailPage
 import { ReceiptPage } from '@app/pages/customer/ReceiptPage';
 import { ProfilePage } from '@app/pages/customer/ProfilePage';
 import { SecurityPage } from '@app/pages/customer/SecurityPage';
+import { BeneficiariesPage } from '@app/pages/customer/BeneficiariesPage';
 import { AdminLoginPage } from '@app/pages/admin/AdminLoginPage';
 import { AdminOverviewPage } from '@app/pages/admin/AdminOverviewPage';
 import { AdminUsersPage } from '@app/pages/admin/AdminUsersPage';
@@ -75,6 +76,7 @@ export const appRoutes = (
       <Route path="receipt/:id" element={<ReceiptPage />} />
       <Route path="profile" element={<ProfilePage />} />
       <Route path="security" element={<SecurityPage />} />
+      <Route path="beneficiaries" element={<BeneficiariesPage />} />
     </Route>
 
     {/* Admin console — its own session, isolated from the customer app. */}

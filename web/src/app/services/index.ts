@@ -3,6 +3,7 @@ import { walletService } from "./wallet";
 import { ordersService } from "./orders";
 import { securityService } from "./security";
 import { usersService } from "./users";
+import { beneficiariesService } from "./beneficiaries";
 
 /**
  * Single service surface for the real backend adapters. The mock layer has
@@ -14,3 +15,4 @@ export const wallet = walletService;
 export const orders = ordersService;
 export const security = securityService;
 export const users = usersService;
+export const beneficiaries = beneficiariesService;

@@ -192,6 +192,7 @@ model User {
   riskEvents            RiskEvent[]
   permissionGrants      AdminPermissionGrant[] @relation("AdminGrantsForUser")
   permissionGrantsGiven AdminPermissionGrant[] @relation("AdminGrantsByUser")
+  beneficiaries         Beneficiary[]
 
   createdAt DateTime @default(now())
 
@@ -218,6 +219,24 @@ model AgentProfile {
 /// separate from User (rather than columns on User) so this sensitive
 /// authentication data has its own table boundary, and so device/session
 /// fields can be added here later without touching the core User model.
+/// A saved recipient for airtime/data purchases. Scoped strictly to the
+/// owning user; uniqueness prevents duplicates of the same number+network.
+model Beneficiary {
+  id          String   @id @default(uuid())
+  userId      String
+  label       String
+  phoneNumber String
+  network     String
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, phoneNumber, network])
+  @@index([userId, lastUsedAt])
+}
+
 model UserSecurity {
   id                String    @id @default(uuid())
   userId            String    @unique

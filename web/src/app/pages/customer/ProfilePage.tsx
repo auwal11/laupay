@@ -77,6 +77,13 @@ export function ProfilePage() {
       </Card>
 
       <Link
+        to="/app/beneficiaries"
+        className="rounded-lg border border-laupay-border bg-white px-4 py-3.5 text-sm font-medium text-laupay-ink hover:border-laupay-indigo"
+      >
+        Beneficiaries — saved numbers for airtime and data
+      </Link>
+
+      <Link
         to="/app/security"
         className="rounded-lg border border-laupay-border bg-white px-4 py-3.5 text-sm font-medium text-laupay-ink hover:border-laupay-indigo"
       >

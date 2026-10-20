@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@app/components/ui/Card";
 import { Button } from "@app/components/ui/Button";
+import { Input } from "@app/components/ui/Input";
 import { Skeleton } from "@app/components/ui/Skeleton";
 import { PinPad } from "@app/components/security/PinPad";
 import { formatDateTime } from "@app/lib/format";
-import { security } from "@app/services";
+import { auth, security } from "@app/services";
+import { useAuth } from "@app/context/AuthContext";
 import type { DeviceInfo, PinStatusResponse, SecurityNotification } from "@app/types/security";
 
 export function SecurityPage() {
@@ -12,9 +16,89 @@ export function SecurityPage() {
     <div className="mx-auto flex max-w-md flex-col gap-8">
       <h1 className="font-display text-xl font-semibold text-laupay-ink">Security</h1>
       <PinSection />
+      <PasswordSection />
       <DevicesSection />
       <NotificationsSection />
     </div>
+  );
+}
+
+function PasswordSection() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    if (newPassword.length < 8) {
+      setError("Your new password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("The new passwords do not match.");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setError("Choose a password different from your current one.");
+      return;
+    }
+    setSaving(true);
+    const result = await auth.changePassword({ currentPassword, newPassword });
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    logout();
+    navigate("/login", {
+      replace: true,
+      state: { notice: "Password changed. Sign in again with your new password." },
+    });
+  }
+
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold text-laupay-ink">Password</h2>
+      <p className="mt-1 text-sm text-laupay-ink-muted">
+        Separate from your transaction PIN. Changing it signs you out of all devices.
+      </p>
+      <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
+        <Input
+          label="Current password"
+          type="password"
+          autoComplete="current-password"
+          value={currentPassword}
+          onChange={(event) => setCurrentPassword(event.target.value)}
+          required
+        />
+        <Input
+          label="New password"
+          type="password"
+          autoComplete="new-password"
+          hint="At least 8 characters."
+          value={newPassword}
+          onChange={(event) => setNewPassword(event.target.value)}
+          required
+        />
+        <Input
+          label="Confirm new password"
+          type="password"
+          autoComplete="new-password"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          required
+        />
+        {error && <p role="alert" className="text-sm text-laupay-danger">{error}</p>}
+        <Button type="submit" variant="secondary" loading={saving} className="self-start">
+          Change password
+        </Button>
+      </form>
+    </Card>
   );
 }
 
