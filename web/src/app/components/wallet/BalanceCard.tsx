@@ -1,10 +1,11 @@
+import { Plus } from "lucide-react";
 import { Card } from "@app/components/ui/Card";
 import { Skeleton } from "@app/components/ui/Skeleton";
 import { ErrorState } from "@app/components/ui/ErrorState";
 import { formatNaira } from "@app/lib/format";
 import { useWalletBalance } from "@app/hooks/useWallet";
 
-export function BalanceCard() {
+export function BalanceCard({ onAddFund }: { onAddFund?: () => void } = {}) {
   const state = useWalletBalance();
 
   if (state.status === "loading") {
@@ -60,6 +61,15 @@ export function BalanceCard() {
             )}
           </div>
         ) : null}
+        {onAddFund && (
+          <button
+            type="button"
+            onClick={onAddFund}
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-laupay-indigo transition hover:bg-laupay-amber"
+          >
+            <Plus size={16} /> Add funds
+          </button>
+        )}
       </div>
     </div>
   );

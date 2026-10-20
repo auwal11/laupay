@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Copy, CreditCard, Landmark, RefreshCw } from "lucide-react";
 import { BalanceCard } from "@app/components/wallet/BalanceCard";
 import { TransactionList } from "@app/components/wallet/TransactionList";
@@ -12,19 +12,27 @@ import type { VirtualAccount } from "@app/types/wallet";
 
 export function WalletPage() {
   const [showFund, setShowFund] = useState(false);
+  const depositRef = useRef<HTMLDivElement>(null);
+
+  function openDeposit() {
+    setShowFund(true);
+    window.setTimeout(() => depositRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-display text-xl font-semibold text-laupay-ink">Wallet</h1>
-      <BalanceCard />
+      <BalanceCard onAddFund={openDeposit} />
 
-      {showFund ? (
-        <DepositPanel onDone={() => setShowFund(false)} />
-      ) : (
-        <Button onClick={() => setShowFund(true)} className="self-start">
-          Fund wallet
-        </Button>
-      )}
+      <div ref={depositRef}>
+        {showFund ? (
+          <DepositPanel onDone={() => setShowFund(false)} />
+        ) : (
+          <Button onClick={openDeposit} className="self-start">
+            Fund wallet
+          </Button>
+        )}
+      </div>
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-laupay-ink">Transaction history</h2>
