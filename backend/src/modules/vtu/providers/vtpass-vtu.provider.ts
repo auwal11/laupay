@@ -85,13 +85,32 @@ export class VtpassVtuProvider implements VTUProvider {
     }
   }
 
+  /**
+   * Maps the platform's network code to VTpass's serviceID. VTpass uses the
+   * historic "etisalat" identifier for 9mobile; every other network maps to its
+   * lowercase code. Previously airtime was hardcoded to `mtn`, which would have
+   * sent every non-MTN top-up to the wrong service.
+   */
+  private serviceIdFor(network: string): string {
+    const key = (network ?? '').trim().toUpperCase();
+    const map: Record<string, string> = {
+      MTN: 'mtn',
+      AIRTEL: 'airtel',
+      GLO: 'glo',
+      '9MOBILE': 'etisalat',
+      ETISALAT: 'etisalat',
+    };
+    return map[key] ?? key.toLowerCase();
+  }
+
   async purchaseAirtime(req: AirtimePurchaseRequest): Promise<VtuProviderResult> {
     const requestId = this.requestIdFor(req.idempotencyKey);
+    const serviceId = this.serviceIdFor(req.network);
     return this.submitPay({
-      requestId,
-      serviceID: 'mtn',
+      request_id: requestId,
+      serviceID: serviceId,
       billersCode: req.phoneNumber,
-      variation_code: 'mtn',
+      variation_code: serviceId,
       amount: req.amount,
       phone: req.phoneNumber,
     });
@@ -100,8 +119,8 @@ export class VtpassVtuProvider implements VTUProvider {
   async purchaseData(req: DataPurchaseRequest): Promise<VtuProviderResult> {
     const requestId = this.requestIdFor(req.idempotencyKey);
     return this.submitPay({
-      requestId,
-      serviceID: `${req.network}-data`,
+      request_id: requestId,
+      serviceID: `${this.serviceIdFor(req.network)}-data`,
       billersCode: req.phoneNumber,
       variation_code: req.planCode,
       amount: 0,
@@ -110,7 +129,10 @@ export class VtpassVtuProvider implements VTUProvider {
   }
 
   private async submitPay(payload: Record<string, unknown>): Promise<VtuProviderResult> {
-    const requestId = String(payload.requestId);
+    // VTpass's /pay contract uses the snake_case `request_id` field; sending
+    // `requestId` was silently ignored and the call rejected with code 011
+    // ("request_id ID is empty"). Verified against the sandbox.
+    const requestId = String(payload.request_id ?? '');
     try {
       const response = await fetch(`${this.config.vtpassBaseUrl}/api/pay`, {
         method: 'POST',
@@ -125,8 +147,11 @@ export class VtpassVtuProvider implements VTUProvider {
       if (!response.ok || !body.code) {
         return { status: 'UNKNOWN', providerReference: requestId, raw: body };
       }
-      const ref = body.content?.transactions?.transactionId ?? body.transactionId ?? requestId;
-      return { status: this.mapCode(body.code), providerReference: String(ref), raw: body };
+      // Store OUR request_id as the providerReference: VTpass re-query keys on
+      // `request_id` (verified against the sandbox — it rejects `transaction_id`
+      // with code 011), so the provider's transactionId cannot be used for
+      // reconciliation. The transactionId remains in `raw` for webhook lookup.
+      return { status: this.mapCode(body.code), providerReference: requestId, raw: body };
     } catch (err) {
       this.logger.error(`VTpass /pay error: ${String(err)}`);
       return { status: 'UNKNOWN', providerReference: requestId };
@@ -135,10 +160,12 @@ export class VtpassVtuProvider implements VTUProvider {
 
   async verifyTransaction(providerReference: string): Promise<VtuProviderResult> {
     try {
-      const response = await fetch(`${this.config.vtpassBaseUrl}/api/re-query`, {
+      // VTpass's re-query route is `/api/requery` (verified against the
+      // sandbox — `/api/re-query` returns 404) and it keys on `request_id`.
+      const response = await fetch(`${this.config.vtpassBaseUrl}/api/requery`, {
         method: 'POST',
         headers: this.headers(),
-        body: JSON.stringify({ requestId: providerReference }),
+        body: JSON.stringify({ request_id: providerReference }),
       });
       const body = (await response.json()) as {
         code?: string;

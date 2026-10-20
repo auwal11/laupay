@@ -62,6 +62,7 @@ export const walletService = {
               amount: String(result.data.amount),
               description: "Wallet funding",
               createdAt: result.data.createdAt ?? new Date().toISOString(),
+              checkoutUrl: result.data.checkoutUrl,
             },
           }
         : result,
@@ -94,6 +95,8 @@ interface BackendPayment {
   status: string;
   amount: string | number;
   providerReference?: string | null;
+  providerName?: string | null;
+  checkoutUrl?: string;
   createdAt?: string;
 }
 

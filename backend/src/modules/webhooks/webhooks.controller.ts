@@ -27,6 +27,16 @@ interface PaystackWebhook {
   data?: { id?: string | number; reference?: string; status?: string };
 }
 
+interface MonnifyWebhook {
+  eventType?: string;
+  eventData?: {
+    paymentReference?: string;
+    transactionReference?: string;
+    paymentStatus?: string;
+    amountPaid?: number;
+  };
+}
+
 interface VtpassCallback {
   type?: string;
   data?: {
@@ -102,17 +112,23 @@ export class WebhooksController {
     @Headers('x-paystack-signature') paystackSig: string | undefined,
     @Headers('monnify-signature') monnifySig: string | undefined,
     @Headers('x-webhook-signature') legacySig: string | undefined,
-    @Body() body: PaystackWebhook,
+    @Body() body: PaystackWebhook & MonnifyWebhook,
   ) {
     const rawBody = req.rawBody;
     if (!rawBody) throw new BadRequestException('Missing raw request body');
-    const verified =
-      this.verifyPaystack(rawBody, paystackSig) ||
-      this.verifyMonnify(rawBody, monnifySig) ||
-      // legacy mock signature keeps the existing E2E suite working
-      (this.config.nodeEnv !== 'production' && mockVerifier.verify(rawBody.toString('utf8'), legacySig));
-    if (!verified) {
+    const paystackVerified = this.verifyPaystack(rawBody, paystackSig);
+    const monnifyVerified = this.verifyMonnify(rawBody, monnifySig);
+    // legacy mock signature keeps the existing E2E suite working
+    const legacyVerified =
+      this.config.nodeEnv !== 'production' && mockVerifier.verify(rawBody.toString('utf8'), legacySig);
+    if (!paystackVerified && !monnifyVerified && !legacyVerified) {
       throw new BadRequestException('Invalid webhook signature');
+    }
+
+    // Monnify delivers a `{ eventType, eventData }` envelope whose signature is
+    // HMAC-SHA512(rawBody, MONNIFY_SECRET_KEY) in `monnify-signature`.
+    if (monnifyVerified && (body.eventType || body.eventData)) {
+      return this.handleMonnifyPayment(body as MonnifyWebhook);
     }
 
     const providerReference = body.data?.reference;
@@ -149,6 +165,50 @@ export class WebhooksController {
   }
 
   /**
+   * Monnify transaction-completion webhook. Uses the same append-only
+   * PaymentEvent dedup and the same requery-before-credit discipline as the
+   * Paystack path — the callback's own status is never trusted.
+   */
+  private async handleMonnifyPayment(body: MonnifyWebhook) {
+    const transactionReference = body.eventData?.transactionReference;
+    const paymentReference = body.eventData?.paymentReference;
+    const providerReference = transactionReference ?? paymentReference;
+    const providerEventId = transactionReference ?? paymentReference;
+    if (!body.eventType || !providerReference || !providerEventId) {
+      throw new BadRequestException('Invalid Monnify event payload');
+    }
+
+    // MonnifyPaymentProvider stores its own transactionReference as the payment
+    // providerReference; fall back to the paymentReference for older/partial
+    // payloads so neither lookup misses a legitimate event.
+    const payment =
+      (await this.prisma.payment.findUnique({ where: { providerReference: providerReference } })) ??
+      (paymentReference
+        ? await this.prisma.payment.findFirst({ where: { providerReference: paymentReference } })
+        : null);
+    if (!payment) throw new BadRequestException('Unknown payment reference');
+
+    try {
+      await this.prisma.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          provider: 'monnify',
+          providerEventId: `${body.eventType}:${providerEventId}`,
+          rawPayload: body as Prisma.InputJsonValue,
+        },
+      });
+    } catch (err) {
+      if (this.isDuplicateEvent(err)) {
+        return { status: 'ignored_duplicate' };
+      }
+      throw err;
+    }
+
+    void this.paymentsService.requeryPayment(payment.id).catch(() => undefined);
+    return { status: 'accepted' };
+  }
+
+  /**
    * VTU provider webhook (delivery confirmation for airtime/data
    * fulfillment). Delegates to OrdersService.reconcileVtuTransaction, which
    * is the single place (shared with the reconciliation job and the
@@ -173,7 +233,16 @@ export class WebhooksController {
 
     const providerReference = body.data.content?.transactions?.transactionId;
     if (!providerReference) throw new BadRequestException('Missing VTpass transactionId');
-    const txn = await this.prisma.vtuTransaction.findUnique({ where: { providerReference } });
+    // We store our own request_id as the VtuTransaction providerReference (that
+    // is what VTpass re-query keys on), so the provider's transactionId from
+    // the callback is matched against the raw payload as a fallback.
+    const txn =
+      (await this.prisma.vtuTransaction.findUnique({ where: { providerReference } })) ??
+      (await this.prisma.vtuTransaction.findFirst({
+        where: {
+          rawResponse: { path: ['content', 'transactions', 'transactionId'], equals: providerReference },
+        },
+      }));
     if (!txn) throw new BadRequestException('Unknown VTU transaction reference');
 
     // VTpass documents no signing header/secret. Never trust its status field;

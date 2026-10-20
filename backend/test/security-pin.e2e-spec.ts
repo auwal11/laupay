@@ -10,7 +10,15 @@ async function registerVerified(
   server: App,
   user: { email: string; password: string; fullName: string; phone?: string },
 ): Promise<string> {
-  await request(server).post('/api/auth/register').send(user).expect(201);
+  await request(server)
+    .post('/api/auth/register')
+    .send({
+      ...user,
+      phone: user.phone ?? '080' + String(Math.floor(Math.random() * 90_000_000) + 10_000_000),
+      termsAccepted: true,
+      termsVersion: 'e2e',
+    })
+    .expect(201);
   const code = MockMailProvider.lastCodeFor(user.email);
   if (!code) throw new Error('No verification code captured for ' + user.email);
   const res = await request(server)
@@ -101,7 +109,7 @@ describe('Security PIN (e2e)', () => {
       .post('/api/security/pin/verify')
       .set('Authorization', `Bearer ${token}`)
       .send({ pin: '0000' })
-      .expect(401);
+      .expect(403);
   });
 
   it('locks the PIN after 5 consecutive failed attempts, even with the correct PIN afterward', async () => {
@@ -119,7 +127,7 @@ describe('Security PIN (e2e)', () => {
         .post('/api/security/pin/verify')
         .set('Authorization', `Bearer ${lockToken}`)
         .send({ pin: '0000' })
-        .expect(401);
+        .expect(403);
     }
 
     // 6th attempt — even with the CORRECT pin — must be rejected as locked.
@@ -152,7 +160,7 @@ describe('Security PIN (e2e)', () => {
       .post('/api/security/pin/verify')
       .set('Authorization', `Bearer ${token}`)
       .send({ pin: '1234' })
-      .expect(401);
+      .expect(403);
   });
 
   it('rejects changing the PIN with an incorrect current PIN', async () => {
@@ -169,7 +177,7 @@ describe('Security PIN (e2e)', () => {
       .post('/api/security/pin/change')
       .set('Authorization', `Bearer ${otherToken}`)
       .send({ currentPin: '9999', newPin: '2222' })
-      .expect(401);
+      .expect(403);
   });
 
   it('requires authentication for every PIN endpoint', async () => {
@@ -192,6 +200,12 @@ describe('Order risk-decision placeholder shape (e2e)', () => {
 
         token = await registerVerified(app.getHttpServer(), user);
 
+    await request(app.getHttpServer())
+      .post('/api/security/pin')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ pin: '1234' })
+      .expect(201);
+
     const prisma = moduleRef.get(require('../src/prisma/prisma.service').PrismaService);
     const wallet = await prisma.walletAccount.findFirstOrThrow({ where: { user: { email: user.email } } });
     await prisma.walletAccount.update({ where: { id: wallet.id }, data: { balance: 1000 } });
@@ -205,7 +219,7 @@ describe('Order risk-decision placeholder shape (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post('/api/orders/airtime')
       .set('Authorization', `Bearer ${token}`)
-      .send({ network: 'MTN', phoneNumber: '08088880000', amount: 100, idempotencyKey: `risk-shape-${Date.now()}` })
+      .send({ network: 'MTN', phoneNumber: '08088880000', amount: 100, idempotencyKey: `risk-shape-${Date.now()}`, pin: '1234' })
       .expect(201);
 
     expect(res.body.riskDecision).toBe('allow');

@@ -35,6 +35,8 @@ export interface Transaction {
   network?: string;
   providerReference?: string;
   failureReason?: string;
+  /** Provider-hosted checkout URL returned when initiating a sandbox/live funding. */
+  checkoutUrl?: string;
 }
 
 export interface TransactionDetail extends Transaction {

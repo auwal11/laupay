@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
+import * as bodyParser from 'body-parser';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -16,7 +17,15 @@ export async function registerVerified(
   server: App,
   user: { email: string; password: string; fullName: string; phone?: string },
 ): Promise<string> {
-  await request(server).post('/api/auth/register').send(user).expect(201);
+  await request(server)
+    .post('/api/auth/register')
+    .send({
+      ...user,
+      phone: user.phone ?? '080' + String(Math.floor(Math.random() * 90_000_000) + 10_000_000),
+      termsAccepted: true,
+      termsVersion: 'e2e',
+    })
+    .expect(201);
   const code = MockMailProvider.lastCodeFor(user.email);
   if (!code) throw new Error('No verification code captured for ' + user.email);
   const res = await request(server)
@@ -24,6 +33,19 @@ export async function registerVerified(
     .send({ email: user.email, code })
     .expect(201);
   return res.body.accessToken as string;
+}
+
+async function waitFor<T>(
+  fn: () => Promise<T | null | undefined>,
+  timeoutMs = 5000,
+): Promise<T> {
+  const start = Date.now();
+  for (;;) {
+    const value = await fn();
+    if (value) return value as T;
+    if (Date.now() - start > timeoutMs) throw new Error('waitFor timed out');
+    await new Promise((r) => setTimeout(r, 50));
+  }
 }
 
 /**
@@ -52,7 +74,16 @@ describe('Payments & Webhooks flow (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ bodyParser: false });
+    // Mirror main.ts: capture the raw request bytes so webhook signatures can
+    // be verified over the exact payload the provider signed.
+    app.use(
+      bodyParser.json({
+        verify: (req, _res, buf) => {
+          (req as unknown as { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+        },
+      }),
+    );
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.setGlobalPrefix('api');
     await app.init();
@@ -192,16 +223,15 @@ describe('Payments & Webhooks flow (e2e)', () => {
       ).providerReference!;
 
       const webhookBody = {
-        providerEventId: `evt_replay_${Date.now()}`,
-        providerReference,
-        status: 'SUCCESS',
+        event: 'charge.success',
+        data: { id: `evt_replay_${Date.now()}`, reference: providerReference },
       };
 
       const first = await request(app.getHttpServer())
         .post('/api/webhooks/payment')
         .set('x-webhook-signature', 'mock-shared-secret')
         .send(webhookBody);
-      expect(first.body.status).toBe('processed');
+      expect(first.body.status).toBe('accepted');
 
       // Exact same event delivered again (providers commonly retry webhooks).
       const replay = await request(app.getHttpServer())
@@ -211,7 +241,7 @@ describe('Payments & Webhooks flow (e2e)', () => {
       expect(replay.body.status).toBe('ignored_duplicate');
 
       const eventCount = await prisma.paymentEvent.count({
-        where: { providerEventId: webhookBody.providerEventId },
+        where: { providerEventId: `charge.success:${webhookBody.data.id}` },
       });
       expect(eventCount).toBe(1);
     });
@@ -233,18 +263,21 @@ describe('Payments & Webhooks flow (e2e)', () => {
         .post('/api/webhooks/payment')
         .set('x-webhook-signature', 'mock-shared-secret')
         .send({
-          providerEventId: `evt_tamper_${Date.now()}`,
-          providerReference: payment.providerReference,
-          status: 'SUCCESS',
+          event: 'charge.success',
+          data: { id: `evt_tamper_${Date.now()}`, reference: payment.providerReference },
           amount: 999999, // not read by the handler at all — must have zero effect
         });
 
-      const walletEntry = await prisma.ledgerEntry.findFirst({
-        where: { referenceType: 'Payment', referenceId: payment.id },
-      });
+      // The handler requeries the provider asynchronously before crediting, so
+      // poll for the ledger entry rather than assuming it exists synchronously.
+      const walletEntry = await waitFor(() =>
+        prisma.ledgerEntry.findFirst({
+          where: { referenceType: 'Payment', referenceId: payment.id },
+        }),
+      );
       // The credited amount must match the ORIGINAL payment amount (10.02),
       // never the bogus amount injected in the webhook body.
-      expect(Number(walletEntry?.amount)).toBe(10.02);
+      expect(Number(walletEntry.amount)).toBe(10.02);
     });
   });
 });

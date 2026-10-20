@@ -99,19 +99,62 @@ export class AppConfigService {
   readonly supabaseStorageBucket = optional('SUPABASE_STORAGE_BUCKET', 'profile-photos');
 
   /**
-   * Staging must never touch real money. This guard is evaluated at boot and
-   * refuses to start if a LIVE key is ever selected alongside staging env.
+   * Guard evaluated at boot (see main.ts).
+   *
+   *  - In PRODUCTION: refuses to start with any mock/simulated provider, so a
+   *    real deployment can never silently fake a payment or fulfillment.
+   *  - In every other environment (staging/dev): refuses to start if a LIVE
+   *    provider credential is present, so staging can never touch real money.
    */
   assertStagingSafety() {
-    const livePrefixes = ['sk_live_', 'pk_live_'];
-    const selected = [this.paystackSecretKey, this.paystackEnabled ? '' : ''].filter(Boolean);
-    for (const key of selected) {
-      if (livePrefixes.some((p) => key.startsWith(p))) {
+    if (this.isProduction) {
+      if (this.paymentProvider === 'mock') {
         throw new Error(
-          '[config] Refusing to start: a LIVE Paystack key was detected while PAYMENT_PROVIDER=paystack. ' +
-            'Staging must use sk_test_/pk_test_ only (requirement 16).',
+          '[config] Refusing to start: PAYMENT_PROVIDER=mock in production. ' +
+            'Real funding must go through paystack/monnify.',
         );
       }
+      if (this.vtuProvider === 'mock') {
+        throw new Error(
+          '[config] Refusing to start: VTU_PROVIDER=mock in production. ' +
+            'Real fulfillment must go through vtpass.',
+        );
+      }
+      if (this.fulfillmentMode === 'simulated') {
+        throw new Error(
+          '[config] Refusing to start: FULFILLMENT_MODE=simulated in production. ' +
+            'Use provider_test or live.',
+        );
+      }
+      return;
+    }
+
+    // Non-production: a LIVE key alongside staging config is always a mistake.
+    if (this.paystackEnabled && ['sk_live_', 'pk_live_'].some((p) => this.paystackSecretKey.startsWith(p))) {
+      throw new Error(
+        '[config] Refusing to start: a LIVE Paystack key was detected while PAYMENT_PROVIDER=paystack. ' +
+          'Staging must use sk_test_/pk_test_ only.',
+      );
+    }
+    if (this.monnifyEnabled) {
+      if ([this.monnifyApiKey, this.monnifySecretKey].some((k) => k.startsWith('MK_PROD_'))) {
+        throw new Error(
+          '[config] Refusing to start: a LIVE Monnify key (MK_PROD_) was detected. ' +
+            'Staging must use MK_TEST_ keys only.',
+        );
+      }
+      if (!this.monnifyBaseUrl.includes('sandbox')) {
+        throw new Error(
+          '[config] Refusing to start: MONNIFY_BASE_URL is not a sandbox host while PAYMENT_PROVIDER=monnify. ' +
+            `Got ${this.monnifyBaseUrl}.`,
+        );
+      }
+    }
+    if (this.vtpassEnabled && this.fulfillmentMode !== 'live' && !this.vtpassBaseUrl.includes('sandbox')) {
+      throw new Error(
+        '[config] Refusing to start: VTPASS_BASE_URL is not a sandbox host while testing VTpass. ' +
+          `Got ${this.vtpassBaseUrl}.`,
+      );
     }
   }
 }

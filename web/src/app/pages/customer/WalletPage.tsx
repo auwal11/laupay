@@ -42,6 +42,12 @@ function FundWalletForm({ onDone }: { onDone: () => void }) {
     const result = await wallet.fundWallet({ amount, method: "bank_transfer", idempotencyKey });
     setSubmitting(false);
     if (result.ok) {
+      // Real sandbox/live providers (Paystack/Monnify) hand back a hosted
+      // checkout URL — send the customer there to complete the payment.
+      if (result.data.checkoutUrl) {
+        window.location.assign(result.data.checkoutUrl);
+        return;
+      }
       setMessage("Funding request submitted. We'll credit your wallet once it's confirmed.");
     } else {
       setMessage(result.error.message);

@@ -15,7 +15,10 @@ class TestAuthHelper {
     server: App,
     user: { email: string; password: string; fullName: string; phone?: string },
   ): Promise<string> {
-    await request(server).post('/api/auth/register').send(user).expect(201);
+    await request(server)
+      .post('/api/auth/register')
+      .send({ ...user, termsAccepted: true, termsVersion: 'e2e' })
+      .expect(201);
 
     // MAIL_PROVIDER=mock captures the code in-process (MockMailProvider.sent).
     const code = MockMailProvider.lastCodeFor(user.email);
@@ -33,8 +36,8 @@ describe('Registration → Email OTP → Login (e2e)', () => {
   let app: INestApplication;
   // `phone` is @unique, so it must be unique per run — a fixed literal makes
   // a second run of this suite fail with a 500 unique-constraint error.
-  const runId = Date.now().toString().slice(-9);
-  const phone = (suffix: string) => `0803${runId}${suffix}`;
+  const runId = Date.now().toString().slice(-7);
+  const phone = (suffix: string) => `080${runId}${suffix}`;
   const user = {
     email: `otp-flow-${runId}@test.local`,
     password: 'Password123!',
@@ -59,7 +62,7 @@ describe('Registration → Email OTP → Login (e2e)', () => {
   it('registration issues NO tokens and leaves the account unverified', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/auth/register')
-      .send(user)
+      .send({ ...user, termsAccepted: true, termsVersion: 'e2e' })
       .expect(201);
     expect(res.body.accessToken).toBeUndefined();
     expect(res.body.requiresVerification).toBe(true);
@@ -80,12 +83,13 @@ describe('Registration → Email OTP → Login (e2e)', () => {
   });
 
   it('the correct OTP activates the account and returns tokens', async () => {
-    const token = await TestAuthHelper.registerVerified(app.getHttpServer(), {
-      ...user,
-      email: `otp-verify-${Date.now()}@test.local`,
-      phone: phone('9'),
-    });
-    expect(typeof token).toBe('string');
+    const code = MockMailProvider.lastCodeFor(user.email);
+    if (!code) throw new Error('No verification code captured for ' + user.email);
+    const res = await request(app.getHttpServer())
+      .post('/api/auth/verify-otp')
+      .send({ email: user.email, code })
+      .expect(201);
+    expect(typeof res.body.accessToken).toBe('string');
   });
 
   it('login succeeds after verification (requirement 4)', async () => {

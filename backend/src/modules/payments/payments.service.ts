@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { LedgerReason, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AppConfigService } from '../../config/app-config.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { PAYMENT_PROVIDER, PaymentProvider } from './providers/payment-provider.interface';
 
@@ -9,6 +10,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
+    private readonly config: AppConfigService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
   ) {}
 
@@ -45,7 +47,10 @@ export class PaymentsService {
       data: {
         status: this.mapProviderStatus(providerResult.status),
         providerReference: providerResult.providerReference,
-        providerName: 'mock',
+        // Record the provider that actually handled this payment. Previously
+        // hardcoded to 'mock', which mislabelled real Paystack/Monnify sandbox
+        // payments in the ledger/audit trail.
+        providerName: this.config.paymentProvider,
       },
     });
 
@@ -53,7 +58,20 @@ export class PaymentsService {
       await this.creditWalletForPayment(updated.id, userId, amount);
     }
 
-    return updated;
+    // Surface the provider-hosted checkout URL (Paystack/Monnify sandbox) so
+    // the client can complete the payment. Never persisted in our DB and never
+    // derived from client input — it comes straight from the provider.
+    const checkoutUrl = this.extractCheckoutUrl(providerResult.raw);
+    return checkoutUrl ? { ...updated, checkoutUrl } : updated;
+  }
+
+  /** Best-effort extraction of the provider-hosted checkout URL from a raw provider payload. */
+  private extractCheckoutUrl(raw: unknown): string | undefined {
+    if (raw && typeof raw === 'object' && 'checkoutUrl' in raw) {
+      const candidate = (raw as { checkoutUrl?: unknown }).checkoutUrl;
+      if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+    }
+    return undefined;
   }
 
   /**

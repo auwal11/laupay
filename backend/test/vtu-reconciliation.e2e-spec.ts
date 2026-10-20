@@ -12,7 +12,15 @@ async function registerVerified(
   server: App,
   user: { email: string; password: string; fullName: string; phone?: string },
 ): Promise<string> {
-  await request(server).post('/api/auth/register').send(user).expect(201);
+  await request(server)
+    .post('/api/auth/register')
+    .send({
+      ...user,
+      phone: user.phone ?? '080' + String(Math.floor(Math.random() * 90_000_000) + 10_000_000),
+      termsAccepted: true,
+      termsVersion: 'e2e',
+    })
+    .expect(201);
   const code = MockMailProvider.lastCodeFor(user.email);
   if (!code) throw new Error('No verification code captured for ' + user.email);
   const res = await request(server)
@@ -20,6 +28,16 @@ async function registerVerified(
     .send({ email: user.email, code })
     .expect(201);
   return res.body.accessToken as string;
+}
+
+/** The VTU webhook reconciles asynchronously, so poll for the terminal state. */
+async function waitForOrderStatus(prisma: PrismaService, orderId: string, status: string) {
+  for (let i = 0; i < 100; i++) {
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    if (order.status === status) return order;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(`Order ${orderId} never reached ${status}`);
 }
 
 /**
@@ -55,6 +73,12 @@ describe('VTU async failure reversal (e2e)', () => {
 
         token = await registerVerified(app.getHttpServer(), user);
 
+    await request(app.getHttpServer())
+      .post('/api/security/pin')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ pin: '1234' })
+      .expect(201);
+
     // Fund the wallet directly so the order below has enough balance.
     const wallet = await prisma.walletAccount.findFirstOrThrow({ where: { user: { email: user.email } } });
     await prisma.walletAccount.update({ where: { id: wallet.id }, data: { balance: 5000 } });
@@ -69,7 +93,7 @@ describe('VTU async failure reversal (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post('/api/orders/airtime')
       .set('Authorization', `Bearer ${token}`)
-      .send({ network: 'MTN', phoneNumber: '08099990000', amount: 200.03, idempotencyKey: key })
+      .send({ network: 'MTN', phoneNumber: '08099990000', amount: 200.03, idempotencyKey: key, pin: '1234' })
       .expect(201);
 
     expect(res.body.status).toBe('FULFILLMENT_UNKNOWN');
@@ -84,7 +108,7 @@ describe('VTU async failure reversal (e2e)', () => {
     const orderRes = await request(app.getHttpServer())
       .post('/api/orders/airtime')
       .set('Authorization', `Bearer ${token}`)
-      .send({ network: 'MTN', phoneNumber: '08099990001', amount: 300.03, idempotencyKey: key });
+      .send({ network: 'MTN', phoneNumber: '08099990001', amount: 300.03, idempotencyKey: key, pin: '1234' });
     const orderId = orderRes.body.id;
     expect(orderRes.body.status).toBe('FULFILLMENT_UNKNOWN');
 
@@ -126,7 +150,7 @@ describe('VTU async failure reversal (e2e)', () => {
     const orderRes = await request(app.getHttpServer())
       .post('/api/orders/airtime')
       .set('Authorization', `Bearer ${token}`)
-      .send({ network: 'MTN', phoneNumber: '08099990002', amount: 150.03, idempotencyKey: key });
+      .send({ network: 'MTN', phoneNumber: '08099990002', amount: 150.03, idempotencyKey: key, pin: '1234' });
     const orderId = orderRes.body.id;
 
     const txn = await prisma.vtuTransaction.findUniqueOrThrow({ where: { orderId } });
@@ -137,11 +161,13 @@ describe('VTU async failure reversal (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/api/webhooks/vtu')
-      .set('x-webhook-signature', 'mock-shared-secret')
-      .send({ providerReference: txn.providerReference, status: 'FAILED' })
+      .send({
+        type: 'transaction-update',
+        data: { content: { transactions: { transactionId: txn.providerReference, status: 'FAILED' } } },
+      })
       .expect(201);
 
-    const resolvedOrder = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    const resolvedOrder = await waitForOrderStatus(prisma, orderId, 'REFUNDED');
     expect(resolvedOrder.status).toBe('REFUNDED');
 
     const balanceAfter = Number(
@@ -155,7 +181,7 @@ describe('VTU async failure reversal (e2e)', () => {
     const orderRes = await request(app.getHttpServer())
       .post('/api/orders/airtime')
       .set('Authorization', `Bearer ${token}`)
-      .send({ network: 'MTN', phoneNumber: '08099990003', amount: 50.02, idempotencyKey: key }); // .02 -> UNKNOWN -> resolves SUCCESS
+      .send({ network: 'MTN', phoneNumber: '08099990003', amount: 50.02, idempotencyKey: key, pin: '1234' }); // .02 -> UNKNOWN -> resolves SUCCESS
     const orderId = orderRes.body.id;
     expect(orderRes.body.status).toBe('FULFILLMENT_UNKNOWN');
 
@@ -174,7 +200,7 @@ describe('VTU async failure reversal (e2e)', () => {
     const orderRes = await request(app.getHttpServer())
       .post('/api/orders/airtime')
       .set('Authorization', `Bearer ${token}`)
-      .send({ network: 'MTN', phoneNumber: '08099990004', amount: 10.0, idempotencyKey: key }); // .00 -> immediate SUCCESS
+      .send({ network: 'MTN', phoneNumber: '08099990004', amount: 10.0, idempotencyKey: key, pin: '1234' }); // .00 -> immediate SUCCESS
     const orderId = orderRes.body.id;
     expect(orderRes.body.status).toBe('FULFILLED');
 

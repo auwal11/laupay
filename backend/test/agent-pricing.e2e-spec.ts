@@ -11,7 +11,15 @@ async function registerVerified(
   server: App,
   user: { email: string; password: string; fullName: string; phone?: string },
 ): Promise<string> {
-  await request(server).post('/api/auth/register').send(user).expect(201);
+  await request(server)
+    .post('/api/auth/register')
+    .send({
+      ...user,
+      phone: user.phone ?? '080' + String(Math.floor(Math.random() * 90_000_000) + 10_000_000),
+      termsAccepted: true,
+      termsVersion: 'e2e',
+    })
+    .expect(201);
   const code = MockMailProvider.lastCodeFor(user.email);
   if (!code) throw new Error('No verification code captured for ' + user.email);
   const res = await request(server)

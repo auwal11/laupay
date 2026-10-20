@@ -88,4 +88,84 @@ describe('WebhooksController provider callbacks', () => {
     await expect(controller.handleVtuWebhook({ type: 'transaction-update', data: { content: { transactions: { status: 'delivered' } } } }))
       .rejects.toThrow('Missing VTpass transactionId');
   });
+
+  describe('Monnify callbacks', () => {
+    const monnifySecret = 'monnify-test-secret';
+    const monnifyConfig = {
+      nodeEnv: 'production',
+      paystackWebhookSecret: '',
+      monnifySecretKey: monnifySecret,
+    } as any;
+
+    const monnifyPayload = (reference: string, txRef: string) =>
+      Buffer.from(
+        JSON.stringify({
+          eventType: 'SUCCESSFUL_TRANSACTION',
+          eventData: { paymentReference: reference, transactionReference: txRef, paymentStatus: 'PAID', amountPaid: 100 },
+        }),
+      );
+
+    it('accepts a Monnify payload signed over the exact raw bytes and re-queries server-side', async () => {
+      const body = monnifyPayload('LAU_MON', 'MON_TX_1');
+      const payment = { id: 'payment-mon', providerReference: 'LAU_MON' };
+      const prisma = {
+        payment: { findUnique: jest.fn().mockResolvedValue(payment) },
+        paymentEvent: { create: jest.fn().mockResolvedValue({}) },
+      };
+      const payments = { requeryPayment: jest.fn().mockResolvedValue(undefined) };
+      const controller = new WebhooksController(monnifyConfig, prisma as any, payments as any, {} as any);
+
+      await expect(
+        controller.handlePaymentWebhook(
+          { rawBody: body } as any,
+          undefined,
+          signature(body, monnifySecret),
+          undefined,
+          JSON.parse(body.toString()),
+        ),
+      ).resolves.toEqual({ status: 'accepted' });
+
+      expect(prisma.paymentEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ provider: 'monnify', providerEventId: 'SUCCESSFUL_TRANSACTION:MON_TX_1' }),
+        }),
+      );
+      expect(payments.requeryPayment).toHaveBeenCalledWith(payment.id);
+    });
+
+    it('ignores a duplicate Monnify event', async () => {
+      const body = monnifyPayload('LAU_MON', 'MON_TX_2');
+      const prisma = {
+        payment: { findUnique: jest.fn().mockResolvedValue({ id: 'payment-mon2' }) },
+        paymentEvent: { create: jest.fn().mockRejectedValue({ code: 'P2002' }) },
+      };
+      const payments = { requeryPayment: jest.fn() };
+      const controller = new WebhooksController(monnifyConfig, prisma as any, payments as any, {} as any);
+
+      await expect(
+        controller.handlePaymentWebhook(
+          { rawBody: body } as any,
+          undefined,
+          signature(body, monnifySecret),
+          undefined,
+          JSON.parse(body.toString()),
+        ),
+      ).resolves.toEqual({ status: 'ignored_duplicate' });
+      expect(payments.requeryPayment).not.toHaveBeenCalled();
+    });
+
+    it('rejects a Monnify payload with a bad signature', async () => {
+      const body = monnifyPayload('LAU_MON', 'MON_TX_3');
+      const controller = new WebhooksController(monnifyConfig, {} as any, {} as any, {} as any);
+      await expect(
+        controller.handlePaymentWebhook(
+          { rawBody: body } as any,
+          undefined,
+          signature(body, 'wrong-secret'),
+          undefined,
+          JSON.parse(body.toString()),
+        ),
+      ).rejects.toThrow('Invalid webhook signature');
+    });
+  });
 });

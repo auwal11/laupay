@@ -11,7 +11,15 @@ async function registerVerified(
   server: App,
   user: { email: string; password: string; fullName: string; phone?: string },
 ): Promise<string> {
-  await request(server).post('/api/auth/register').send(user).expect(201);
+  await request(server)
+    .post('/api/auth/register')
+    .send({
+      ...user,
+      phone: user.phone ?? '080' + String(Math.floor(Math.random() * 90_000_000) + 10_000_000),
+      termsAccepted: true,
+      termsVersion: 'e2e',
+    })
+    .expect(201);
   const code = MockMailProvider.lastCodeFor(user.email);
   if (!code) throw new Error('No verification code captured for ' + user.email);
   const res = await request(server)
@@ -58,6 +66,13 @@ describe('Security (e2e)', () => {
 
         tokenB = await registerVerified(app.getHttpServer(), userB);
 
+    // Purchases require a transaction PIN (see SecurityService.verifyPin).
+    await request(app.getHttpServer())
+      .post('/api/security/pin')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ pin: '1234' })
+      .expect(201);
+
     // Fund User A's wallet directly via Prisma so we can place a paid order
     // without depending on the payments flow in this test file.
     const walletA = await prisma.walletAccount.findFirstOrThrow({
@@ -76,6 +91,7 @@ describe('Security (e2e)', () => {
         phoneNumber: '08010000000',
         amount: 100, // .00 -> mock provider SUCCESS path
         idempotencyKey: `sec-test-order-${Date.now()}`,
+        pin: '1234',
       });
     orderIdOwnedByA = orderRes.body.id;
   });
@@ -171,6 +187,7 @@ describe('Security (e2e)', () => {
           phoneNumber: '08010000001',
           amount: 100,
           idempotencyKey: `sec-tamper-order-${Date.now()}`,
+          pin: '1234',
           status: 'FULFILLED', // not a declared field — must be rejected, never silently dropped-and-succeeded
         });
       expect(res.status).toBe(400);
@@ -185,6 +202,7 @@ describe('Security (e2e)', () => {
           phoneNumber: '08010000002',
           amount: -500,
           idempotencyKey: `sec-negative-${Date.now()}`,
+          pin: '1234',
         });
       expect(res.status).toBe(400);
     });
@@ -196,12 +214,12 @@ describe('Security (e2e)', () => {
       const first = await request(app.getHttpServer())
         .post('/api/orders/airtime')
         .set('Authorization', `Bearer ${tokenA}`)
-        .send({ network: 'MTN', phoneNumber: '08010000003', amount: 100, idempotencyKey: key });
+        .send({ network: 'MTN', phoneNumber: '08010000003', amount: 100, idempotencyKey: key, pin: '1234' });
 
       const second = await request(app.getHttpServer())
         .post('/api/orders/airtime')
         .set('Authorization', `Bearer ${tokenA}`)
-        .send({ network: 'MTN', phoneNumber: '08010000003', amount: 100, idempotencyKey: key });
+        .send({ network: 'MTN', phoneNumber: '08010000003', amount: 100, idempotencyKey: key, pin: '1234' });
 
       expect(first.body.id).toBe(second.body.id);
 

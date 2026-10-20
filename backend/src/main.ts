@@ -11,6 +11,9 @@ import { AppConfigService } from './config/app-config.service';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   const config = app.get(AppConfigService);
+  // Refuse to boot with a dangerous provider/credential combination (mock in
+  // production, or a live key in staging) before accepting any traffic.
+  config.assertStagingSafety();
 
   // Paystack signs the exact bytes received over HTTP. Capture them before
   // JSON parsing; re-serialising req.body can change whitespace/key order.
