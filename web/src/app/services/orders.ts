@@ -1,6 +1,6 @@
 import { request } from "./api";
 import type { ApiResult } from "@app/types/common";
-import type { CreateOrderPayload, DataPlan, Network, Order } from "@app/types/orders";
+import type { CreateOrderPayload, DataPlan, Network, Order, PurchaseKind } from "@app/types/orders";
 
 const SUPPORTED_NG_NETWORKS: Network[] = [
   { id: "MTN", name: "MTN" },
@@ -72,7 +72,11 @@ export const ordersService = {
   },
 
   async getOrder(id: string): Promise<ApiResult<Order>> {
-    return request<Order>(`/orders/${id}`);
+    return request<BackendOrder>(`/orders/${id}`).then((result) =>
+      result.ok
+        ? { ok: true, data: normalizeOrder(result.data, result.data) }
+        : result,
+    );
   },
 };
 
@@ -92,6 +96,10 @@ interface BackendDataPlan {
 interface BackendOrder {
   id: string;
   status: string;
+  type?: string;
+  network?: string;
+  phoneNumber?: string;
+  dataPlanId?: string;
   amount?: string | number;
   totalAmount?: string | number;
   failureReason?: string;
@@ -99,16 +107,38 @@ interface BackendOrder {
 }
 
 /** Backend order rows don't carry the client-only fields the UI renders. */
-function normalizeOrder(value: BackendOrder, input: CreateOrderPayload): Order {
+function normalizeOrder(value: BackendOrder, input: CreateOrderPayload | BackendOrder): Order {
+  const kind: PurchaseKind = "kind" in input
+    ? input.kind
+    : String(value.type ?? "").toLowerCase().includes("data") ? "data" : "airtime";
+  const networkId = "networkId" in input ? (input as CreateOrderPayload).networkId : (value.network ?? "");
+  const phoneNumber = "phoneNumber" in input ? (input as CreateOrderPayload).phoneNumber : (value.phoneNumber ?? "");
+  const amount = value.amount ?? value.totalAmount ?? ("amount" in input ? input.amount : "0");
   return {
     id: value.id,
     reference: value.id,
-    kind: input.kind,
-    status: String(value.status).toLowerCase() as Order["status"],
-    networkId: input.networkId,
-    phoneNumber: input.phoneNumber,
-    amount: String(value.amount ?? value.totalAmount ?? input.amount ?? "0"),
+    kind,
+    status: mapOrderStatus(value.status),
+    networkId,
+    phoneNumber,
+    amount: String(amount),
+    total: value.totalAmount != null ? String(value.totalAmount) : undefined,
     failureReason: value.failureReason,
     createdAt: value.createdAt,
   };
+}
+
+function mapOrderStatus(status: string): Order["status"] {
+  switch (String(status).toUpperCase()) {
+    case "FULFILLED": return "success";
+    case "FULFILLMENT_FAILED":
+    case "REFUNDED": return "failed";
+    case "FULFILLMENT_UNKNOWN": return "unknown";
+    case "FULFILLING":
+    case "PAID": return "processing";
+    case "CANCELLED": return "cancelled";
+    case "PRICED":
+    case "CREATED":
+    default: return "pending";
+  }
 }

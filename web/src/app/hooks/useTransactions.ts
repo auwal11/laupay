@@ -8,7 +8,7 @@ export function useTransactions(): AsyncState<Transaction[]> {
 
   useEffect(() => {
     let cancelled = false;
-    wallet.getTransactions().then((result) => {
+    const load = () => wallet.getTransactions().then((result) => {
       if (cancelled) return;
       if (!result.ok) {
         setState({ status: "error", error: result.error });
@@ -18,8 +18,14 @@ export function useTransactions(): AsyncState<Transaction[]> {
         setState({ status: "success", data: result.data });
       }
     });
+    void load();
+    // Orders can move from confirming to a terminal provider result after the
+    // initial ledger read. Refresh while this screen is open so status pills
+    // and debit totals reflect the backend ledger without a manual reload.
+    const refresh = window.setInterval(() => { void load(); }, 15000);
     return () => {
       cancelled = true;
+      window.clearInterval(refresh);
     };
   }, []);
 

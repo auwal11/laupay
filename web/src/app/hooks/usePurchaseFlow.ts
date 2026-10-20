@@ -31,6 +31,7 @@ interface PurchaseFlowState {
   networkError: string | null;
   plansLoading: boolean;
   plansError: string | null;
+  processingLabel: "Verifying PIN…" | "Processing payment…";
 }
 
 const AIRTIME_AMOUNTS = ["100", "200", "500", "1000", "2000"];
@@ -53,6 +54,7 @@ function initialState(): PurchaseFlowState {
     networkError: null,
     plansLoading: false,
     plansError: null,
+    processingLabel: "Verifying PIN…",
   };
 }
 
@@ -98,13 +100,26 @@ export function usePurchaseFlow(kind: PurchaseKind) {
   }, []);
 
   /** Interprets the order the backend returns and routes to the right step — never assumes success from a 2xx. */
+  const pollOrder = useCallback(async (orderId: string) => {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 5000));
+      const result = await orders.getOrder(orderId);
+      if (!result.ok) return;
+      setState((prev) => ({ ...prev, order: result.data }));
+      if (!["pending", "processing", "unknown"].includes(result.data.status)) return;
+    }
+  }, []);
+
   const routeOrderResult = useCallback((order: Order) => {
     if (order.status === "auth_required") {
       setState((prev) => ({ ...prev, order, step: "verify", verifyError: null }));
     } else {
       setState((prev) => ({ ...prev, order, step: "result" }));
+      if (["pending", "processing", "unknown"].includes(order.status)) {
+        void pollOrder(order.id);
+      }
     }
-  }, []);
+  }, [pollOrder]);
 
   /**
    * "Confirm purchase" on the review step no longer creates anything — it
@@ -121,7 +136,10 @@ export function usePurchaseFlow(kind: PurchaseKind) {
     (pin: string) => {
       const networkId = state.networkId;
       if (!networkId) return;
-      setState((s) => ({ ...s, step: "processing", verifyError: null }));
+      setState((s) => ({ ...s, step: "processing", processingLabel: "Verifying PIN…", verifyError: null }));
+      window.setTimeout(() => {
+        setState((s) => s.step === "processing" ? { ...s, processingLabel: "Processing payment…" } : s);
+      }, 700);
       orders
         .createOrder({
           kind,

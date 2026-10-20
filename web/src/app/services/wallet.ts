@@ -108,7 +108,7 @@ function normalizeTransaction(entry: BackendLedgerEntry): Transaction {
     id: entry.id,
     reference: entry.referenceId ?? entry.id,
     type: entry.orderType === "airtime" ? "airtime" : entry.orderType === "data" ? "data" : isCredit ? "wallet_funding" : "wallet_debit",
-    status: (entry.status ?? "success") as Transaction["status"],
+    status: mapTransactionStatus(entry.status),
     amount: String(entry.amount),
     description: entry.description ?? (isCredit ? "Wallet credit" : "Wallet debit"),
     createdAt: entry.createdAt,
@@ -118,4 +118,22 @@ function normalizeTransaction(entry: BackendLedgerEntry): Transaction {
     network: entry.network,
     counterparty: entry.counterparty,
   };
+}
+
+function mapTransactionStatus(status?: string): Transaction["status"] {
+  switch (String(status ?? "success").toUpperCase()) {
+    case "FULFILLED":
+    case "SUCCESS": return "success";
+    case "FULFILLMENT_FAILED":
+    case "REFUNDED":
+    case "FAILED":
+    case "CANCELLED": return "failed";
+    case "FULFILLMENT_UNKNOWN":
+    case "UNKNOWN": return "unknown";
+    case "FULFILLING":
+    case "PROCESSING":
+    case "PAID": return "processing";
+    case "PENDING": return "pending";
+    default: return "pending";
+  }
 }
