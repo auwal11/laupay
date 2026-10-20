@@ -47,6 +47,7 @@ export function AdminOrdersPage() {
         type: type || undefined,
         status: status || undefined,
         page,
+        pageSize: 20,
       }),
     [search, type, status, page],
   );

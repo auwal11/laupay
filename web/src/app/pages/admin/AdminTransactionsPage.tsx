@@ -33,6 +33,7 @@ export function AdminTransactionsPage() {
         direction: direction || undefined,
         source: source || undefined,
         page,
+        pageSize: 20,
       }),
     [search, direction, source, page],
   );

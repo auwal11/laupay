@@ -39,7 +39,7 @@ export function AdminWalletsPage() {
   const float = useAsync(() => adminService.float(), []);
 
   const state = useAsync(
-    () => adminService.wallets({ search: search || undefined, status: status || undefined, page }),
+    () => adminService.wallets({ search: search || undefined, status: status || undefined, page, pageSize: 20 }),
     [search, status, page],
   );
 

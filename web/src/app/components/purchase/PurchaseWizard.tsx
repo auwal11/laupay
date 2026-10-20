@@ -320,7 +320,7 @@ function ResultCard({
     order.status === "cancelled" && order.failureReason === "INSUFFICIENT_FUNDS";
   const terminalMessage = TERMINAL_MESSAGES[order.status];
   const successful = order.status === "success";
-  const failed = order.status === "failed" || order.status === "cancelled";
+  const failed = order.status === "failed" || order.status === "refunded" || order.status === "cancelled";
   const pending = !successful && !failed;
   const resultTitle = successful
     ? `${kind === "airtime" ? "Airtime" : "Data"} purchase successful`
@@ -328,7 +328,7 @@ function ResultCard({
   const resultMessage = successful
     ? "Your purchase was completed successfully."
     : failed
-      ? insufficientFunds ? "Your wallet balance was not enough for this purchase." : order.failureReason ?? "The provider could not complete this purchase."
+      ? insufficientFunds ? "Your wallet balance was not enough for this purchase." : order.status === "refunded" ? "The purchase failed and the debit was returned to your wallet." : order.failureReason ?? "The provider could not complete this purchase."
       : terminalMessage?.text ?? "We are still confirming this purchase. You do not need to retry.";
 
   return (

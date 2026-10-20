@@ -14,6 +14,7 @@ export type TransactionState =
   | "processing"
   | "success"
   | "failed"
+  | "refunded"
   | "unknown"
   | "cancelled"
   | "held";

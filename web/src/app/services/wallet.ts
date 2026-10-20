@@ -125,9 +125,9 @@ function mapTransactionStatus(status?: string): Transaction["status"] {
     case "FULFILLED":
     case "SUCCESS": return "success";
     case "FULFILLMENT_FAILED":
-    case "REFUNDED":
     case "FAILED":
     case "CANCELLED": return "failed";
+    case "REFUNDED": return "refunded";
     case "FULFILLMENT_UNKNOWN":
     case "UNKNOWN": return "unknown";
     case "FULFILLING":

@@ -131,8 +131,8 @@ function normalizeOrder(value: BackendOrder, input: CreateOrderPayload | Backend
 function mapOrderStatus(status: string): Order["status"] {
   switch (String(status).toUpperCase()) {
     case "FULFILLED": return "success";
-    case "FULFILLMENT_FAILED":
-    case "REFUNDED": return "failed";
+    case "FULFILLMENT_FAILED": return "failed";
+    case "REFUNDED": return "refunded";
     case "FULFILLMENT_UNKNOWN": return "unknown";
     case "FULFILLING":
     case "PAID": return "processing";

@@ -34,7 +34,7 @@ export function AdminUsersPage() {
   const [fundError, setFundError] = useState<string | null>(null);
 
   const state = useAsync(
-    () => adminService.users({ search: search || undefined, role: role || undefined, status: status || undefined, page }),
+    () => adminService.users({ search: search || undefined, role: role || undefined, status: status || undefined, page, pageSize: 20 }),
     [search, role, status, page],
   );
 
