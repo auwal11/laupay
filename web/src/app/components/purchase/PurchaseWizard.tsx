@@ -81,17 +81,7 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
           {state.step === "select_amount_plan" && (
             <StepCard title={STEP_LABELS.select_amount_plan} onBack={flow.goBack}>
               {kind === "airtime" ? (
-                <div className="grid grid-cols-3 gap-2">
-                  {flow.airtimeAmounts.map((amount) => (
-                    <button
-                      key={amount}
-                      onClick={() => flow.selectAmount(amount)}
-                      className="rounded-md border border-laupay-border bg-white px-3 py-3 text-sm font-semibold text-laupay-ink hover:border-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo"
-                    >
-                      {formatNaira(amount)}
-                    </button>
-                  ))}
-                </div>
+                <AirtimeAmountPicker amounts={flow.airtimeAmounts} onSelect={flow.selectAmount} />
               ) : state.plansLoading ? (
                 <div role="status" aria-label="Loading data plans" className="flex flex-col gap-2">
                   {[1, 2, 3].map((item) => <span key={item} className="h-12 animate-pulse rounded-md bg-laupay-surface-muted" />)}
@@ -230,11 +220,12 @@ function PhoneForm({ onSubmit, initialValue }: { onSubmit: (v: string) => void; 
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!/^\+?\d{10,14}$/.test(value.replace(/\s/g, ""))) {
-      setError("Enter a valid phone number.");
+    const normalized = normalizeNgPhone(value);
+    if (!normalized) {
+      setError("Enter a valid Nigerian phone number, e.g. 08012345678.");
       return;
     }
-    onSubmit(value);
+    onSubmit(normalized);
   }
 
   return (
@@ -254,6 +245,29 @@ function PhoneForm({ onSubmit, initialValue }: { onSubmit: (v: string) => void; 
       </Button>
     </form>
   );
+}
+
+function AirtimeAmountPicker({ amounts, onSelect }: { amounts: string[]; onSelect: (amount: string) => void }) {
+  const [custom, setCustom] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  function submitCustom(event: FormEvent) {
+    event.preventDefault();
+    const value = Number(custom);
+    if (!Number.isInteger(value) || value < 100 || value > 10000) {
+      setError("Enter an amount from ₦100 to ₦10,000.");
+      return;
+    }
+    setError(null);
+    onSelect(String(value));
+  }
+  return <div className="flex flex-col gap-4"><div className="grid grid-cols-3 gap-2">{amounts.map((amount) => <button key={amount} onClick={() => onSelect(amount)} className="rounded-md border border-laupay-border bg-white px-3 py-3 text-sm font-semibold text-laupay-ink hover:border-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo">{formatNaira(amount)}</button>)}</div><form onSubmit={submitCustom} className="flex items-end gap-2"><label className="min-w-0 flex-1 text-xs font-medium text-laupay-ink">Custom amount<input value={custom} onChange={(event) => setCustom(event.target.value.replace(/\D/g, ""))} type="number" min="100" max="10000" step="1" inputMode="numeric" placeholder="₦100 – ₦10,000" className="mt-1.5 w-full rounded-md border border-laupay-border px-3 py-2.5 text-sm outline-none focus:border-laupay-indigo" /></label><Button type="submit">Use amount</Button></form>{error && <p role="alert" className="text-xs text-laupay-danger">{error}</p>}</div>;
+}
+
+function normalizeNgPhone(value: string): string {
+  const compact = value.replace(/[\s()-]/g, "");
+  if (/^0[789]\d{9}$/.test(compact)) return compact;
+  if (/^\+234[789]\d{9}$/.test(compact)) return `0${compact.slice(4)}`;
+  return "";
 }
 
 const TERMINAL_MESSAGES: Partial<Record<Order["status"], { tone: "muted" | "danger"; text: string }>> = {

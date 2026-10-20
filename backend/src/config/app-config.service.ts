@@ -65,6 +65,8 @@ export class AppConfigService {
   readonly vtpassApiKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_API_KEY');
   readonly vtpassSecretKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_SECRET_KEY');
   readonly vtpassBaseUrl = optional('VTPASS_BASE_URL', 'https://sandbox.vtpass.com');
+  /** Explicit QA-only outcome override for provider_test; default calls VTpass. */
+  readonly vtpassTestOutcome = optional('VTPASS_TEST_OUTCOME', 'provider');
 
   readonly mailProvider = optional('MAIL_PROVIDER', 'mock');
   readonly brevoApiKey = optional('BREVO_API_KEY', '');

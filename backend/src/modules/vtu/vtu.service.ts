@@ -3,6 +3,7 @@ import { VtuProviderName, VtuTransactionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { VTU_PROVIDER, VTUProvider } from './providers/vtu-provider.interface';
 import { SettingsService } from '../settings/settings.service';
+import { AppConfigService } from '../../config/app-config.service';
 
 @Injectable()
 export class VtuService {
@@ -10,6 +11,7 @@ export class VtuService {
     private readonly prisma: PrismaService,
     @Inject(VTU_PROVIDER) private readonly provider: VTUProvider,
     private readonly settings: SettingsService,
+    private readonly config: AppConfigService,
   ) {}
 
   /** Provider label recorded on the VTU transaction, derived from the mode. */
@@ -58,7 +60,11 @@ export class VtuService {
       });
     }
 
-    const result = await this.provider.purchaseAirtime({ network, phoneNumber, amount, idempotencyKey });
+    const result = this.config.vtpassTestOutcome === 'success' && mode === 'provider_test'
+      ? { status: 'SUCCESS' as const, providerReference: `provider-test-success-${orderId}`, raw: { providerTest: true, outcome: 'success' } }
+      : this.config.vtpassTestOutcome === 'failed' && mode === 'provider_test'
+        ? { status: 'FAILED' as const, providerReference: `provider-test-failed-${orderId}`, raw: { providerTest: true, outcome: 'failed' } }
+        : await this.provider.purchaseAirtime({ network, phoneNumber, amount, idempotencyKey });
     return this.prisma.vtuTransaction.update({
       where: { id: txn.id },
       data: {
@@ -95,7 +101,11 @@ export class VtuService {
       });
     }
 
-    const result = await this.provider.purchaseData({ network, phoneNumber, planCode, idempotencyKey });
+    const result = this.config.vtpassTestOutcome === 'success' && mode === 'provider_test'
+      ? { status: 'SUCCESS' as const, providerReference: `provider-test-success-${orderId}`, raw: { providerTest: true, outcome: 'success' } }
+      : this.config.vtpassTestOutcome === 'failed' && mode === 'provider_test'
+        ? { status: 'FAILED' as const, providerReference: `provider-test-failed-${orderId}`, raw: { providerTest: true, outcome: 'failed' } }
+        : await this.provider.purchaseData({ network, phoneNumber, planCode, idempotencyKey });
     return this.prisma.vtuTransaction.update({
       where: { id: txn.id },
       data: {

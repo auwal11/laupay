@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@app/components/ui/Card";
 import { Button } from "@app/components/ui/Button";
@@ -11,7 +11,28 @@ export function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    setFullName(user.fullName);
+    setPhone(user.phone ?? "");
+  }, [user]);
+
   if (!user) return null;
+
+  async function saveProfile() {
+    const normalizedPhone = normalizeNgPhone(phone);
+    if (!fullName.trim() || (phone.trim() && !normalizedPhone)) {
+      setMessage("Enter your name and a valid Nigerian phone number.");
+      return;
+    }
+    setSaving(true); setMessage(null);
+    const result = await users.updateProfile({ fullName: fullName.trim(), ...(normalizedPhone ? { phone: normalizedPhone } : {}) });
+    if (result.ok) { await refreshUser(); setMessage("Profile details saved."); } else setMessage(result.error.message);
+    setSaving(false);
+  }
 
   async function uploadPhoto(file: File) {
     if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024) {
@@ -46,12 +67,13 @@ export function ProfilePage() {
           </div>
         </div>
         {message && <p className="mb-4 text-sm text-laupay-ink-muted" role="status">{message}</p>}
-        <dl className="flex flex-col gap-3 text-sm">
-          <Row label="Name" value={user.fullName} />
-          <Row label="Email" value={user.email} />
-          <Row label="Phone" value={user.phone} />
-          <Row label="Account type" value={user.role} />
-        </dl>
+        <div className="flex flex-col gap-3">
+          <label className="text-sm font-medium text-laupay-ink">Full name<input value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1.5 w-full rounded-lg border border-laupay-border px-3 py-2.5 text-sm outline-none focus:border-laupay-indigo" /></label>
+          <label className="text-sm font-medium text-laupay-ink">Email<input value={user.email.toLowerCase()} readOnly className="mt-1.5 w-full rounded-lg border border-laupay-border bg-laupay-surface-muted px-3 py-2.5 text-sm text-laupay-ink-muted" /></label>
+          <label className="text-sm font-medium text-laupay-ink">Phone number<input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08012345678" inputMode="tel" className="mt-1.5 w-full rounded-lg border border-laupay-border px-3 py-2.5 text-sm outline-none focus:border-laupay-indigo" /></label>
+          <Button type="button" onClick={() => void saveProfile()} loading={saving}>Save profile</Button>
+        </div>
+        <Row label="Account type" value="Customer" />
       </Card>
 
       <Link
@@ -79,4 +101,12 @@ function Row({ label, value }: { label: string; value: string }) {
       <dd className="font-medium capitalize text-laupay-ink">{value}</dd>
     </div>
   );
+}
+
+function normalizeNgPhone(value: string): string {
+  const compact = value.replace(/[\s()-]/g, "");
+  if (!compact) return "";
+  if (/^0[789]\d{9}$/.test(compact)) return compact;
+  if (/^\+234[789]\d{9}$/.test(compact)) return `0${compact.slice(4)}`;
+  return "";
 }
