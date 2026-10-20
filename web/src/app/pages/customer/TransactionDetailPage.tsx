@@ -1,88 +1,29 @@
 import { useEffect, useState } from "react";
+import * as React from "react";
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Check, Copy, Download, Share2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "@app/components/ui/Card";
 import { StatusBadge } from "@app/components/ui/Badge";
+import { Button } from "@app/components/ui/Button";
 import { Skeleton } from "@app/components/ui/Skeleton";
 import { ErrorState } from "@app/components/ui/ErrorState";
-import { formatDateTime, formatNaira } from "@app/lib/format";
 import { DisputeDialog } from "@app/components/transactions/DisputeDialog";
+import { formatDateTime, formatNaira } from "@app/lib/format";
 import { wallet } from "@app/services";
 import type { AsyncState } from "@app/types/common";
 import type { TransactionDetail } from "@app/types/wallet";
 
 export function TransactionDetailPage() {
-  const { id = "" } = useParams();
-  const [state, setState] = useState<AsyncState<TransactionDetail>>({ status: "loading" });
-  const [disputeOpen, setDisputeOpen] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setState({ status: "loading" });
-    wallet.getTransaction(id).then((result) => {
-      if (cancelled) return;
-      setState(result.ok ? { status: "success", data: result.data } : { status: "error", error: result.error });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  if (state.status === "loading") {
-    return <Skeleton className="h-64 w-full max-w-md" />;
-  }
-
-  if (state.status === "error") {
-    return <ErrorState error={state.error} />;
-  }
-
+  const { id = "" } = useParams(); const [state, setState] = useState<AsyncState<TransactionDetail>>({ status: "loading" }); const [copied, setCopied] = useState(false); const [disputeOpen, setDisputeOpen] = useState(false); const [otherOpen, setOtherOpen] = useState(false);
+  useEffect(() => { let cancelled = false; wallet.getTransaction(id).then((result) => { if (!cancelled) setState(result.ok ? { status: "success", data: result.data } : { status: "error", error: result.error }); }); return () => { cancelled = true; }; }, [id]);
+  if (state.status === "loading") return <Skeleton className="h-[560px] w-full max-w-2xl" />;
+  if (state.status === "error") return <ErrorState error={state.error} />;
   if (state.status !== "success") return null;
-
-  const txn = state.data;
-
-  return (
-    <div className="mx-auto flex max-w-md flex-col gap-4">
-      <h1 className="font-display text-xl font-semibold text-laupay-ink">Transaction details</h1>
-      <Card>
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-laupay-ink">{txn.description}</p>
-          <StatusBadge status={txn.status} />
-        </div>
-        <p className="mt-3 font-display text-2xl font-semibold text-laupay-ink">
-          {formatNaira(txn.amount)}
-        </p>
-
-        <dl className="mt-5 flex flex-col gap-2.5 text-sm">
-          <Row label="Reference" value={txn.reference} />
-          {txn.providerReference && <Row label="Provider reference" value={txn.providerReference} />}
-          {txn.network && <Row label="Network" value={txn.network} />}
-          {txn.counterparty && <Row label="Recipient" value={txn.counterparty} />}
-          <Row label="Date" value={formatDateTime(txn.createdAt)} />
-        </dl>
-
-        {txn.status === "failed" && txn.failureReason && (
-          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-laupay-danger">
-            {txn.failureReason}
-          </p>
-        )}
-
-        <Link
-          to={`/app/receipt/${txn.id}`}
-          className="mt-5 inline-block text-sm font-medium text-laupay-indigo hover:underline"
-        >
-          View receipt
-        </Link>
-        <button type="button" onClick={() => setDisputeOpen(true)} className="mt-4 block text-sm font-medium text-laupay-danger hover:underline">Dispute Transaction</button>
-      </Card>
-      {disputeOpen && <DisputeDialog transaction={txn} onClose={() => setDisputeOpen(false)} onCreated={() => setDisputeOpen(false)} />}
-    </div>
-  );
+  const txn = state.data; const isCredit = txn.direction === "credit";
+  async function copyReference() { await navigator.clipboard?.writeText(txn.reference); setCopied(true); window.setTimeout(() => setCopied(false), 1800); }
+  async function share() { const text = `LAUPAY · ${txn.description} · ${formatNaira(txn.amount)} · ${txn.reference}`; if (navigator.share) await navigator.share({ title: "LAUPAY transaction", text }); else await copyReference(); }
+  return <div className="mx-auto flex w-full max-w-2xl flex-col gap-5"><Link to="/app/transactions" className="inline-flex items-center gap-2 text-sm font-medium text-laupay-indigo"><ArrowLeft size={16} />Transaction History</Link><div><h1 className="font-display text-2xl font-semibold text-laupay-ink">Transaction Details</h1><p className="mt-1 text-sm text-laupay-ink-muted">Review the full record for this transaction.</p></div><Card className="p-5 sm:p-7"><div className="flex flex-wrap items-center justify-between gap-3"><span className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ${isCredit ? "bg-laupay-success/10 text-laupay-success" : "bg-laupay-indigo/10 text-laupay-indigo"}`}>{isCredit ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}{isCredit ? "CREDIT" : "DEBIT"}</span><StatusBadge status={txn.status} /></div><p className="mt-6 font-display text-4xl font-semibold tracking-tight text-laupay-indigo">{isCredit ? "+" : "-"}{formatNaira(txn.amount)}</p><p className="mt-2 text-sm font-medium text-laupay-ink">{txn.description}</p><p className="mt-1 text-sm text-laupay-ink-muted">{formatDateTime(txn.createdAt)}</p></Card><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Action icon={<Share2 size={19} />} label="Share" onClick={() => void share()} /><Action icon={<Download size={19} />} label="Download Receipt" onClick={() => window.print()} /></div><Card><h2 className="font-display text-base font-semibold text-laupay-ink">Balance summary</h2><div className="mt-4 grid grid-cols-2 divide-x divide-laupay-border rounded-lg border border-laupay-border bg-laupay-surface-muted"><Metric label="Balance before" value={txn.balanceBefore ? formatNaira(txn.balanceBefore) : "Not available"} /><Metric label="Balance after" value={txn.balanceAfter ? formatNaira(txn.balanceAfter) : "Not available"} /></div><dl className="mt-5 flex flex-col gap-3 text-sm"><Info label="Amount" value={formatNaira(txn.amount)} /><Info label="Our fee" value="Not available" /><Info label={isCredit ? "Total credit" : "Total debit"} value={formatNaira(txn.amount)} strong /></dl></Card><Card><button type="button" onClick={() => setOtherOpen((open) => !open)} className="flex w-full items-center justify-between text-left"><span className="font-display text-base font-semibold text-laupay-ink">Other Details</span><span className="text-sm text-laupay-indigo">{otherOpen ? "Hide" : "Show"}</span></button>{otherOpen && <dl className="mt-4 flex flex-col divide-y divide-laupay-border">{txn.type && <Info label="Transaction type" value={txn.type.replace("_", " ")} />}{txn.reference && <Info label="Transaction reference" value={txn.reference} copy onCopy={() => void copyReference()} copied={copied} />}{txn.counterparty && <Info label="Beneficiary / phone" value={txn.counterparty} />}{txn.network && <Info label="Network / provider" value={txn.network} />}{txn.providerReference && <Info label="Provider reference" value={txn.providerReference} />}{<Info label="Transaction date" value={formatDateTime(txn.createdAt)} />}{<Info label="Transaction status" value={txn.status} />}</dl>}</Card><div className="rounded-xl border border-laupay-border bg-white p-5 shadow-card"><p className="font-medium text-laupay-ink">Need help with this transaction?</p><p className="mt-1 text-sm text-laupay-ink-muted">Send the exact transaction record to the LAUPAY support team.</p><button type="button" onClick={() => setDisputeOpen(true)} className="mt-4 rounded-lg border border-laupay-indigo px-4 py-2.5 text-sm font-semibold text-laupay-indigo hover:bg-laupay-indigo hover:text-white">Dispute Transaction</button></div>{disputeOpen && <DisputeDialog transaction={txn} onClose={() => setDisputeOpen(false)} onCreated={() => setDisputeOpen(false)} />}</div>;
 }
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <dt className="text-laupay-ink-muted">{label}</dt>
-      <dd className="font-medium text-laupay-ink">{value}</dd>
-    </div>
-  );
-}
+function Action({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) { return <button type="button" onClick={onClick} className="flex items-center gap-3 rounded-xl border border-laupay-border bg-white p-4 text-left shadow-card hover:border-laupay-indigo"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-laupay-amber/15 text-laupay-indigo">{icon}</span><span className="text-sm font-semibold text-laupay-ink">{label}</span></button>; }
+function Metric({ label, value }: { label: string; value: string }) { return <div className="p-4"><p className="text-xs text-laupay-ink-muted">{label}</p><p className="mt-1 break-words text-sm font-semibold text-laupay-ink">{value}</p></div>; }
+function Info({ label, value, strong, copy, onCopy, copied }: { label: string; value: string; strong?: boolean; copy?: boolean; onCopy?: () => void; copied?: boolean }) { return <div className="flex items-start justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-laupay-ink-muted">{label}</dt><dd className={`flex min-w-0 items-start gap-2 break-words text-right text-sm ${strong ? "font-semibold text-laupay-indigo" : "font-medium text-laupay-ink"}`}>{value}{copy && <button type="button" onClick={onCopy} aria-label="Copy reference" className="shrink-0 rounded p-1 text-laupay-indigo hover:bg-laupay-surface-muted">{copied ? <Check size={15} /> : <Copy size={15} />}</button>}</dd></div>; }

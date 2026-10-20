@@ -88,6 +88,8 @@ interface BackendLedgerEntry {
   network?: string;
   counterparty?: string;
   orderType?: string;
+  balanceBefore?: string;
+  balanceAfter?: string;
 }
 
 interface BackendPayment {
@@ -110,6 +112,8 @@ function normalizeTransaction(entry: BackendLedgerEntry): Transaction {
     amount: String(entry.amount),
     description: entry.description ?? (isCredit ? "Wallet credit" : "Wallet debit"),
     createdAt: entry.createdAt,
+    balanceBefore: entry.balanceBefore,
+    balanceAfter: entry.balanceAfter,
     direction: isCredit ? "credit" : "debit",
     network: entry.network,
     counterparty: entry.counterparty,

@@ -35,6 +35,9 @@ export interface Transaction {
   network?: string;
   providerReference?: string;
   failureReason?: string;
+  /** Wallet balance snapshots around this entry, when the backend provides them. */
+  balanceBefore?: string;
+  balanceAfter?: string;
   /** Provider-hosted checkout URL returned when initiating a sandbox/live funding. */
   checkoutUrl?: string;
 }
@@ -46,6 +49,8 @@ export interface TransactionDetail extends Transaction {
   planLabel?: string;
   providerReference?: string;
   failureReason?: string;
+  balanceBefore?: string;
+  balanceAfter?: string;
 }
 
 export interface WalletFundingPayload {

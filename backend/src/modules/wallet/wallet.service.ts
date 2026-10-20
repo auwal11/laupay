@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
@@ -42,9 +42,14 @@ export class WalletService {
     const byId = new Map(orders.map((order) => [order.id, order]));
     return entries.map((entry) => {
       const order = entry.referenceId ? byId.get(entry.referenceId) : undefined;
+      const amount = new Prisma.Decimal(entry.amount);
+      const balanceAfter = new Prisma.Decimal(entry.balanceAfter);
+      const balanceBefore = entry.direction === 'CREDIT' ? balanceAfter.minus(amount) : balanceAfter.plus(amount);
       return {
         ...entry,
         amount: String(entry.amount),
+        balanceBefore: balanceBefore.toFixed(2),
+        balanceAfter: balanceAfter.toFixed(2),
         direction: entry.direction.toLowerCase(),
         description: order ? `${order.type === 'AIRTIME' ? 'Airtime' : 'Data'} purchase` : entry.reason === 'WALLET_FUNDING' ? 'Wallet funding' : entry.reason === 'REVERSAL' || entry.reason === 'ORDER_REFUND' ? 'Wallet reversal' : entry.direction === 'CREDIT' ? 'Wallet credit' : 'Wallet debit',
         status: order ? mapOrderStatus(order.status) : 'success',
