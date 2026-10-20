@@ -14,8 +14,11 @@ export function useWalletBalance(): AsyncState<WalletBalance> & { refetch: () =>
       if (cancelled) return;
       setState(result.ok ? { status: "success", data: result.data } : { status: "error", error: result.error });
     });
+    const refresh = () => setTick((value) => value + 1);
+    window.addEventListener("laupay:wallet-changed", refresh);
     return () => {
       cancelled = true;
+      window.removeEventListener("laupay:wallet-changed", refresh);
     };
   }, [tick]);
 

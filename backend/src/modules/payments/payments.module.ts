@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
+import { VirtualAccountsService } from './virtual-accounts.service';
 import { PAYMENT_PROVIDER } from './providers/payment-provider.interface';
 import { MockPaymentProvider } from './providers/mock-payment.provider';
 import { PaystackPaymentProvider } from './providers/paystack-payment.provider';
@@ -32,7 +33,7 @@ const paymentProviderFactory = {
 @Module({
   imports: [JwtModule.register({}), LedgerModule, RiskModule, NotificationsModule],
   controllers: [PaymentsController],
-  providers: [PaymentsService, paymentProviderFactory],
-  exports: [PaymentsService],
+  providers: [PaymentsService, VirtualAccountsService, paymentProviderFactory],
+  exports: [PaymentsService, VirtualAccountsService],
 })
 export class PaymentsModule {}

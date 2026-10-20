@@ -193,6 +193,7 @@ model User {
   permissionGrants      AdminPermissionGrant[] @relation("AdminGrantsForUser")
   permissionGrantsGiven AdminPermissionGrant[] @relation("AdminGrantsByUser")
   beneficiaries         Beneficiary[]
+  virtualAccount        VirtualAccount?
 
   createdAt DateTime @default(now())
 
@@ -205,6 +206,26 @@ model User {
 /// Binary fallback for profile photos when the Supabase Storage bucket is
 /// unavailable. Served read-only from GET /api/images/:id; rows are deleted
 /// when the owner replaces or removes their photo.
+/// Dedicated Monnify reserved account used for wallet deposits. One per user;
+/// the account number is stable so customers can save it as a transfer
+/// beneficiary. Created on demand from the wallet deposit screen.
+model VirtualAccount {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider         String   @default("monnify")
+  accountReference String   @unique
+  accountName      String
+  bankName         String
+  accountNumber    String
+  /// Every bank account returned by the provider for this reference.
+  accounts         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([accountNumber])
+}
+
 model StoredImage {
   id        String   @id
   mimeType  String

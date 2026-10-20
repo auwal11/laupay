@@ -17,6 +17,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MockWebhookVerifier } from './verifiers/webhook-verifier.interface';
 import { PaymentsService } from '../payments/payments.service';
 import { OrdersService } from '../orders/orders.service';
+import { VirtualAccountsService } from '../payments/virtual-accounts.service';
 
 const mockVerifier = new MockWebhookVerifier();
 
@@ -34,6 +35,10 @@ interface MonnifyWebhook {
     transactionReference?: string;
     paymentStatus?: string;
     amountPaid?: number;
+    currency?: string;
+    accountReference?: string;
+    product?: { type?: string; reference?: string };
+    destinationAccountInformation?: { accountNumber?: string; bankName?: string };
   };
 }
 
@@ -62,6 +67,7 @@ export class WebhooksController {
     private readonly prisma: PrismaService,
     private readonly paymentsService: PaymentsService,
     private readonly ordersService: OrdersService,
+    private readonly virtualAccounts: VirtualAccountsService,
   ) {}
 
   /**
@@ -128,7 +134,11 @@ export class WebhooksController {
     // Monnify delivers a `{ eventType, eventData }` envelope whose signature is
     // HMAC-SHA512(rawBody, MONNIFY_SECRET_KEY) in `monnify-signature`.
     if (monnifyVerified && (body.eventType || body.eventData)) {
-      return this.handleMonnifyPayment(body as MonnifyWebhook);
+      const monnifyBody = body as MonnifyWebhook;
+      if (monnifyBody.eventData?.product?.type === 'RESERVED_ACCOUNT') {
+        return this.handleReservedAccountDeposit(monnifyBody);
+      }
+      return this.handleMonnifyPayment(monnifyBody);
     }
 
     const providerReference = body.data?.reference;
@@ -206,6 +216,43 @@ export class WebhooksController {
 
     void this.paymentsService.requeryPayment(payment.id).catch(() => undefined);
     return { status: 'accepted' };
+  }
+
+  /**
+   * Bank transfer into a customer's Monnify reserved account. The signature is
+   * already verified above; the credit itself is idempotent on the provider
+   * transaction reference, so webhook retries cannot duplicate a deposit.
+   */
+  private async handleReservedAccountDeposit(body: MonnifyWebhook) {
+    const event = body.eventData;
+    if (body.eventType !== 'SUCCESSFUL_TRANSACTION' || !event) {
+      return { status: 'ignored_event' };
+    }
+    const status = (event.paymentStatus ?? '').toUpperCase();
+    if (status && !['PAID', 'SUCCESS', 'SUCCESSFUL', 'OVERPAID'].includes(status)) {
+      return { status: 'ignored_status' };
+    }
+    const currency = (event.currency ?? 'NGN').toUpperCase();
+    if (currency !== 'NGN') throw new BadRequestException('Unsupported deposit currency');
+
+    const account = await this.virtualAccounts.findForEvent({
+      productReference: event.product?.reference,
+      accountReference: event.accountReference,
+      paymentReference: event.paymentReference,
+      accountNumber: event.destinationAccountInformation?.accountNumber,
+    });
+    if (!account) throw new BadRequestException('Unknown deposit account');
+
+    const transactionReference = event.transactionReference ?? event.paymentReference;
+    if (!transactionReference) throw new BadRequestException('Missing deposit reference');
+
+    return this.paymentsService.creditReservedAccountDeposit({
+      userId: account.userId,
+      amount: Number(event.amountPaid),
+      transactionReference,
+      accountReference: account.accountReference,
+      raw: body as unknown,
+    });
   }
 
   /**

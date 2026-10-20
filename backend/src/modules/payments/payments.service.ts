@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { LedgerReason, PaymentMethod, PaymentStatus } from '@prisma/client';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { AuditAction, LedgerReason, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -201,6 +201,74 @@ export class PaymentsService {
     }
 
     return updated;
+  }
+
+  /**
+   * Credits a wallet deposit that arrived by bank transfer into the customer's
+   * Monnify reserved account. Idempotent on the provider transaction
+   * reference, so webhook retries cannot double-credit.
+   */
+  async creditReservedAccountDeposit(input: {
+    userId: string;
+    amount: number;
+    transactionReference: string;
+    accountReference: string;
+    raw?: unknown;
+  }) {
+    const amount = Math.round(Number(input.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Invalid deposit amount');
+    }
+    if (!input.transactionReference) {
+      throw new BadRequestException('Missing deposit reference');
+    }
+
+    const existing = await this.prisma.payment.findUnique({
+      where: { providerReference: input.transactionReference },
+    });
+    if (existing) return { status: 'ignored_duplicate', paymentId: existing.id };
+
+    let payment;
+    try {
+      payment = await this.prisma.payment.create({
+        data: {
+          userId: input.userId,
+          method: PaymentMethod.PROVIDER_TRANSFER,
+          status: PaymentStatus.SUCCESS,
+          amount,
+          providerName: 'monnify',
+          providerReference: input.transactionReference,
+          idempotencyKey: `monnify-reserved:${input.transactionReference}`,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const duplicate = await this.prisma.payment.findUnique({
+          where: { providerReference: input.transactionReference },
+        });
+        return { status: 'ignored_duplicate', paymentId: duplicate?.id };
+      }
+      throw error;
+    }
+
+    await this.creditWalletForPayment(payment.id, input.userId, amount);
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: null,
+        action: AuditAction.WALLET_ADJUSTMENT,
+        entityType: 'Payment',
+        entityId: payment.id,
+        metadata: {
+          event: 'virtual_account.deposit',
+          accountReference: input.accountReference,
+          transactionReference: input.transactionReference,
+          amount: amount.toString(),
+          raw: (input.raw ?? undefined) as Prisma.InputJsonValue | undefined,
+        },
+      },
+    }).catch(() => undefined);
+
+    return { status: 'credited', paymentId: payment.id, amount };
   }
 
   private async creditWalletForPayment(paymentId: string, userId: string, amount: number) {

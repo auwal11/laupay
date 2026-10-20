@@ -21,7 +21,7 @@ describe('WebhooksController provider callbacks', () => {
       paymentEvent: { create: jest.fn().mockResolvedValue({}) },
     };
     const payments = { requeryPayment: jest.fn().mockResolvedValue(undefined) };
-    const controller = new WebhooksController(config, prisma as any, payments as any, {} as any);
+    const controller = new WebhooksController(config, prisma as any, payments as any, {} as any, {} as any);
 
     await expect(controller.handlePaymentWebhook(
       { rawBody: body } as any,
@@ -35,7 +35,7 @@ describe('WebhooksController provider callbacks', () => {
 
   it('rejects a Paystack signature made from altered bytes', async () => {
     const body = Buffer.from('{"event":"charge.success","data":{"id":123,"reference":"LAU_123"}}');
-    const controller = new WebhooksController(config, {} as any, {} as any, {} as any);
+    const controller = new WebhooksController(config, {} as any, {} as any, {} as any, {} as any);
     await expect(controller.handlePaymentWebhook(
       { rawBody: Buffer.from('{ "event":"charge.success","data":{"id":123,"reference":"LAU_123"}}') } as any,
       signature(body, paystackSecret),
@@ -52,7 +52,7 @@ describe('WebhooksController provider callbacks', () => {
       paymentEvent: { create: jest.fn().mockRejectedValue({ code: 'P2002' }) },
     };
     const payments = { requeryPayment: jest.fn() };
-    const controller = new WebhooksController(config, prisma as any, payments as any, {} as any);
+    const controller = new WebhooksController(config, prisma as any, payments as any, {} as any, {} as any);
     await expect(controller.handlePaymentWebhook(
       { rawBody: body } as any,
       signature(body, paystackSecret),
@@ -68,7 +68,7 @@ describe('WebhooksController provider callbacks', () => {
       vtuTransaction: { findUnique: jest.fn().mockResolvedValue({ id: 'vtu-1', providerReference: 'VT-123' }) },
     };
     const orders = { reconcileVtuTransaction: jest.fn().mockResolvedValue(undefined) };
-    const controller = new WebhooksController(config, prisma as any, {} as any, orders as any);
+    const controller = new WebhooksController(config, prisma as any, {} as any, orders as any, {} as any);
     const payload = {
       type: 'transaction-update',
       data: {
@@ -84,7 +84,7 @@ describe('WebhooksController provider callbacks', () => {
   });
 
   it('rejects a VTpass callback without the documented transaction id', async () => {
-    const controller = new WebhooksController(config, { vtuTransaction: { findUnique: jest.fn() } } as any, {} as any, {} as any);
+    const controller = new WebhooksController(config, { vtuTransaction: { findUnique: jest.fn() } } as any, {} as any, {} as any, {} as any);
     await expect(controller.handleVtuWebhook({ type: 'transaction-update', data: { content: { transactions: { status: 'delivered' } } } }))
       .rejects.toThrow('Missing VTpass transactionId');
   });
@@ -113,7 +113,7 @@ describe('WebhooksController provider callbacks', () => {
         paymentEvent: { create: jest.fn().mockResolvedValue({}) },
       };
       const payments = { requeryPayment: jest.fn().mockResolvedValue(undefined) };
-      const controller = new WebhooksController(monnifyConfig, prisma as any, payments as any, {} as any);
+      const controller = new WebhooksController(monnifyConfig, prisma as any, payments as any, {} as any, {} as any);
 
       await expect(
         controller.handlePaymentWebhook(
@@ -140,7 +140,7 @@ describe('WebhooksController provider callbacks', () => {
         paymentEvent: { create: jest.fn().mockRejectedValue({ code: 'P2002' }) },
       };
       const payments = { requeryPayment: jest.fn() };
-      const controller = new WebhooksController(monnifyConfig, prisma as any, payments as any, {} as any);
+      const controller = new WebhooksController(monnifyConfig, prisma as any, payments as any, {} as any, {} as any);
 
       await expect(
         controller.handlePaymentWebhook(
@@ -156,7 +156,7 @@ describe('WebhooksController provider callbacks', () => {
 
     it('rejects a Monnify payload with a bad signature', async () => {
       const body = monnifyPayload('LAU_MON', 'MON_TX_3');
-      const controller = new WebhooksController(monnifyConfig, {} as any, {} as any, {} as any);
+      const controller = new WebhooksController(monnifyConfig, {} as any, {} as any, {} as any, {} as any);
       await expect(
         controller.handlePaymentWebhook(
           { rawBody: body } as any,

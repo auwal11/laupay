@@ -1,4 +1,4 @@
-import { IsNumber, IsPositive, IsString, IsUUID } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches } from 'class-validator';
 
 export class InitializeFundingDto {
   @IsNumber()
@@ -17,4 +17,16 @@ export class ConfirmCashDto {
   // agent pricing (see PaymentsService.computeAgentDebitAmount) — a client-
   // supplied amount on a financial debit would be a direct balance-
   // manipulation vulnerability. See docs/security/security-model.md §3.
+}
+
+export class EnsureVirtualAccountDto {
+  /**
+   * Live deployments require the customer's own 11-digit BVN. It is forwarded
+   * to Monnify to create the reserved account and is never persisted.
+   * Non-live deployments fall back to a configured sandbox BVN.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{11}$/, { message: 'bvn must be an 11-digit number' })
+  bvn?: string;
 }

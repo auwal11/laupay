@@ -60,6 +60,16 @@ export class AppConfigService {
   readonly monnifySecretKey = this.requiredIf(this.monnifyEnabled, 'MONNIFY_SECRET_KEY');
   readonly monnifyBaseUrl = optional('MONNIFY_BASE_URL', 'https://sandbox.monnify.com');
   readonly monnifyContractCode = this.requiredIf(this.monnifyEnabled, 'MONNIFY_CONTRACT_CODE');
+  /**
+   * Reserved (virtual) accounts are created independently of PAYMENT_PROVIDER,
+   * so the Monnify keys are read even when Paystack handles checkout. In
+   * non-live modes a configured test BVN is used for the sandbox; a live
+   * deployment requires the customer to supply their own BVN.
+   */
+  readonly monnifyTestBvn = optional('MONNIFY_TEST_BVN', '');
+  get monnifyVirtualAccountsConfigured(): boolean {
+    return !!(this.monnifyApiKey && this.monnifySecretKey && this.monnifyContractCode);
+  }
 
   readonly vtpassEnabled = this.vtuProvider === 'vtpass';
   readonly vtpassApiKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_API_KEY');

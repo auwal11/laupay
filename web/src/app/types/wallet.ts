@@ -53,6 +53,15 @@ export interface TransactionDetail extends Transaction {
   balanceAfter?: string;
 }
 
+/** Dedicated bank account a customer transfers into to fund their wallet. */
+export interface VirtualAccount {
+  provider: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  reference: string;
+}
+
 export interface WalletFundingPayload {
   amount: string;
   method: "bank_transfer" | "card";

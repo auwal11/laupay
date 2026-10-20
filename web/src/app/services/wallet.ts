@@ -1,6 +1,12 @@
 import { request } from "./api";
 import type { ApiResult } from "@app/types/common";
-import type { Transaction, TransactionDetail, WalletBalance, WalletFundingPayload } from "@app/types/wallet";
+import type {
+  Transaction,
+  TransactionDetail,
+  VirtualAccount,
+  WalletBalance,
+  WalletFundingPayload,
+} from "@app/types/wallet";
 
 /**
  * Real adapter for the backend wallet + payments modules. Every figure is
@@ -41,6 +47,21 @@ export const walletService = {
     return found
       ? { ok: true, data: found }
       : { ok: false, error: { code: "NOT_FOUND", message: "Transaction not found." } };
+  },
+
+  /** Returns the existing deposit account, if one has been created. */
+  async getVirtualAccount(): Promise<ApiResult<VirtualAccount | null>> {
+    return request<{ account: VirtualAccount | null }>("/payments/virtual-account").then((result) =>
+      result.ok ? { ok: true, data: result.data.account } : result,
+    );
+  },
+
+  /** Idempotent — creates the customer's reserved account on first call. */
+  async ensureVirtualAccount(bvn?: string): Promise<ApiResult<VirtualAccount>> {
+    return request<VirtualAccount>("/payments/virtual-account", {
+      method: "POST",
+      body: bvn ? { bvn } : {},
+    });
   },
 
   async fundWallet(payload: WalletFundingPayload): Promise<ApiResult<Transaction>> {
