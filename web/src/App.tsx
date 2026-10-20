@@ -459,7 +459,7 @@ function Home() {
       </header>
 
       <main id="top">
-        <section className="relative overflow-hidden bg-[#171A4A] pb-20 pt-32 text-white sm:pb-32 sm:pt-44 lg:pb-36 lg:pt-40">
+        <section className="relative overflow-hidden bg-[#171A4A] pb-24 pt-36 text-white sm:pb-36 sm:pt-48 lg:pb-40 lg:pt-48">
           {/* Decorative rings are hidden below `sm` — at 520px wide they extended well
           past a 360px viewport and were a common source of sideways scroll. */}
           <div className="absolute -right-40 top-0 hidden h-[520px] w-[520px] rounded-full border border-white/[.05] sm:block" />
@@ -473,17 +473,17 @@ function Home() {
                 {/* Lowered the clamp minimum: 7.5vw lands near 27px on a 360px
                     Android, so the old 2.8rem floor forced ~45px type and
                     overflowed small screens. Now fluid with a sane floor. */}
-                <h1 className="reveal reveal-delay-1 mt-7 max-w-[680px] font-display text-[clamp(2.4rem,9vw,6.6rem)] font-extrabold leading-[1.08] tracking-[-.055em] text-balance sm:mt-8 sm:leading-[1.05] sm:tracking-[-.065em] lg:text-[clamp(4.75rem,7.9vw,6.6rem)] lg:leading-[1.03]">
+                <h1 className="reveal reveal-delay-1 mt-8 max-w-[720px] font-display text-[clamp(2.65rem,10vw,7rem)] font-extrabold leading-[1.1] tracking-[-.05em] text-balance sm:mt-9 sm:leading-[1.08] sm:tracking-[-.055em] lg:text-[clamp(5.1rem,8.2vw,7rem)] lg:leading-[1.08]">
                   Everyday digital services.<br /><span className="flow-word-shift">One simple flow.</span>
                 </h1>
-                <p className="reveal reveal-delay-2 mt-8 max-w-[38ch] text-[18px] leading-[1.65] text-white/75 sm:mt-9 sm:text-[20px] lg:mt-8">
+                <p className="reveal reveal-delay-2 mt-9 max-w-[42ch] text-[19px] leading-[1.7] text-white/75 sm:mt-10 sm:text-[20px] lg:mt-9">
                   Airtime, data, payments, wallet services, and more — brought together so your next transaction feels clear from the start.
                 </p>
-                <div className="reveal reveal-delay-3 mt-10 flex flex-wrap items-center gap-3 sm:mt-12 sm:gap-4 lg:mt-10">
-                  <a href={`${CUSTOMER_APP_ORIGIN}/register`} className="group inline-flex min-h-[54px] flex-[1.35] items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#F4B33F] px-5 text-[15px] sm:gap-3 sm:px-7 font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1 sm:flex-none">
+                <div className="reveal reveal-delay-3 mt-11 flex flex-wrap items-center gap-3 sm:mt-13 sm:gap-4 lg:mt-11">
+                  <a href={`${CUSTOMER_APP_ORIGIN}/register`} className="group inline-flex min-h-[58px] flex-[1.35] items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#F4B33F] px-5 text-[15px] sm:gap-3 sm:px-8 font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1 sm:flex-none">
                     Get Started <ArrowRight size={17} className="transition-transform group-hover:translate-x-1" />
                   </a>
-                  <a href={`${CUSTOMER_APP_ORIGIN}/login`} className="inline-flex min-h-[54px] flex-1 items-center justify-center gap-3 whitespace-nowrap rounded-full border border-white/25 px-5 text-[15px] sm:px-7 font-extrabold text-white transition-colors hover:bg-white/10 sm:flex-none">
+                  <a href={`${CUSTOMER_APP_ORIGIN}/login`} className="inline-flex min-h-[58px] flex-1 items-center justify-center gap-3 whitespace-nowrap rounded-full border border-white/25 px-5 text-[15px] sm:px-8 font-extrabold text-white transition-colors hover:bg-white/10 sm:flex-none">
                     Login
                   </a>
                 </div>
@@ -507,12 +507,12 @@ function Home() {
           </div>
         </section>
 
-        <section id="flow" className="bg-background py-28 sm:py-36 lg:py-44">
+        <section id="flow" className="bg-background py-32 sm:py-40 lg:py-48">
           <div className="section-shell">
             <div className="grid gap-8 lg:grid-cols-[.75fr_1.25fr] lg:items-end lg:gap-16">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">Everyday value</p>
-                <h2 className="mt-6 max-w-[560px] font-display text-[2.1rem] font-extrabold leading-[1.1] tracking-[-.045em] text-balance sm:text-[3.4rem] sm:leading-[1.06] sm:tracking-[-.055em] lg:text-[3.75rem]">
+                <h2 className="mt-7 max-w-[560px] font-display text-[2.3rem] font-extrabold leading-[1.12] tracking-[-.04em] text-balance sm:text-[3.65rem] sm:leading-[1.08] sm:tracking-[-.05em] lg:text-[4rem]">
                   More value in every <span className="flow-word-shift">flow.</span>
                 </h2>
               </div>
@@ -571,7 +571,7 @@ function Home() {
               <div className="relative p-7 sm:p-10 lg:grid lg:grid-cols-[1.1fr_.9fr] lg:items-end lg:gap-x-16 lg:p-14">
                 <div>
                 <p className="eyebrow text-[#F4B33F]">Your LAUPAY dashboard</p>
-                <h2 className="mt-6 max-w-[460px] font-display text-[2.1rem] font-extrabold leading-[1.1] tracking-[-.045em] text-balance sm:text-[3.4rem] sm:leading-[1.06] sm:tracking-[-.055em]">
+                <h2 className="mt-7 max-w-[460px] font-display text-[2.3rem] font-extrabold leading-[1.12] tracking-[-.04em] text-balance sm:text-[3.65rem] sm:leading-[1.08] sm:tracking-[-.05em]">
                   Your dashboard, in your <span className="text-[#F4B33F]">hand.</span>
                 </h2>
                 <p className="mt-6 max-w-[420px] text-[17px] leading-8 text-white/70">
@@ -585,7 +585,7 @@ function Home() {
                   <li className="flex items-center gap-2"><Check size={15} className="text-[#F4B33F]" /> Clear status for every transaction</li>
                 </ul>
                 <div className="mt-8">
-                  <a href={`${CUSTOMER_APP_ORIGIN}/register`} className="group inline-flex items-center gap-3 rounded-full bg-[#F4B33F] min-h-[52px] px-7 py-3.5 text-sm font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1">
+                  <a href={`${CUSTOMER_APP_ORIGIN}/register`} className="group inline-flex items-center gap-3 rounded-full bg-[#F4B33F] min-h-[58px] px-7 py-4 text-sm font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1">
                     Get Started <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
                   </a>
                 </div>
@@ -595,12 +595,12 @@ function Home() {
           </div>
         </section>
 
-        <section id="demo" className="bg-[#F0F1F7] py-28 dark:bg-[#0D0F21] sm:py-36 lg:py-44">
+        <section id="demo" className="bg-[#F0F1F7] py-32 dark:bg-[#0D0F21] sm:py-40 lg:py-48">
           <div className="section-shell">
             <div className="mb-14 flex flex-col justify-between gap-6 sm:mb-20 sm:flex-row sm:items-end">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">A look inside</p>
-                <h2 className="mt-6 max-w-[560px] font-display text-[2.1rem] font-extrabold leading-[1.1] tracking-[-.045em] text-balance sm:text-[3.4rem] sm:leading-[1.06] sm:tracking-[-.055em] lg:text-[3.75rem]">Open LAUPAY. See what’s next.</h2>
+                <h2 className="mt-7 max-w-[560px] font-display text-[2.3rem] font-extrabold leading-[1.12] tracking-[-.04em] text-balance sm:text-[3.65rem] sm:leading-[1.08] sm:tracking-[-.05em] lg:text-[4rem]">Open LAUPAY. See what’s next.</h2>
               </div>
               <p className="max-w-[360px] text-[17px] leading-8 text-muted-foreground">Start at your dashboard, then choose a service.</p>
             </div>
@@ -659,14 +659,14 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
           </div>
         </section>
 
-        <section id="services" className="bg-background py-28 sm:py-36 lg:py-44">
+        <section id="services" className="bg-background py-32 sm:py-40 lg:py-48">
           <div className="section-shell">
             <div className="grid gap-14 lg:grid-cols-[.75fr_1.25fr] lg:gap-16">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">One place, useful things</p>
-                <h2 className="mt-6 font-display text-[2.1rem] font-extrabold leading-[1.1] tracking-[-.045em] text-balance sm:text-[3.4rem] sm:leading-[1.06] sm:tracking-[-.055em] lg:text-[3.75rem]">The everyday, joined up.</h2>
+                <h2 className="mt-7 font-display text-[2.3rem] font-extrabold leading-[1.12] tracking-[-.04em] text-balance sm:text-[3.65rem] sm:leading-[1.08] sm:tracking-[-.05em] lg:text-[4rem]">The everyday, joined up.</h2>
                 <p className="mt-6 max-w-[400px] text-[17px] leading-8 text-muted-foreground">A service should feel close at hand, whether it is in your pocket or across the counter.</p>
-                <button type="button" onClick={() => scrollTo('demo')} className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#171A4A] min-h-[52px] px-7 py-3.5 text-sm font-extrabold text-white transition-transform hover:-translate-y-0.5 dark:bg-[#F4B33F] dark:text-[#171A4A]">Explore the preview <ArrowRight size={14} /></button>
+                <button type="button" onClick={() => scrollTo('demo')} className="mt-9 inline-flex items-center gap-2 rounded-full bg-[#171A4A] min-h-[58px] px-7 py-4 text-sm font-extrabold text-white transition-transform hover:-translate-y-0.5 dark:bg-[#F4B33F] dark:text-[#171A4A]">Explore the preview <ArrowRight size={14} /></button>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {services.map((item, index) => {
@@ -683,12 +683,12 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
           </div>
         </section>
 
-        <section id="journeys" className="bg-[#171A4A] py-28 text-white sm:py-36 lg:py-44">
+        <section id="journeys" className="bg-[#171A4A] py-32 text-white sm:py-40 lg:py-48">
           <div className="section-shell">
             <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end sm:gap-10">
               <div>
                 <p className="eyebrow text-[#F4B33F]">Different days, same clarity</p>
-                <h2 className="mt-6 max-w-[620px] font-display text-[2.1rem] font-extrabold leading-[1.1] tracking-[-.045em] text-balance sm:text-[3.4rem] sm:leading-[1.06] sm:tracking-[-.055em] lg:text-[3.75rem]">Built around real moments.</h2>
+                <h2 className="mt-7 max-w-[620px] font-display text-[2.3rem] font-extrabold leading-[1.12] tracking-[-.04em] text-balance sm:text-[3.65rem] sm:leading-[1.08] sm:tracking-[-.05em] lg:text-[4rem]">Built around real moments.</h2>
               </div>
               <p className="max-w-[380px] text-[17px] leading-8 text-white/65">The bridge works from both sides: for the person making a request and the person helping it happen.</p>
             </div>
@@ -724,12 +724,12 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
           </div>
         </section>
 
-        <section id="security" className="bg-[#F0F1F7] py-28 dark:bg-[#0D0F21] sm:py-36 lg:py-44">
+        <section id="security" className="bg-[#F0F1F7] py-32 dark:bg-[#0D0F21] sm:py-40 lg:py-48">
           <div className="section-shell">
             <div className="grid gap-14 lg:grid-cols-[.8fr_1.2fr] lg:items-start lg:gap-16">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">Built with care</p>
-                <h2 className="mt-6 max-w-[540px] font-display text-[2.1rem] font-extrabold leading-[1.1] tracking-[-.045em] text-balance sm:text-[3.4rem] sm:leading-[1.06] sm:tracking-[-.055em] lg:text-[3.75rem]">Built with security at every step.</h2>
+                <h2 className="mt-7 max-w-[540px] font-display text-[2.3rem] font-extrabold leading-[1.12] tracking-[-.04em] text-balance sm:text-[3.65rem] sm:leading-[1.08] sm:tracking-[-.05em] lg:text-[4rem]">Built with security at every step.</h2>
                 <p className="mt-6 max-w-[420px] text-[17px] leading-8 text-muted-foreground">Clear choices, clear confirmations, and useful status updates keep you in control.</p>
               </div>
               <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
@@ -750,12 +750,12 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
           </div>
         </section>
 
-        <section id="future" className="bg-background py-28 sm:py-36 lg:py-44">
+        <section id="future" className="bg-background py-32 sm:py-40 lg:py-48">
           <div className="section-shell">
             <div className="grid gap-14 lg:grid-cols-[.75fr_1.25fr] lg:gap-16">
               <div>
                 <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">The direction</p>
-                <h2 className="mt-6 max-w-[540px] font-display text-[2.1rem] font-extrabold leading-[1.1] tracking-[-.045em] text-balance sm:text-[3.4rem] sm:leading-[1.06] sm:tracking-[-.055em] lg:text-[3.75rem]">Today, then tomorrow.</h2>
+                <h2 className="mt-7 max-w-[540px] font-display text-[2.3rem] font-extrabold leading-[1.12] tracking-[-.04em] text-balance sm:text-[3.65rem] sm:leading-[1.08] sm:tracking-[-.05em] lg:text-[4rem]">Today, then tomorrow.</h2>
                  <p className="mt-6 max-w-[420px] text-[17px] leading-8 text-muted-foreground">Useful services first, with more connected possibilities ahead.</p>
                 <div className="mt-8 inline-flex rounded-full border border-border bg-card p-1">
                   {(['today', 'tomorrow'] as const).map((item) => <button type="button" key={item} onClick={() => setStory(item)} className={`rounded-full px-4 py-2 text-xs font-extrabold capitalize ${story === item ? 'bg-[#171A4A] text-white dark:bg-[#F4B33F] dark:text-[#171A4A]' : 'text-muted-foreground'}`}>{item}</button>)}
@@ -777,11 +777,11 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
           </div>
         </section>
 
-        <section className="bg-[#F0F1F7] py-28 dark:bg-[#0D0F21] sm:py-36 lg:py-44">
+        <section className="bg-[#F0F1F7] py-32 dark:bg-[#0D0F21] sm:py-40 lg:py-48">
           <div className="section-shell">
             <div className="mx-auto max-w-[650px] text-center">
                  <p className="eyebrow text-[#B17819] dark:text-[#F4B33F]">Good to know</p>
-                 <h2 className="mt-6 font-display text-[2.1rem] font-extrabold leading-[1.1] tracking-[-.045em] text-balance sm:text-[3.4rem] sm:leading-[1.06] sm:tracking-[-.055em] lg:text-[3.75rem]">A few useful answers.</h2>
+                 <h2 className="mt-7 font-display text-[2.3rem] font-extrabold leading-[1.12] tracking-[-.04em] text-balance sm:text-[3.65rem] sm:leading-[1.08] sm:tracking-[-.05em] lg:text-[4rem]">A few useful answers.</h2>
             </div>
             <div className="mx-auto mt-14 max-w-[760px] border-t border-border sm:mt-16">
               {faqs.map((item, index) => (
@@ -797,7 +797,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
           </div>
         </section>
 
-        <section className="bg-[#171A4A] py-28 text-white sm:py-36 lg:py-44">
+        <section className="bg-[#171A4A] py-32 text-white sm:py-40 lg:py-48">
           <div className="section-shell relative overflow-hidden rounded-3xl border border-white/10 bg-[#11142A] px-6 py-20 text-center sm:px-12 sm:py-24 lg:py-28">
             <div className="absolute -left-16 -top-28 h-64 w-64 rounded-full border border-[#F4B33F]/15" />
             <div className="absolute -bottom-32 -right-20 h-72 w-72 rounded-full border border-white/10" />
@@ -805,7 +805,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
               <FlowMark inverse />
               <h2 className="mt-8 font-display text-[2.4rem] font-extrabold leading-[1.08] tracking-[-.05em] text-balance sm:text-6xl sm:leading-[1.05] lg:text-[4.25rem]">Make everyday services simpler.</h2>
               <p className="mx-auto mt-6 max-w-[480px] text-[17px] leading-8 text-white/65">Choose a service and follow the flow from start to finish.</p>
-              <button type="button" onClick={() => scrollTo('demo')} className="mt-8 inline-flex items-center gap-3 rounded-full bg-[#F4B33F] min-h-[52px] px-7 py-3.5 text-sm font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1">See the flow <ArrowRight size={15} /></button>
+              <button type="button" onClick={() => scrollTo('demo')} className="mt-9 inline-flex items-center gap-3 rounded-full bg-[#F4B33F] min-h-[58px] px-7 py-4 text-sm font-extrabold text-[#171A4A] transition-transform hover:-translate-y-1">See the flow <ArrowRight size={15} /></button>
             </div>
           </div>
         </section>
