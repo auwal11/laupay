@@ -5,6 +5,7 @@ import { AppNav } from "@app/components/nav/AppNav";
 import { useAuth } from "@app/context/AuthContext";
 import { security } from "@app/services";
 import type { SecurityNotification } from "@app/types/security";
+import { assetUrl } from "@app/lib/assets";
 
 export function AppShellLayout() {
   const { user, logout } = useAuth();
@@ -89,6 +90,6 @@ function NotificationPanel({ notifications, onClose, onRead }: { notifications: 
 
 function Avatar({ user }: { user: { fullName: string; profilePhotoUrl?: string | null } }) {
   const initials = user.fullName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-  if (user.profilePhotoUrl) return <img src={user.profilePhotoUrl} alt="" className="h-8 w-8 rounded-full object-cover" />;
+  if (user.profilePhotoUrl) return <img src={assetUrl(user.profilePhotoUrl)} alt="" className="h-8 w-8 rounded-full object-cover" />;
   return <span className="flex h-8 w-8 items-center justify-center rounded-full bg-laupay-indigo text-[10px] font-extrabold text-white">{initials || "L"}</span>;
 }

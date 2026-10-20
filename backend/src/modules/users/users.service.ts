@@ -14,6 +14,7 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: { fullName?: string; phone?: string; profilePhotoData?: string; removeProfilePhoto?: string }) {
+    const existing = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     let profilePhotoUrl: string | null | undefined;
     if (dto.removeProfilePhoto === 'true') profilePhotoUrl = null;
     if (dto.profilePhotoData) profilePhotoUrl = await this.profileStorage.save(dto.profilePhotoData);
@@ -21,6 +22,9 @@ export class UsersService {
       where: { id: userId },
       data: { fullName: dto.fullName, phone: dto.phone, ...(profilePhotoUrl !== undefined ? { profilePhotoUrl } : {}) },
     });
+    if (profilePhotoUrl !== undefined && profilePhotoUrl !== existing.profilePhotoUrl) {
+      await this.profileStorage.deleteByUrl(existing.profilePhotoUrl);
+    }
     const { passwordHash, ...safe } = user;
     return safe;
   }

@@ -22,7 +22,8 @@ async function bootstrap() {
     // is still larger than body-parser's default 100kb limit on some phones.
     // Keep an explicit bounded limit so uploads work without accepting huge
     // request bodies.
-    limit: '2mb',
+    // 2 MB decoded image + base64 expansion (~2.7 MB) must fit.
+    limit: '4mb',
     verify: (req, _res, buffer) => {
       (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
     },

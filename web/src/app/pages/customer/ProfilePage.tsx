@@ -4,6 +4,8 @@ import { Card } from "@app/components/ui/Card";
 import { Button } from "@app/components/ui/Button";
 import { useAuth } from "@app/context/AuthContext";
 import { users } from "@app/services";
+import { assetUrl } from "@app/lib/assets";
+import { compressProfileImage } from "@app/lib/image";
 
 export function ProfilePage() {
   const { user, logout } = useAuth();
@@ -35,14 +37,18 @@ export function ProfilePage() {
   }
 
   async function uploadPhoto(file: File) {
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024) {
-      setMessage("Choose a JPG, PNG or WebP image under 5 MB.");
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 10 * 1024 * 1024) {
+      setMessage("Choose a JPG, PNG or WebP image under 10 MB.");
       return;
     }
     setBusy(true); setMessage(null);
-    const data = await fileToDataUrl(file);
-    const result = await users.updateProfile({ profilePhotoData: data });
-    if (result.ok) { await refreshUser(); setMessage("Profile photo updated."); } else setMessage(result.error.message);
+    try {
+      const data = await compressProfileImage(file);
+      const result = await users.updateProfile({ profilePhotoData: data });
+      if (result.ok) { await refreshUser(); setMessage("Profile photo updated."); } else setMessage(result.error.message);
+    } catch {
+      setMessage("We could not read that image. Try a different photo.");
+    }
     setBusy(false);
   }
 
@@ -59,7 +65,7 @@ export function ProfilePage() {
 
       <Card>
         <div className="mb-5 flex items-center gap-4">
-          {user.profilePhotoUrl ? <img src={user.profilePhotoUrl} alt="Profile" className="h-16 w-16 rounded-full object-cover ring-2 ring-laupay-amber/40" /> : <span className="flex h-16 w-16 items-center justify-center rounded-full bg-laupay-indigo text-lg font-extrabold text-white ring-2 ring-laupay-amber/40">{user.fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span>}
+          {user.profilePhotoUrl ? <img src={assetUrl(user.profilePhotoUrl)} alt="Profile" className="h-16 w-16 rounded-full object-cover ring-2 ring-laupay-amber/40" /> : <span className="flex h-16 w-16 items-center justify-center rounded-full bg-laupay-indigo text-lg font-extrabold text-white ring-2 ring-laupay-amber/40">{user.fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span>}
           <div className="flex flex-wrap gap-2">
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadPhoto(file); e.currentTarget.value = ""; }} />
             <Button type="button" variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>{busy ? "Saving…" : user.profilePhotoUrl ? "Change photo" : "Add photo"}</Button>
@@ -95,10 +101,6 @@ export function ProfilePage() {
       </Button>
     </div>
   );
-}
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file); });
 }
 
 function Row({ label, value }: { label: string; value: string }) {

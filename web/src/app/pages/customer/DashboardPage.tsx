@@ -5,6 +5,7 @@ import { BalanceCard } from "@app/components/wallet/BalanceCard";
 import { TransactionList } from "@app/components/wallet/TransactionList";
 import { useAuth } from "@app/context/AuthContext";
 import { firstNameFrom } from "@app/lib/name";
+import { assetUrl } from "@app/lib/assets";
 
 const QUICK_ACTIONS: { to: string; icon: LucideIcon; label: string; ready: boolean }[] = [
   { to: "/app/airtime", icon: Smartphone, label: "Airtime", ready: true },
@@ -21,7 +22,7 @@ export function DashboardPage() {
   return (
     <div className="flex flex-col gap-7">
       <div className="flex items-center gap-3">
-        <ProfileAvatar name={user?.fullName ?? "LAUPAY"} photo={user?.profilePhotoUrl} />
+        <ProfileAvatar name={user?.fullName ?? "LAUPAY"} photo={assetUrl(user?.profilePhotoUrl)} />
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-laupay-ink-muted">Built for everyday payments</p>
           <h1 className="mt-1 font-display text-2xl font-semibold tracking-[-0.03em] text-laupay-ink">Hi {firstNameFrom(user?.fullName)}</h1>

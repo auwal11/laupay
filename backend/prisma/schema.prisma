@@ -202,6 +202,16 @@ model User {
   @@index([status])
 }
 
+/// Binary fallback for profile photos when the Supabase Storage bucket is
+/// unavailable. Served read-only from GET /api/images/:id; rows are deleted
+/// when the owner replaces or removes their photo.
+model StoredImage {
+  id        String   @id
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
 model AgentProfile {
   id            String   @id @default(uuid())
   userId        String   @unique
