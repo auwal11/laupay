@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Check, Copy, CreditCard, Landmark, RefreshCw } from "lucide-react";
 import { BalanceCard } from "@app/components/wallet/BalanceCard";
 import { TransactionList } from "@app/components/wallet/TransactionList";
@@ -11,8 +12,25 @@ import { generateIdempotencyKey } from "@app/lib/idempotency";
 import type { VirtualAccount } from "@app/types/wallet";
 
 export function WalletPage() {
-  const [showFund, setShowFund] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [showFund, setShowFund] = useState(
+    () => Boolean((location.state as { openDeposit?: boolean } | null)?.openDeposit),
+  );
   const depositRef = useRef<HTMLDivElement>(null);
+
+  // Arriving from the dashboard "Add funds" shortcut: open the deposit panel,
+  // then consume the state so a refresh doesn't reopen it.
+  useEffect(() => {
+    if ((location.state as { openDeposit?: boolean } | null)?.openDeposit) {
+      navigate(location.pathname, { replace: true });
+      window.setTimeout(
+        () => depositRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        50,
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function openDeposit() {
     setShowFund(true);

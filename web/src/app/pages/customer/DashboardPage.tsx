@@ -48,7 +48,7 @@ export function DashboardPage() {
         <PurchaseNoticeBanner notice={notice} onDismiss={() => setNoticeVisible(false)} />
       )}
 
-      <BalanceCard />
+      <BalanceCard onAddFund={() => navigate("/app/wallet", { state: { openDeposit: true } })} />
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-laupay-ink">Quick actions</h2>
