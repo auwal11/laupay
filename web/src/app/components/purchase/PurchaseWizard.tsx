@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { Share2 } from "lucide-react";
+import { Check, Copy, Info, Share2, ShieldCheck, Smartphone } from "lucide-react";
 import { Button } from "@app/components/ui/Button";
 import { Input } from "@app/components/ui/Input";
 import { Card } from "@app/components/ui/Card";
@@ -28,12 +28,16 @@ const STEP_LABELS: Record<PurchaseStep, string> = {
   result: "Done",
 };
 
-export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
+export function PurchaseWizard({ kind, onStepChange }: { kind: PurchaseKind; onStepChange?: (step: PurchaseStep) => void }) {
   const flow = usePurchaseFlow(kind);
   const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
   const { state } = flow;
   const productName = kind === "airtime" ? "Airtime" : "Data";
+
+  useEffect(() => {
+    onStepChange?.(state.step);
+  }, [state.step, onStepChange]);
 
   /** Done = primary exit: reset the wizard and return home with a one-shot banner. */
   function handleDone() {
@@ -153,20 +157,23 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
             </StepCard>
           )}
 
-          {state.step === "review" && (
+          {state.step === "review" && (kind === "airtime" ? (
+            <AirtimeReview
+              network={state.networks.find((n) => n.id === state.networkId)?.name ?? state.networkId ?? "—"}
+              phoneNumber={state.phoneNumber ?? ""}
+              amount={state.amount ?? "0"}
+              onBack={flow.goBack}
+              onConfirm={flow.confirm}
+            />
+          ) : (
             <StepCard title={STEP_LABELS.review} onBack={flow.goBack}>
               <dl className="flex flex-col gap-3 text-sm">
                 <Row label="Network" value={state.networks.find((n) => n.id === state.networkId)?.name ?? "—"} />
                 <Row label="Phone number" value={state.phoneNumber} />
-                {kind === "airtime" && (
-                  <Row label="Amount" value={formatNaira(state.amount ?? "0")} />
-                )}
-                {kind === "data" && (
-                  <Row
-                    label="Plan"
-                    value={state.plans.find((p) => p.id === state.planId)?.label ?? "—"}
-                  />
-                )}
+                <Row
+                  label="Plan"
+                  value={state.plans.find((p) => p.id === state.planId)?.label ?? "—"}
+                />
               </dl>
               <p className="mt-4 text-xs text-laupay-ink-muted">
                 LAUPAY determines the final price, fees, and whether extra verification is needed once you confirm.
@@ -175,7 +182,7 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
                 Confirm purchase
               </Button>
             </StepCard>
-          )}
+          ))}
 
           {state.step === "processing" && (
             <StepCard title={STEP_LABELS.processing}>
@@ -210,6 +217,111 @@ export function PurchaseWizard({ kind }: { kind: PurchaseKind }) {
         </motion.div>
       </AnimatePresence>
     </div>
+  );
+}
+
+function AirtimeReview({
+  network,
+  phoneNumber,
+  amount,
+  onBack,
+  onConfirm,
+}: {
+  network: string;
+  phoneNumber: string;
+  amount: string;
+  onBack: () => void;
+  onConfirm: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyNumber() {
+    try {
+      await navigator.clipboard.writeText(phoneNumber);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <section
+      aria-labelledby="airtime-review-title"
+      className="rounded-3xl border border-laupay-border bg-white p-5 shadow-raised sm:p-6"
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-laupay-amber/15 text-laupay-amber">
+          <Smartphone size={20} strokeWidth={2.2} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id="airtime-review-title" className="font-display text-lg font-semibold text-laupay-ink">
+            Airtime purchase
+          </h2>
+          <p className="text-xs text-laupay-ink-muted">Review transaction details</p>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-laupay-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-laupay-success">
+          <ShieldCheck size={12} /> Secure
+        </span>
+      </div>
+
+      <div className="mt-5 rounded-2xl bg-laupay-surface-muted px-5 py-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-laupay-ink-muted">
+          You are purchasing
+        </p>
+        <p className="mt-2 font-display text-[2.25rem] font-semibold leading-none tracking-[-0.02em] text-laupay-ink tabular-nums">
+          {formatNaira(amount)}
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-laupay-ink-muted">
+          <span>Airtime for {phoneNumber}</span>
+          <span className="inline-flex items-center rounded-full border border-laupay-indigo/10 bg-white px-2.5 py-1 text-xs font-semibold text-laupay-indigo">
+            {network}
+          </span>
+        </div>
+      </div>
+
+      <dl className="mt-2 divide-y divide-laupay-border text-sm">
+        <div className="flex items-center justify-between gap-4 py-3.5">
+          <dt className="text-laupay-ink-muted">Network</dt>
+          <dd className="font-medium text-laupay-ink">{network}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-4 py-3.5">
+          <dt className="text-laupay-ink-muted">Phone number</dt>
+          <dd className="flex items-center gap-2 font-medium tabular-nums text-laupay-ink">
+            {phoneNumber}
+            <button
+              type="button"
+              onClick={copyNumber}
+              aria-label={copied ? "Phone number copied" : "Copy phone number"}
+              className="rounded-md p-1 text-laupay-ink-muted transition hover:bg-laupay-surface-muted hover:text-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-laupay-indigo"
+            >
+              {copied ? <Check size={15} /> : <Copy size={15} />}
+            </button>
+          </dd>
+        </div>
+        <div className="flex items-center justify-between gap-4 py-3.5">
+          <dt className="text-laupay-ink-muted">Airtime amount</dt>
+          <dd className="font-semibold text-laupay-ink tabular-nums">{formatNaira(amount)}</dd>
+        </div>
+      </dl>
+
+      <div className="mt-2 flex gap-3 rounded-xl border border-laupay-border bg-laupay-surface-muted/60 p-3.5">
+        <Info size={16} className="mt-0.5 shrink-0 text-laupay-pending" aria-hidden="true" />
+        <p className="text-xs leading-relaxed text-laupay-ink-muted">
+          LAUPAY determines the final price, applicable fees, and whether additional verification is
+          required when you confirm your purchase.
+        </p>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-2">
+        <Button fullWidth onClick={onConfirm} disabled={!phoneNumber}>
+          Confirm purchase
+        </Button>
+        <Button fullWidth variant="ghost" onClick={onBack}>
+          Go back
+        </Button>
+      </div>
+    </section>
   );
 }
 
