@@ -4,6 +4,7 @@ import { PaymentStatus, VtuTransactionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
 import { OrdersService } from '../orders/orders.service';
+import { SettingsService } from '../settings/settings.service';
 
 /**
  * Implements the reconciliation routine described in
@@ -40,6 +41,7 @@ export class ReconciliationService {
     private readonly prisma: PrismaService,
     private readonly paymentsService: PaymentsService,
     private readonly ordersService: OrdersService,
+    private readonly settings: SettingsService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -52,7 +54,7 @@ export class ReconciliationService {
    * on demand (see AdminController) — useful for tests and for manually
    * resolving a specific incident without waiting for the next tick.
    */
-  async runOnce(): Promise<{ paymentsChecked: number; vtuChecked: number }> {
+  async runOnce(): Promise<{ paymentsChecked: number; vtuChecked: number; ordersTimedOut: number; paymentsExpired: number }> {
     const cutoff = new Date(Date.now() - this.staleThresholdMs);
 
     const stalePayments = await this.prisma.payment.findMany({
@@ -103,6 +105,24 @@ export class ReconciliationService {
       );
     }
 
-    return { paymentsChecked: stalePayments.length, vtuChecked: staleVtu.length };
+    // Expire payment intents that were initialized but never completed, so
+    // the customer's history does not show a permanent "pending" record.
+    const timeoutMinutes = await this.settings.getNumber('order_timeout_minutes');
+    const paymentCutoff = new Date(Date.now() - (timeoutMinutes > 0 ? timeoutMinutes : 15) * 60_000);
+    const expired = await this.prisma.payment.updateMany({
+      where: { status: PaymentStatus.PENDING, createdAt: { lt: paymentCutoff } },
+      data: { status: PaymentStatus.FAILED },
+    });
+
+    // Resolve orders that never reached a terminal state (the "Confirming
+    // forever" bug). OrdersService re-queries once, then fails + refunds.
+    const ordersTimedOut = await this.ordersService.resolveStaleOrders(timeoutMinutes);
+
+    return {
+      paymentsChecked: stalePayments.length,
+      vtuChecked: staleVtu.length,
+      ordersTimedOut,
+      paymentsExpired: expired.count,
+    };
   }
 }

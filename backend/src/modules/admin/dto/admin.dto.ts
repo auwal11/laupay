@@ -11,6 +11,10 @@ import {
   IsUUID,
   Max,
   Min,
+  IsObject,
+  MinLength,
+  MaxLength,
+  ArrayMaxSize,
 } from 'class-validator';
 
 export class AdminLoginDto {
@@ -100,4 +104,139 @@ export class DisputeListQueryDto {
 export class UpdateDisputeDto {
   @IsIn(['OPEN', 'IN_REVIEW', 'RESOLVED', 'REJECTED', 'CLOSED'])
   status!: string;
+}
+
+
+// =====================================================================
+// Admin control panel DTOs
+// =====================================================================
+
+export class ReasonDto {
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class FreezeUserDto extends ReasonDto {}
+
+export class MarkVerifiedDto extends ReasonDto {
+  @IsIn(['email', 'phone'])
+  field!: 'email' | 'phone';
+}
+
+export class AddNoteDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(2000)
+  body!: string;
+}
+
+export class SetRoleDto extends ReasonDto {
+  @IsIn(['ADMIN', 'SUPPORT', 'FINANCE', 'VIEWER'])
+  role!: string;
+}
+
+export class WalletCreditDto extends ReasonDto {
+  @IsUUID()
+  userId!: string;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
+}
+
+export class WalletDebitDto extends WalletCreditDto {}
+
+export class ReverseEntryDto extends ReasonDto {}
+
+export class OrderReasonDto extends ReasonDto {}
+
+export class OpenDisputeDto extends ReasonDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  details?: string;
+}
+
+export class AssignDisputeDto extends ReasonDto {
+  @IsUUID()
+  adminId!: string;
+}
+
+export class DisputeMessageDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  body!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  internal?: boolean;
+}
+
+export class DisputeResolutionDto extends ReasonDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  note?: string;
+}
+
+export class UpdateSettingsBodyDto extends ReasonDto {
+  @IsObject()
+  settings!: Record<string, string>;
+}
+
+export class KillSwitchDto extends ReasonDto {
+  @IsIn(['service_airtime_enabled', 'service_data_enabled', 'service_wallet_funding_enabled', 'maintenance_mode'])
+  key!: string;
+
+  /** true = service is paused; false = running normally. */
+  @IsBoolean()
+  paused!: boolean;
+}
+
+export class ProviderModeDto extends ReasonDto {
+  @IsIn(['simulated', 'provider_test', 'live'])
+  mode!: string;
+
+  @IsOptional()
+  @IsString()
+  confirmation?: string;
+}
+
+export class BlacklistDto extends ReasonDto {
+  @IsString()
+  @MinLength(7)
+  @MaxLength(20)
+  phone!: string;
+}
+
+export class RiskListQueryDto {
+  @IsOptional() @IsString() severity?: string;
+  @IsOptional() @IsString() type?: string;
+  @IsOptional() @IsUUID() userId?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize?: number;
+}
+
+export class ReportQueryDto {
+  @IsOptional() @IsString() from?: string;
+  @IsOptional() @IsString() to?: string;
+}
+
+export class DisputeIdQueryDto {
+  @IsOptional() @IsIn(['OPEN', 'IN_REVIEW', 'RESOLVED', 'REJECTED', 'CLOSED']) status?: string;
+  @IsOptional() @IsString() search?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize?: number;
 }

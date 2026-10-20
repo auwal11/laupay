@@ -1,5 +1,5 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { LedgerReason, OrderStatus, OrderType } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { AuditAction, LedgerReason, OrderStatus, OrderType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { VtuService } from '../vtu/vtu.service';
@@ -7,6 +7,8 @@ import { SecurityService } from '../security/security.service';
 import { InsufficientBalanceError } from '../ledger/ledger.errors';
 import { AppConfigService } from '../../config/app-config.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
+import { RiskService } from '../risk/risk.service';
 
 /** Orders that have already reached a terminal state — never re-touched by
  * async resolution once here (see reconcileVtuTransaction below). */
@@ -34,6 +36,8 @@ export class OrdersService {
     private readonly security: SecurityService,
     private readonly config: AppConfigService,
     private readonly notifications: NotificationsService,
+    private readonly settings: SettingsService,
+    private readonly risk: RiskService,
   ) {}
 
   /**
@@ -53,6 +57,9 @@ export class OrdersService {
     await this.security.verifyPin(userId, pin);
     const existing = await this.prisma.order.findUnique({ where: { idempotencyKey } });
     if (existing) return existing;
+
+    await this.settings.assertServiceEnabled('airtime', 'Airtime purchases');
+    await this.risk.assertCanTransact({ userId, kind: 'airtime', amount, phoneNumber });
 
     const order = await this.prisma.order.create({
       data: {
@@ -107,6 +114,9 @@ export class OrdersService {
     // Price is taken from the server-side catalog record, never from the
     // client — see docs/security/security-model.md §3.
     const amount = Number(plan.priceNaira);
+
+    await this.settings.assertServiceEnabled('data', 'Data purchases');
+    await this.risk.assertCanTransact({ userId, kind: 'data', amount, phoneNumber });
 
     const order = await this.prisma.order.create({
       data: {
@@ -274,6 +284,213 @@ export class OrdersService {
       // Notification delivery must never turn an already-booked order into a
       // client-visible failure. The order/ledger remains authoritative.
       this.logger.warn(`Could not create notification for order ${orderId}: ${String(error)}`);
+    }
+  }
+
+
+  // -----------------------------------------------------------------
+  // Admin settlement / fulfilment control
+  // -----------------------------------------------------------------
+
+  async adminOrderDetail(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: { select: { id: true, email: true, fullName: true, phone: true, status: true } },
+        dataPlan: { select: { id: true, label: true, externalCode: true, priceNaira: true } },
+        vtuTransaction: true,
+        payments: true,
+      },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    const ledgerEntries = await this.prisma.ledgerEntry.findMany({
+      where: { referenceType: 'Order', referenceId: orderId },
+      orderBy: { createdAt: 'asc' },
+    });
+    return { ...order, ledgerEntries };
+  }
+
+  /** Re-query the provider for an unresolved order. Safe to call repeatedly. */
+  async adminRetryFulfillment(orderId: string, adminId: string, ipAddress?: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { vtuTransaction: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (TERMINAL_STATUSES.includes(order.status)) {
+      throw new BadRequestException('This order is already final and cannot be retried');
+    }
+    if (!order.vtuTransaction) {
+      throw new BadRequestException('This order has no provider transaction to re-query');
+    }
+    const resolved = await this.reconcileVtuTransaction(order.vtuTransaction.id);
+    await this.audit(adminId, 'Order', orderId, ipAddress, 'order.retry', order.status, resolved?.status ?? order.status, 'Provider re-query requested by admin');
+    return resolved;
+  }
+
+  /**
+   * Manually marks an order successful (e.g. the provider delivered but the
+   * callback was lost). Requires a written reason and is fully audited.
+   */
+  async adminMarkSuccessful(orderId: string, adminId: string, reason: string, ipAddress?: string) {
+    if (!reason || reason.trim().length < 5) {
+      throw new BadRequestException('A reason of at least 5 characters is required');
+    }
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { vtuTransaction: true } });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.status === OrderStatus.FULFILLED) return order;
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.FULFILLED,
+        failureReason: null,
+        settledBy: adminId,
+        settledAt: new Date(),
+      },
+    });
+    if (order.vtuTransaction) {
+      await this.prisma.vtuTransaction.update({
+        where: { id: order.vtuTransaction.id },
+        data: { status: 'SUCCESS' },
+      }).catch(() => undefined);
+    }
+    await this.createOrderNotification(updated.userId, 'Purchase successful', 'Your purchase was confirmed as completed successfully.', updated.id, updated.status);
+    await this.audit(adminId, 'Order', orderId, ipAddress, 'order.mark_successful', order.status, updated.status, reason);
+    return updated;
+  }
+
+  /**
+   * Manually marks an order failed. If the wallet was already debited, the
+   * debit is reversed through the ledger (never by editing balances directly).
+   */
+  async adminMarkFailed(orderId: string, adminId: string | null, reason: string, ipAddress?: string) {
+    if (!reason || reason.trim().length < 5) {
+      throw new BadRequestException('A reason of at least 5 characters is required');
+    }
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { vtuTransaction: true } });
+    if (!order) throw new NotFoundException('Order not found');
+    if (TERMINAL_STATUSES.includes(order.status)) return order;
+
+    return this.failOrder(order, adminId, reason, ipAddress, 'ADMIN_MANUAL');
+  }
+
+  /**
+   * Background timeout resolution: any order left unresolved beyond the
+   * configured window is re-queried once, then failed + refunded so a customer
+   * can never be stuck on "Confirming" forever.
+   */
+  async resolveStaleOrders(timeoutMinutes: number): Promise<number> {
+    if (!(timeoutMinutes > 0)) return 0;
+    const cutoff = new Date(Date.now() - timeoutMinutes * 60_000);
+    const stale = await this.prisma.order.findMany({
+      where: {
+        status: {
+          in: [OrderStatus.CREATED, OrderStatus.PAID, OrderStatus.FULFILLING, OrderStatus.FULFILLMENT_UNKNOWN],
+        },
+        createdAt: { lt: cutoff },
+      },
+      take: 100,
+      include: { vtuTransaction: true },
+    });
+
+    for (const order of stale) {
+      try {
+        if (order.vtuTransaction) {
+          const resolved = await this.reconcileVtuTransaction(order.vtuTransaction.id);
+          if (resolved && TERMINAL_STATUSES.includes(resolved.status)) continue;
+          if (resolved && resolved.status === OrderStatus.FULFILLMENT_UNKNOWN) {
+            // provider still has no definitive answer — fall through and settle
+          }
+        }
+        const fresh = await this.prisma.order.findUnique({ where: { id: order.id } });
+        if (fresh && !TERMINAL_STATUSES.includes(fresh.status)) {
+          await this.failOrder(fresh, null, 'Order timed out without a provider outcome', undefined, 'TIMEOUT');
+        }
+      } catch (err) {
+        this.logger.error(`Failed to resolve stale order ${order.id}: ${String(err)}`);
+      }
+    }
+    return stale.length;
+  }
+
+  /** Shared failure path: reverse the debit (idempotently) and notify. */
+  private async failOrder(
+    order: { id: string; userId: string; status: OrderStatus; vtuTransaction?: { id: string } | null },
+    adminId: string | null,
+    reason: string,
+    ipAddress: string | undefined,
+    failureReason: string,
+  ) {
+    const ledgerIdempotencyKey = `ledger:order:${order.id}`;
+    const originalEntry = await this.prisma.ledgerEntry.findUnique({
+      where: { idempotencyKey: ledgerIdempotencyKey },
+    });
+    let reversed = false;
+    if (originalEntry) {
+      await this.ledger.reverse(originalEntry.id, `${ledgerIdempotencyKey}:reversal`);
+      reversed = true;
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: reversed ? OrderStatus.REFUNDED : OrderStatus.FULFILLMENT_FAILED,
+        failureReason,
+        settledBy: adminId,
+        settledAt: new Date(),
+      },
+    });
+
+    if (order.vtuTransaction) {
+      await this.prisma.vtuTransaction.update({
+        where: { id: order.vtuTransaction.id },
+        data: { status: 'FAILED' },
+      }).catch(() => undefined);
+    }
+
+    await this.createOrderNotification(
+      updated.userId,
+      reversed ? 'Purchase failed — refunded' : 'Purchase failed',
+      reversed
+        ? 'Your purchase could not be completed. The amount debited has been returned to your wallet.'
+        : 'Your purchase could not be completed.',
+      updated.id,
+      updated.status,
+    );
+    await this.audit(adminId, 'Order', order.id, ipAddress, 'order.mark_failed', order.status, updated.status, reason, {
+      reversed,
+    });
+    return updated;
+  }
+
+  private async audit(
+    actorId: string | null,
+    entityType: string,
+    entityId: string,
+    ipAddress: string | undefined,
+    action: string,
+    before: string,
+    after: string,
+    reason: string,
+    extra?: Record<string, unknown>,
+  ) {
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: actorId ?? undefined,
+          action: AuditAction.ADMIN_ACTION,
+          entityType,
+          entityId,
+          ipAddress,
+          reason,
+          before: { status: before },
+          after: { status: after },
+          metadata: { action, ...(extra ?? {}) },
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Audit write failed for ${entityType} ${entityId}: ${String(err)}`);
     }
   }
 

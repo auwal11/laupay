@@ -10,6 +10,8 @@ type AdminStatus = "checking" | "authenticated" | "anonymous";
 interface AdminAuthValue {
   session: AdminSession | null;
   status: AdminStatus;
+  permissions: string[];
+  hasPermission: (permission: string) => boolean;
   login: (email: string, password: string) => Promise<ApiError | null>;
   logout: () => void;
 }
@@ -71,7 +73,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const result = await adminService.login(email, password);
     if (!result.ok) return result.error;
     setAdminToken(result.data.accessToken);
-    const next: AdminSession = { email, role: result.data.role };
+    const next: AdminSession = { email, role: result.data.role, permissions: result.data.permissions ?? [] };
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(next));
     }
@@ -87,9 +89,14 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     setStatus("anonymous");
   }, []);
 
+  const permissions = session?.permissions ?? [];
+  const hasPermission = useCallback(
+    (permission: string) => permissions.includes(permission),
+    [permissions],
+  );
   const value = useMemo(
-    () => ({ session, status, login, logout }),
-    [session, status, login, logout],
+    () => ({ session, status, permissions, hasPermission, login, logout }),
+    [session, status, permissions, hasPermission, login, logout],
   );
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;

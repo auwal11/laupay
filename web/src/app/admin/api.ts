@@ -97,3 +97,30 @@ async function safeParseError(res: Response): Promise<ApiError> {
     };
   }
 }
+
+/** Downloads an authenticated CSV endpoint as a browser file. */
+export async function downloadAdminCsv(path: string, filename: string): Promise<ApiError | null> {
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {},
+    });
+    if (res.status === 401) {
+      setAdminToken(null);
+      onUnauthorized?.();
+      return await safeParseError(res);
+    }
+    if (!res.ok) return await safeParseError(res);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    return null;
+  } catch {
+    return { code: "NETWORK_ERROR", message: "Couldn't download the export. Please try again." };
+  }
+}

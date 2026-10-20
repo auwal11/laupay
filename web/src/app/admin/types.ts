@@ -1,15 +1,24 @@
-export type AdminRole = "ADMIN" | "SUPPORT";
+export type AdminRole = "ADMIN" | "SUPPORT" | "FINANCE" | "VIEWER";
 
 export interface AdminSession {
   email: string;
   role: AdminRole;
+  permissions?: string[];
 }
 
 export interface AdminLoginResponse {
   accessToken: string;
   refreshToken?: string;
   role: AdminRole;
+  permissions?: string[];
 }
+
+export type AdminPermission =
+  | "overview.read" | "users.read" | "users.freeze" | "users.credit" | "users.manage"
+  | "wallets.read" | "wallets.adjust" | "ledger.reverse" | "orders.read" | "orders.settle"
+  | "disputes.read" | "disputes.manage" | "disputes.refund" | "audit.read"
+  | "settings.read" | "settings.write" | "providers.switch_live"
+  | "reports.read" | "risk.read" | "risk.manage" | "admins.manage";
 
 export interface Paged<T> {
   total: number;
@@ -101,14 +110,48 @@ export interface AdminAuditEntry {
   entityType: string;
   entityId: string | null;
   metadata: Record<string, unknown> | null;
+  reason?: string | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  userAgent?: string | null;
   ipAddress: string | null;
   createdAt: string;
   actor: AdminUserSummary | null;
 }
 
+export interface ProviderHealth {
+  window: string;
+  vtu: { provider: string; mode: string; total: number; success: number; failed: number; unknown: number; processing: number };
+  payments: { provider: string; success: number; failed: number; pending: number };
+  successRate: number | null;
+  failureCount: number;
+  avgLatencyMs: number | null;
+}
+
+export interface RiskEvent {
+  id: string;
+  userId: string | null;
+  type: string;
+  severity: string;
+  decision: string | null;
+  amount: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  user?: AdminUserSummary | null;
+}
+
 export interface AdminOverview {
   fulfillmentMode: string;
-  users: { total: number; active: number };
+  users: { total: number; active: number; pendingVerification?: number; blocked?: number };
+  providerHealth?: ProviderHealth;
+  attention?: {
+    pendingPayments: number;
+    stuckOrders: number;
+    openDisputes: number;
+    failedVtu24h: number;
+    criticalRiskToday: number;
+  };
+  riskEventsToday?: RiskEvent[];
   wallets: { total: number; aggregateBalance: string; currency: string };
   orders: { total: number; byStatus: Record<string, number> };
   payments: { pendingOrUnknown: number };
@@ -124,6 +167,9 @@ export interface AdminSettings {
   autoTestCredit: { enabled: boolean; amount: number };
   mailProvider: string;
   adminWebOrigin: string;
+  settings?: Record<string, string>;
+  effective?: { fulfillmentMode: string; paymentProvider: string };
+  blacklist?: string[];
 }
 
 export interface AdminDispute {
@@ -145,4 +191,65 @@ export interface AdminDispute {
   ledgerReason: string;
   referenceId: string | null;
   transactionCreatedAt: string;
+}
+
+
+export interface AdminUserDetail extends AdminUserRow {
+  walletAccount: (AdminUserWallet & { id: string }) | null;
+  orders: AdminOrder[];
+  transactions: AdminTransaction[];
+  disputes: AdminDispute[];
+  notes: Array<{ id: string; body: string; createdAt: string; admin: { id: string; email: string; fullName: string } | null }>;
+  riskEvents: RiskEvent[];
+  sessions: Array<{ id: string; createdAt: string; expiresAt: string }>;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  emailVerifiedAt?: string | null;
+  phoneVerifiedAt?: string | null;
+  pinSetAt?: string | null;
+  pinLockedUntil?: string | null;
+  failedPinAttempts?: number;
+  lastLoginAt?: string | null;
+  lastLoginIp?: string | null;
+  updatedAt?: string;
+  frozenReason?: string | null;
+}
+
+export interface AdminOrderDetail extends AdminOrder {
+  failureReason?: string | null;
+  settledBy?: string | null;
+  settledAt?: string | null;
+  dataPlan?: { id: string; label: string; externalCode: string; priceNaira: string } | null;
+  payments?: Array<{ id: string; status: string; amount: string; providerName: string | null; providerReference: string | null }>;
+  vtuTransaction?: {
+    id: string;
+    status: string;
+    provider: string;
+    providerReference: string | null;
+    rawResponse: unknown;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  ledgerEntries: Array<{ id: string; direction: string; amount: string; balanceAfter: string; reason: string; narrative: string | null; createdAt: string }>;
+  user?: (AdminUserSummary & { status?: string }) | null;
+}
+
+export interface AdminDisputeDetail extends AdminDispute {
+  messages: Array<{ id: string; authorType: string; authorId: string | null; body: string; internal: boolean; createdAt: string }>;
+  assignedAdmin?: { id: string; email: string; fullName: string } | null;
+  ledgerEntry: { id: string; direction: string; amount: string; balanceAfter: string; reason: string; createdAt: string; referenceType: string | null; referenceId: string | null };
+  order?: AdminOrder | null;
+  assignedAdminId?: string | null;
+  resolutionNote?: string | null;
+  refundEntryId?: string | null;
+  lastActivityAt?: string;
+}
+
+export interface AdminReport {
+  range: { from: string; to: string };
+  fulfilled: { count: number; amount: string };
+  refunded: { count: number; amount: string };
+  failedCount: number;
+  byType: Array<{ type: string; count: number; amount: string }>;
+  ledger: { debits: string; credits: string };
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { adminService } from "@app/admin/services";
 import {
   LoadingRows,
@@ -36,6 +37,8 @@ export function AdminOrdersPage() {
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const state = useAsync(
     () =>
@@ -56,7 +59,35 @@ export function AdminOrdersPage() {
 
   return (
     <div>
-      <PageHeader title="Orders" description="Airtime and data orders across all accounts." />
+      <PageHeader
+        title="Orders"
+        description="Airtime and data orders across all accounts."
+        actions={
+          <Button
+            variant="secondary"
+            loading={exporting}
+            onClick={async () => {
+              setExporting(true);
+              setExportError(null);
+              const err = await adminService.exportOrdersCsv({
+                search: search || undefined,
+                type: type || undefined,
+                status: status || undefined,
+              });
+              setExporting(false);
+              if (err) setExportError(err.message);
+            }}
+          >
+            Export CSV
+          </Button>
+        }
+      />
+
+      {exportError && (
+        <p role="alert" className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-laupay-danger">
+          {exportError}
+        </p>
+      )}
 
       <form onSubmit={onSearch} className="mb-4 flex flex-wrap items-end gap-3">
         <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
@@ -138,7 +169,9 @@ export function AdminOrdersPage() {
                   {state.data.items.map((o) => (
                     <tr key={o.id} className="border-b border-laupay-border last:border-0">
                       <Td className="whitespace-nowrap text-xs text-laupay-ink-muted">
-                        {formatDateTime(o.createdAt)}
+                        <Link to={`/admin/orders/${o.id}`} className="text-laupay-indigo hover:underline">
+                          {formatDateTime(o.createdAt)}
+                        </Link>
                       </Td>
                       <Td>
                         <span className="font-medium">{o.user?.fullName ?? "—"}</span>

@@ -28,6 +28,9 @@ import { AdminTransactionsPage } from '@app/pages/admin/AdminTransactionsPage';
 import { AdminTransactionDetailPage } from '@app/pages/admin/AdminTransactionDetailPage';
 import { AdminWalletsPage } from '@app/pages/admin/AdminWalletsPage';
 import { AdminOrdersPage } from '@app/pages/admin/AdminOrdersPage';
+import { AdminOrderDetailPage } from '@app/pages/admin/AdminOrderDetailPage';
+import { AdminDisputeDetailPage } from '@app/pages/admin/AdminDisputeDetailPage';
+import { AdminReportsPage } from '@app/pages/admin/AdminReportsPage';
 import { AdminAuditPage } from '@app/pages/admin/AdminAuditPage';
 import { AdminSettingsPage } from '@app/pages/admin/AdminSettingsPage';
 import { AdminDisputesPage } from '@app/pages/admin/AdminDisputesPage';
@@ -91,7 +94,10 @@ export const appRoutes = (
       <Route path="transactions/:id" element={<AdminTransactionDetailPage />} />
       <Route path="wallets" element={<AdminWalletsPage />} />
       <Route path="orders" element={<AdminOrdersPage />} />
+      <Route path="orders/:id" element={<AdminOrderDetailPage />} />
       <Route path="disputes" element={<AdminDisputesPage />} />
+      <Route path="disputes/:id" element={<AdminDisputeDetailPage />} />
+      <Route path="reports" element={<AdminReportsPage />} />
       <Route path="audit" element={<AdminAuditPage />} />
       <Route path="settings" element={<AdminSettingsPage />} />
     </Route>

@@ -7,6 +7,7 @@ import { MockPaymentProvider } from './providers/mock-payment.provider';
 import { PaystackPaymentProvider } from './providers/paystack-payment.provider';
 import { MonnifyPaymentProvider } from './providers/monnify-payment.provider';
 import { LedgerModule } from '../ledger/ledger.module';
+import { RiskModule } from '../risk/risk.module';
 import { AppConfigService } from '../../config/app-config.service';
 
 /**
@@ -28,7 +29,7 @@ const paymentProviderFactory = {
 };
 
 @Module({
-  imports: [JwtModule.register({}), LedgerModule],
+  imports: [JwtModule.register({}), LedgerModule, RiskModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, paymentProviderFactory],
   exports: [PaymentsService],

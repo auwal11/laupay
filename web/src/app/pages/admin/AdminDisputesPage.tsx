@@ -1,15 +1,95 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { adminService } from "@app/admin/services";
-import { LoadingRows, PageHeader, Pagination, StatusBadge, useAsync } from "@app/admin/ui";
+import { LoadingRows, PageHeader, Pagination, StatusBadge, selectClass, useAsync } from "@app/admin/ui";
 import { Card } from "@app/components/ui/Card";
-import { Button } from "@app/components/ui/Button";
 import { EmptyState } from "@app/components/ui/EmptyState";
 import { ErrorState } from "@app/components/ui/ErrorState";
 import { formatDateTime, formatNaira } from "@app/lib/format";
 
 export function AdminDisputesPage() {
-  const [status, setStatus] = useState(""); const [page, setPage] = useState(1); const [busy, setBusy] = useState<string | null>(null); const [message, setMessage] = useState<string | null>(null);
-  const state = useAsync(() => adminService.disputes({ status: status || undefined, page }), [status, page]);
-  async function update(id: string, next: string) { setBusy(id); setMessage(null); const result = await adminService.updateDispute(id, next); setBusy(null); if (!result.ok) { setMessage(result.error.message); return; } setMessage(`Dispute ${result.data.caseReference} updated to ${next.replace('_', ' ')}.`); state.reload(); }
-  return <div><PageHeader title="Disputes" description="Review customer transaction complaints and record how each case was handled." actions={<select aria-label="Filter disputes" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="rounded-md border border-laupay-border bg-white px-3 py-2 text-sm"><option value="">All cases</option><option value="OPEN">Open</option><option value="IN_REVIEW">In review</option><option value="RESOLVED">Resolved</option><option value="REJECTED">Rejected</option><option value="CLOSED">Closed</option></select>} />{message && <p role="status" className="mb-4 rounded-lg bg-laupay-surface-muted px-4 py-3 text-sm text-laupay-ink">{message}</p>}{state.status === "loading" && <LoadingRows rows={6} />}{state.status === "error" && <ErrorState error={state.error} onRetry={state.reload} />}{state.status === "success" && (state.data.items.length === 0 ? <EmptyState title="No disputes" description="Customer disputes will appear here after they are submitted." /> : <div className="flex flex-col gap-3">{state.data.items.map((item) => <Card key={item.id} className="p-4"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-laupay-ink">{item.caseReference}</p><StatusBadge value={item.status} /></div><p className="mt-2 text-sm text-laupay-ink">{item.reason.replace(/_/g, " ")}</p><p className="mt-1 text-xs text-laupay-ink-muted">{item.userName} · {item.userEmail} · submitted {formatDateTime(item.createdAt)}</p><p className="mt-2 break-words text-xs text-laupay-ink-muted">Transaction: {item.ledgerEntryId} · {item.direction} · {formatNaira(item.amount)} · {formatDateTime(item.transactionCreatedAt)}</p>{item.details && <p className="mt-3 rounded-md bg-laupay-surface-muted px-3 py-2 text-sm text-laupay-ink">{item.details}</p>}</div><div className="flex shrink-0 flex-wrap gap-2">{item.status === "OPEN" && <Button variant="secondary" disabled={busy === item.id} onClick={() => void update(item.id, "IN_REVIEW")}>{busy === item.id ? "Saving…" : "Start review"}</Button>}{item.status === "IN_REVIEW" && <><Button disabled={busy === item.id} onClick={() => void update(item.id, "RESOLVED")}>{busy === item.id ? "Saving…" : "Resolve"}</Button><Button variant="danger" disabled={busy === item.id} onClick={() => void update(item.id, "REJECTED")}>Reject</Button></>}{(item.status === "RESOLVED" || item.status === "REJECTED") && <Button variant="secondary" disabled={busy === item.id} onClick={() => void update(item.id, "CLOSED")}>Close case</Button>}</div></div></Card>)}</div>)}{state.status === "success" && <Pagination page={state.data.page} pageSize={state.data.pageSize} total={state.data.total} onPage={setPage} />}</div>;
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(1);
+  const state = useAsync(
+    () => adminService.disputes({ status: status || undefined, page }),
+    [status, page],
+  );
+
+  return (
+    <div>
+      <PageHeader
+        title="Disputes"
+        description="Customer transaction complaints, evidence and refund decisions."
+        actions={
+          <select
+            aria-label="Filter disputes"
+            value={status}
+            onChange={(event) => {
+              setStatus(event.target.value);
+              setPage(1);
+            }}
+            className={selectClass}
+          >
+            <option value="">All cases</option>
+            <option value="OPEN">Open</option>
+            <option value="IN_REVIEW">In review</option>
+            <option value="RESOLVED">Resolved</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="CLOSED">Closed</option>
+          </select>
+        }
+      />
+      {state.status === "loading" && <LoadingRows rows={6} />}
+      {state.status === "error" && <ErrorState error={state.error} onRetry={state.reload} />}
+      {state.status === "success" &&
+        (state.data.items.length === 0 ? (
+          <EmptyState
+            title="No disputes"
+            description="Customer disputes will appear here after they are submitted."
+          />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {state.data.items.map((item) => (
+              <Card key={item.id} className="p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        to={`/admin/disputes/${item.id}`}
+                        className="font-semibold text-laupay-indigo hover:underline"
+                      >
+                        {item.caseReference}
+                      </Link>
+                      <StatusBadge value={item.status} />
+                    </div>
+                    <p className="mt-2 text-sm text-laupay-ink">{item.reason.replace(/_/g, " ")}</p>
+                    <p className="mt-1 text-xs text-laupay-ink-muted">
+                      {item.userName} · {item.userEmail} · submitted {formatDateTime(item.createdAt)}
+                    </p>
+                    <p className="mt-2 break-words text-xs text-laupay-ink-muted">
+                      {item.direction} · {formatNaira(item.amount)} · transaction{" "}
+                      {formatDateTime(item.transactionCreatedAt)}
+                    </p>
+                  </div>
+                  <Link
+                    to={`/admin/disputes/${item.id}`}
+                    className="shrink-0 text-xs font-medium text-laupay-indigo hover:underline"
+                  >
+                    Review case →
+                  </Link>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ))}
+      {state.status === "success" && (
+        <Pagination
+          page={state.data.page}
+          pageSize={state.data.pageSize}
+          total={state.data.total}
+          onPage={setPage}
+        />
+      )}
+    </div>
+  );
 }

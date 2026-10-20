@@ -32,6 +32,26 @@ export class NotificationsService {
     });
   }
 
+  /** Fan-out a notification to every admin-console user (ops alerts). */
+  async notifyAdmins(input: { title: string; body: string; category?: string; metadata?: Record<string, unknown> }) {
+    const admins = await this.prisma.user.findMany({
+      where: { role: { in: ['ADMIN', 'SUPPORT', 'FINANCE', 'VIEWER'] }, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    await Promise.all(
+      admins.map((admin) =>
+        this.create({
+          userId: admin.id,
+          category: input.category ?? 'system',
+          title: input.title,
+          body: input.body,
+          metadata: input.metadata,
+        }).catch(() => undefined),
+      ),
+    );
+    return { notified: admins.length };
+  }
+
   async list(userId: string, take = 50) {
     return this.prisma.notification.findMany({
       where: { userId },

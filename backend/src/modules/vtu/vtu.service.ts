@@ -1,20 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { VtuProviderName, VtuTransactionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AppConfigService } from '../../config/app-config.service';
 import { VTU_PROVIDER, VTUProvider } from './providers/vtu-provider.interface';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class VtuService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(VTU_PROVIDER) private readonly provider: VTUProvider,
-    private readonly config: AppConfigService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** Provider label recorded on the VTU transaction, derived from the mode. */
-  private providerName(): VtuProviderName {
-    switch (this.config.fulfillmentMode) {
+  private providerName(mode: string): VtuProviderName {
+    switch (mode) {
       case 'live':
         return VtuProviderName.VTPASS_LIVE;
       case 'provider_test':
@@ -37,16 +37,17 @@ export class VtuService {
     const existing = await this.prisma.vtuTransaction.findUnique({ where: { idempotencyKey } });
     if (existing) return existing;
 
+    const mode = await this.settings.effectiveFulfillmentMode();
     const txn = await this.prisma.vtuTransaction.create({
       data: {
         orderId,
-        provider: this.providerName(),
+        provider: this.providerName(mode),
         status: VtuTransactionStatus.PROCESSING,
         idempotencyKey,
       },
     });
 
-    if (this.config.isSimulatedFulfillment) {
+    if (mode === 'simulated') {
       return this.prisma.vtuTransaction.update({
         where: { id: txn.id },
         data: {
@@ -73,16 +74,17 @@ export class VtuService {
     const existing = await this.prisma.vtuTransaction.findUnique({ where: { idempotencyKey } });
     if (existing) return existing;
 
+    const mode = await this.settings.effectiveFulfillmentMode();
     const txn = await this.prisma.vtuTransaction.create({
       data: {
         orderId,
-        provider: this.providerName(),
+        provider: this.providerName(mode),
         status: VtuTransactionStatus.PROCESSING,
         idempotencyKey,
       },
     });
 
-    if (this.config.isSimulatedFulfillment) {
+    if (mode === 'simulated') {
       return this.prisma.vtuTransaction.update({
         where: { id: txn.id },
         data: {

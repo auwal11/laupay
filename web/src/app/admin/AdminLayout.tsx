@@ -9,6 +9,7 @@ import {
   Users,
   Wallet,
   CircleAlert,
+  ChartColumn,
 } from "lucide-react";
 import { cn } from "@app/lib/cn";
 import { useAdminAuth } from "./AdminAuthContext";
@@ -21,6 +22,7 @@ const NAV = [
   { to: "/admin/wallets", label: "Wallets", icon: Wallet, end: false },
   { to: "/admin/orders", label: "Orders", icon: ShoppingCart, end: false },
   { to: "/admin/disputes", label: "Disputes", icon: CircleAlert, end: false },
+  { to: "/admin/reports", label: "Reports", icon: ChartColumn, end: false },
   { to: "/admin/audit", label: "Audit log", icon: ScrollText, end: false },
   { to: "/admin/settings", label: "Settings", icon: SettingsIcon, end: false },
 ];

@@ -205,3 +205,87 @@ export function Td({ children, className }: { children?: ReactNode; className?: 
 export const selectClass =
   "rounded-md border border-laupay-border bg-white px-3 py-2.5 text-sm text-laupay-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo";
 
+
+/**
+ * Reason-gated confirmation used by every sensitive admin action. Enforces a
+ * written reason (min length) in the UI; the API enforces it again.
+ */
+export function ReasonDialog({
+  open,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  danger,
+  requireToken,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  requireToken?: string;
+  busy?: boolean;
+  onCancel: () => void;
+  onConfirm: (reason: string, token: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [token, setToken] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  if (!open) return null;
+
+  function submit() {
+    if (reason.trim().length < 5) {
+      setError("Enter a reason of at least 5 characters.");
+      return;
+    }
+    if (requireToken && token.trim() !== requireToken) {
+      setError(`Type ${requireToken} exactly to continue.`);
+      return;
+    }
+    setError(null);
+    onConfirm(reason.trim(), token.trim());
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-laupay-ink/40 p-4">
+      <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+        <h2 className="font-display text-base font-semibold text-laupay-ink">{title}</h2>
+        {description && <p className="mt-1 text-sm text-laupay-ink-muted">{description}</p>}
+        <label className="mt-4 block text-sm font-medium text-laupay-ink">
+          Reason (required, audited)
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            className="mt-1.5 w-full rounded-md border border-laupay-border px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo"
+            placeholder="Why are you making this change?"
+          />
+        </label>
+        {requireToken && (
+          <label className="mt-3 block text-sm font-medium text-laupay-ink">
+            Type {requireToken} to confirm
+            <input
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              className="mt-1.5 w-full rounded-md border border-laupay-border px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo"
+              placeholder={requireToken}
+            />
+          </label>
+        )}
+        {error && <p className="mt-3 text-xs font-medium text-laupay-danger">{error}</p>}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant={danger ? "danger" : "primary"} onClick={submit} loading={busy}>
+            {busy ? "Processing…" : confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

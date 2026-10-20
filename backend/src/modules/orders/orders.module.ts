@@ -6,9 +6,10 @@ import { LedgerModule } from '../ledger/ledger.module';
 import { VtuModule } from '../vtu/vtu.module';
 import { SecurityModule } from '../security/security.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { RiskModule } from '../risk/risk.module';
 
 @Module({
-  imports: [JwtModule.register({}), LedgerModule, VtuModule, SecurityModule, NotificationsModule],
+  imports: [JwtModule.register({}), LedgerModule, VtuModule, SecurityModule, NotificationsModule, RiskModule],
   controllers: [OrdersController],
   providers: [OrdersService],
   exports: [OrdersService],

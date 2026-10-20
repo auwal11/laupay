@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   AuditAction,
   LedgerDirection,
@@ -11,6 +11,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { CreditsService } from '../credits/credits.service';
+import { SettingsService } from '../settings/settings.service';
+import { RiskService } from '../risk/risk.service';
 
 function startOfToday(): Date {
   const d = new Date();
@@ -38,6 +40,8 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
     private readonly credits: CreditsService,
+    private readonly settings: SettingsService,
+    private readonly risk: RiskService,
   ) {}
 
   // -----------------------------------------------------------------
@@ -57,6 +61,14 @@ export class AdminService {
       todayEntryCount,
       recentUsers,
       recentEntries,
+      pendingVerification,
+      blockedUsers,
+      openDisputes,
+      vtuGroups,
+      paymentGroups,
+      riskEventsToday,
+      criticalRiskToday,
+      timeoutMinutes,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
@@ -78,7 +90,45 @@ export class AdminService {
         take: 5,
         include: { walletAccount: { include: { user: { select: { id: true, email: true, fullName: true } } } } },
       }),
+      this.prisma.user.count({ where: { status: UserStatus.PENDING_VERIFICATION } }),
+      this.prisma.user.count({ where: { status: { in: [UserStatus.SUSPENDED, UserStatus.FROZEN, UserStatus.CLOSED] } } }),
+      this.prisma.transactionDispute.count({ where: { status: { in: ['OPEN', 'IN_REVIEW'] } } }),
+      this.prisma.vtuTransaction.groupBy({
+        by: ['status'],
+        where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+        _count: { _all: true },
+      }),
+      this.prisma.payment.groupBy({
+        by: ['status'],
+        where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+        _count: { _all: true },
+      }),
+      this.risk.topEventsToday(5),
+      this.prisma.riskEvent.count({
+        where: { createdAt: { gte: startOfToday() }, severity: 'critical' },
+      }),
+      this.settings.getNumber('order_timeout_minutes'),
     ]);
+
+    const timeoutCutoff = new Date(Date.now() - (timeoutMinutes > 0 ? timeoutMinutes : 15) * 60_000);
+    const stuckOrders = await this.prisma.order.count({
+      where: {
+        status: {
+          in: [
+            OrderStatus.CREATED,
+            OrderStatus.PAID,
+            OrderStatus.FULFILLING,
+            OrderStatus.FULFILLMENT_UNKNOWN,
+          ],
+        },
+        createdAt: { lt: timeoutCutoff },
+      },
+    });
+    const countBy = (groups: Array<{ status: string; _count: { _all: number } }>) =>
+      Object.fromEntries(groups.map((g) => [g.status, g._count._all]));
+    const vtu24 = countBy(vtuGroups as never);
+    const pay24 = countBy(paymentGroups as never);
+    const vtuTotal = Object.values(vtu24).reduce((a, b) => a + b, 0);
 
     const ordersByStatus = Object.fromEntries(
       orderStatusGroups.map((g) => [g.status, g._count._all]),
@@ -86,7 +136,12 @@ export class AdminService {
 
     return {
       fulfillmentMode: this.config.fulfillmentMode,
-      users: { total: userCount, active: activeUserCount },
+      users: {
+        total: userCount,
+        active: activeUserCount,
+        pendingVerification,
+        blocked: blockedUsers,
+      },
       wallets: {
         total: walletCount,
         aggregateBalance: (balanceAgg._sum.balance ?? new Prisma.Decimal(0)).toString(),
@@ -100,8 +155,58 @@ export class AdminService {
         entriesToday: todayEntryCount,
       },
       providers: this.providerStatus(),
+      providerHealth: this.buildProviderHealth(
+        vtu24,
+        pay24,
+        vtuTotal,
+        await this.settings.effectiveFulfillmentMode(),
+        await this.settings.effectivePaymentProvider(),
+      ),
+      attention: {
+        pendingPayments,
+        stuckOrders,
+        openDisputes,
+        failedVtu24h: (vtu24.FAILED ?? 0) + (vtu24.UNKNOWN ?? 0),
+        criticalRiskToday,
+      },
+      riskEventsToday,
       recentUsers,
       recentTransactions: recentEntries.map((e) => this.mapEntry(e)),
+    };
+  }
+
+  private buildProviderHealth(
+    vtu24: Record<string, number>,
+    pay24: Record<string, number>,
+    vtuTotal: number,
+    fulfillmentMode: string,
+    paymentProvider: string,
+  ) {
+    const succeeded = (vtu24.SUCCESS ?? 0) + (pay24.SUCCESS ?? 0);
+    const failed = (vtu24.FAILED ?? 0) + (pay24.FAILED ?? 0) + (vtu24.UNKNOWN ?? 0) + (pay24.UNKNOWN ?? 0);
+    const attempted = succeeded + failed + (vtu24.PROCESSING ?? 0) + (pay24.PROCESSING ?? 0) + (vtu24.PENDING ?? 0) + (pay24.PENDING ?? 0);
+    return {
+      window: '24h',
+      vtu: {
+        provider: this.config.vtuProvider,
+        mode: fulfillmentMode,
+        total: vtuTotal,
+        success: vtu24.SUCCESS ?? 0,
+        failed: vtu24.FAILED ?? 0,
+        unknown: vtu24.UNKNOWN ?? 0,
+        processing: vtu24.PROCESSING ?? 0,
+      },
+      payments: {
+        provider: paymentProvider,
+        success: pay24.SUCCESS ?? 0,
+        failed: pay24.FAILED ?? 0,
+        pending: (pay24.PENDING ?? 0) + (pay24.PROCESSING ?? 0),
+      },
+      successRate: attempted > 0 ? Math.round((succeeded / attempted) * 1000) / 10 : null,
+      failureCount: failed,
+      // We do not persist provider call latency; exposing a fabricated number
+      // would be misleading, so this is explicitly null until instrumented.
+      avgLatencyMs: null,
     };
   }
 
@@ -338,7 +443,15 @@ export class AdminService {
     return { ...wallet, transactions: entries.map((e) => this.mapEntry(e)) };
   }
 
-  async setWalletStatus(walletId: string, status: WalletStatus, adminId: string, ipAddress?: string) {
+  async setWalletStatus(
+    walletId: string,
+    status: WalletStatus,
+    actor: { adminId: string; ipAddress?: string; userAgent?: string },
+    reason: string,
+  ) {
+    if (!reason || reason.trim().length < 5) {
+      throw new BadRequestException('A written reason of at least 5 characters is required');
+    }
     const wallet = await this.prisma.walletAccount.findUnique({ where: { id: walletId } });
     if (!wallet) throw new NotFoundException('Wallet not found');
 
@@ -348,12 +461,16 @@ export class AdminService {
     });
     await this.prisma.auditLog.create({
       data: {
-        actorId: adminId,
+        actorId: actor.adminId,
         action: AuditAction.ADMIN_ACTION,
         entityType: 'WalletAccount',
         entityId: walletId,
-        ipAddress,
-        metadata: { from: wallet.status, to: status, ownerId: wallet.ownerId },
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent,
+        reason,
+        before: { status: wallet.status },
+        after: { status },
+        metadata: { action: 'wallet.set_status', ownerId: wallet.ownerId },
       },
     });
     return updated;
@@ -432,7 +549,12 @@ export class AdminService {
     return { total: Number(countRows[0]?.count ?? 0), page: q.page ?? 1, pageSize: take, items };
   }
 
-  async updateDispute(id: string, status: string, adminId: string, ipAddress?: string) {
+  async updateDispute(
+    id: string,
+    status: string,
+    actor: { adminId: string; ipAddress?: string; userAgent?: string },
+    reason: string,
+  ) {
     const allowed = ['OPEN', 'IN_REVIEW', 'RESOLVED', 'REJECTED', 'CLOSED'];
     if (!allowed.includes(status)) throw new NotFoundException('Invalid dispute status');
     const existing = await this.prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT * FROM "TransactionDispute" WHERE "id" = ${id} LIMIT 1`);
@@ -443,7 +565,20 @@ export class AdminService {
       WHERE "id" = ${id}
       RETURNING *
     `);
-    await this.prisma.auditLog.create({ data: { actorId: adminId, action: AuditAction.ADMIN_ACTION, entityType: 'TransactionDispute', entityId: id, ipAddress, metadata: { from: String(existing[0].status ?? ''), to: status, caseReference: String(existing[0].caseReference ?? '') } } });
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: actor.adminId,
+        action: AuditAction.ADMIN_ACTION,
+        entityType: 'TransactionDispute',
+        entityId: id,
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent,
+        reason,
+        before: { status: String(existing[0].status ?? '') },
+        after: { status },
+        metadata: { action: 'dispute.set_status', caseReference: String(existing[0].caseReference ?? '') },
+      },
+    });
     return updated[0];
   }
 

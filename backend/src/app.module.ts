@@ -19,12 +19,16 @@ import { SecurityModule } from './modules/security/security.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CreditsModule } from './modules/credits/credits.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
+import { SettingsModule } from './modules/settings/settings.module';
+import { RiskModule } from './modules/risk/risk.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
+    SettingsModule,
+    RiskModule,
     ScheduleModule.forRoot(),
     // Global default rate limit; specific routes (auth, webhooks) apply
     // stricter limits via @Throttle(...) — see security-model.md §4.

@@ -41,11 +41,15 @@ enum UserRole {
   AGENT
   ADMIN
   SUPPORT
+  FINANCE
+  VIEWER
 }
 
 enum UserStatus {
   ACTIVE
   SUSPENDED
+  FROZEN
+  CLOSED
   PENDING_VERIFICATION
 }
 
@@ -146,34 +150,48 @@ enum DisputeStatus {
 // ============================================================
 
 model User {
-  id            String     @id @default(uuid())
-  email         String     @unique
-  phone         String?    @unique
-  passwordHash  String
-  fullName      String
+  id              String     @id @default(uuid())
+  email           String     @unique
+  phone           String?    @unique
+  passwordHash    String
+  fullName        String
   profilePhotoUrl String?
   termsAcceptedAt DateTime?
-  termsVersion String?
-  role          UserRole   @default(CUSTOMER)
-  status        UserStatus @default(PENDING_VERIFICATION)
+  termsVersion    String?
+  role            UserRole   @default(CUSTOMER)
+  status          UserStatus @default(PENDING_VERIFICATION)
 
   /// Set once when an automatic test credit is granted (see AdminService),
   /// so the "apply once after verify + PIN" grant can never double-apply.
   testCreditGrantedAt DateTime?
 
-  // Agent-specific profile fields live in AgentProfile (1:1, optional)
-  agentProfile  AgentProfile?
+  // Admin/ops metadata
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
+  frozenReason     String?
+  emailVerifiedAt  DateTime?
+  phoneVerifiedAt  DateTime?
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean   @default(false)
 
-  walletAccount WalletAccount?
-  orders        Order[]
-  payments      Payment[]
-  refreshTokens RefreshToken[]
-  emailOtps     EmailOtp[]
-  passwordResetTokens PasswordResetToken[]
-  auditLogs     AuditLog[]     @relation("AuditActor")
-  security      UserSecurity?
-  notifications Notification[]
-  disputes      TransactionDispute[]
+  // Agent-specific profile fields live in AgentProfile (1:1, optional)
+  agentProfile AgentProfile?
+
+  walletAccount         WalletAccount?
+  orders                Order[]
+  payments              Payment[]
+  refreshTokens         RefreshToken[]
+  emailOtps             EmailOtp[]
+  passwordResetTokens   PasswordResetToken[]
+  auditLogs             AuditLog[]             @relation("AuditActor")
+  security              UserSecurity?
+  notifications         Notification[]
+  disputes              TransactionDispute[]
+  adminNotes            AdminNote[]            @relation("AdminNotesAboutUser")
+  authoredNotes         AdminNote[]            @relation("AdminNotesByAdmin")
+  riskEvents            RiskEvent[]
+  permissionGrants      AdminPermissionGrant[] @relation("AdminGrantsForUser")
+  permissionGrantsGiven AdminPermissionGrant[] @relation("AdminGrantsByUser")
 
   createdAt DateTime @default(now())
 
@@ -184,14 +202,14 @@ model User {
 }
 
 model AgentProfile {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id])
-  businessName   String?
-  outletAddress  String?
-  isVerified     Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  businessName  String?
+  outletAddress String?
+  isVerified    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 /// PIN authentication for step-up verification (e.g. confirming a purchase).
@@ -238,39 +256,40 @@ model EmailOtp {
 
 /// Persistent resend throttles, shared across app replicas and restarts.
 model OtpRateLimit {
-  id              String   @id @default(uuid())
-  key             String   @unique
+  id              String    @id @default(uuid())
+  key             String    @unique
   category        String
-  count           Int      @default(0)
+  count           Int       @default(0)
   windowStartedAt DateTime
   lastAttemptAt   DateTime?
   blockedUntil    DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([category, windowStartedAt])
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  tokenHash String   @unique
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }
 
 model PasswordResetToken {
-  id String @id @default(uuid())
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String @unique
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
   expiresAt DateTime
-  usedAt DateTime?
-  createdAt DateTime @default(now())
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
   @@index([userId, expiresAt])
 }
 
@@ -298,14 +317,14 @@ model WalletAccount {
 }
 
 model LedgerEntry {
-  id              String          @id @default(uuid())
+  id              String        @id @default(uuid())
   walletAccountId String
-  walletAccount   WalletAccount   @relation(fields: [walletAccountId], references: [id])
+  walletAccount   WalletAccount @relation(fields: [walletAccountId], references: [id])
 
-  direction     LedgerDirection
-  amount        Decimal         @db.Decimal(18, 2) // always positive; direction gives sign
-  balanceAfter  Decimal         @db.Decimal(18, 2) // snapshot for fast audit/reconciliation
-  reason        LedgerReason
+  direction    LedgerDirection
+  amount       Decimal         @db.Decimal(18, 2) // always positive; direction gives sign
+  balanceAfter Decimal         @db.Decimal(18, 2) // snapshot for fast audit/reconciliation
+  reason       LedgerReason
 
   /// Human-readable line shown on statements/receipts, e.g.
   /// "Test credit — Ibrahim Lau Provision Shop".
@@ -332,18 +351,24 @@ model LedgerEntry {
 }
 
 model TransactionDispute {
-  id            String        @id @default(uuid())
-  caseReference String        @unique
-  userId        String
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ledgerEntryId String
-  ledgerEntry   LedgerEntry   @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
-  reason        String
-  details       String?
-  status        DisputeStatus @default(OPEN)
-  resolvedAt    DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id              String        @id @default(uuid())
+  caseReference   String        @unique
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntryId   String
+  ledgerEntry     LedgerEntry   @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+  reason          String
+  details         String?
+  status          DisputeStatus @default(OPEN)
+  assignedAdminId String?
+  resolutionNote  String?
+  refundEntryId   String?
+  lastActivityAt  DateTime      @default(now())
+  resolvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  messages DisputeMessage[]
 
   @@unique([userId, ledgerEntryId])
   @@index([userId, createdAt])
@@ -355,11 +380,11 @@ model TransactionDispute {
 // ============================================================
 
 model Network {
-  id       String     @id @default(uuid())
-  code     String     @unique // "MTN", "AIRTEL", "GLO", "9MOBILE"
-  name     String
+  id        String     @id @default(uuid())
+  code      String     @unique // "MTN", "AIRTEL", "GLO", "9MOBILE"
+  name      String
   dataPlans DataPlan[]
-  createdAt DateTime  @default(now())
+  createdAt DateTime   @default(now())
 
   /// Agent-price discount for open-amount purchases (airtime) on this
   /// network, as a percentage off the customer-facing face value. Defaults
@@ -371,21 +396,21 @@ model Network {
 }
 
 model DataPlan {
-  id            String   @id @default(uuid())
-  networkId     String
-  network       Network  @relation(fields: [networkId], references: [id])
-  externalCode  String   // provider's plan code, opaque to us
-  label         String   // "1GB - 30 Days"
-  priceNaira    Decimal  @db.Decimal(18, 2) // what we charge the customer
-  costNaira     Decimal  @db.Decimal(18, 2) // what the provider charges us (for margin/reporting)
+  id              String   @id @default(uuid())
+  networkId       String
+  network         Network  @relation(fields: [networkId], references: [id])
+  externalCode    String // provider's plan code, opaque to us
+  label           String // "1GB - 30 Days"
+  priceNaira      Decimal  @db.Decimal(18, 2) // what we charge the customer
+  costNaira       Decimal  @db.Decimal(18, 2) // what the provider charges us (for margin/reporting)
   /// What an agent's float is debited for this plan, if different from
   /// priceNaira (the agent's margin/incentive). Null means "not configured
   /// yet" — falls back to priceNaira (face value), never a guessed number.
   agentPriceNaira Decimal? @db.Decimal(18, 2)
-  validityDays  Int?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  validityDays    Int?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   orders Order[]
 
@@ -397,9 +422,9 @@ model DataPlan {
 // ============================================================
 
 model Order {
-  id     String    @id @default(uuid())
+  id     String @id @default(uuid())
   userId String
-  user   User      @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   // If this order was placed by an agent on behalf of a walk-in customer,
   // agentId identifies who placed it; userId may then be a "walk-in" placeholder
@@ -412,18 +437,25 @@ model Order {
 
   // Snapshot fields — never re-derive price from live catalog after creation,
   // always trust what was charged at order time.
-  network      String?
-  phoneNumber  String?
-  dataPlanId   String?
-  dataPlan     DataPlan? @relation(fields: [dataPlanId], references: [id])
-  amount       Decimal   @db.Decimal(18, 2)
+  network     String?
+  phoneNumber String?
+  dataPlanId  String?
+  dataPlan    DataPlan? @relation(fields: [dataPlanId], references: [id])
+  amount      Decimal   @db.Decimal(18, 2)
 
   /// Fulfillment mode this order was placed under: simulated | provider_test | live.
   /// Captured at creation so history stays truthful if the env mode changes.
-  mode         String?
+  mode String?
 
-  payments        Payment[]
-  vtuTransaction  VtuTransaction?
+  payments       Payment[]
+  vtuTransaction VtuTransaction?
+
+  /// Machine-readable reason when the order failed/cancelled
+  /// (e.g. INSUFFICIENT_FUNDS, PROVIDER_FAILED, ADMIN_MANUAL).
+  failureReason String?
+  /// Admin who settled the order manually (success/failure), when applicable.
+  settledBy     String?
+  settledAt     DateTime?
 
   idempotencyKey String @unique // supplied by client or derived from a client request ID
 
@@ -439,19 +471,19 @@ model Order {
 // ============================================================
 
 model Payment {
-  id      String @id @default(uuid())
+  id      String  @id @default(uuid())
   orderId String?
-  order   Order? @relation(fields: [orderId], references: [id])
+  order   Order?  @relation(fields: [orderId], references: [id])
   userId  String
-  user    User   @relation(fields: [userId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
 
   method PaymentMethod
   status PaymentStatus @default(PENDING)
   amount Decimal       @db.Decimal(18, 2)
 
-  providerName       String? // "paystack", "mock", etc — free text, provider-defined
-  providerReference  String? @unique
-  idempotencyKey     String  @unique
+  providerName      String? // "paystack", "mock", etc — free text, provider-defined
+  providerReference String? @unique
+  idempotencyKey    String  @unique
 
   events PaymentEvent[]
 
@@ -463,13 +495,13 @@ model Payment {
 }
 
 model PaymentEvent {
-  id                String   @id @default(uuid())
-  paymentId         String
-  payment           Payment  @relation(fields: [paymentId], references: [id])
-  provider          String
-  providerEventId   String
-  rawPayload         Json
-  receivedAt        DateTime @default(now())
+  id              String   @id @default(uuid())
+  paymentId       String
+  payment         Payment  @relation(fields: [paymentId], references: [id])
+  provider        String
+  providerEventId String
+  rawPayload      Json
+  receivedAt      DateTime @default(now())
 
   @@unique([provider, providerEventId]) // webhook dedup key
 }
@@ -487,7 +519,7 @@ model VtuTransaction {
   status            VtuTransactionStatus @default(PENDING)
   providerReference String?              @unique
   idempotencyKey    String               @unique
-  rawResponse        Json?
+  rawResponse       Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -507,6 +539,10 @@ model AuditLog {
   entityType String
   entityId   String?
   metadata   Json?
+  reason     String?
+  before     Json?
+  after      Json?
+  userAgent  String?
   ipAddress  String?
   createdAt  DateTime    @default(now())
 
@@ -522,18 +558,82 @@ model AuditLog {
 /// AuditLog) so the product can show narrative messages — e.g. a test credit
 /// from Ibrahim Lau Provision Shop, or an order receipt — with a read state.
 model Notification {
-  id       String   @id @default(uuid())
-  userId   String
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category String   @default("account") // account | wallet | order | security | system
-  title    String
-  body     String
-  metadata Json?
-  readAt   DateTime?
-  createdAt DateTime @default(now())
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  String    @default("account") // account | wallet | order | security | system
+  title     String
+  body      String
+  metadata  Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+// ============================================================
+// ADMIN OPERATIONS
+// ============================================================
+
+/// Internal, admin-only notes about a customer. Never shown to the customer.
+model AdminNote {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("AdminNotesAboutUser", fields: [userId], references: [id], onDelete: Cascade)
+  adminId   String?
+  admin     User?    @relation("AdminNotesByAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Threaded messages on a dispute. `internal = true` messages are admin-only.
+model DisputeMessage {
+  id         String             @id @default(uuid())
+  disputeId  String
+  dispute    TransactionDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  authorType String // customer | admin | system
+  authorId   String?
+  body       String
+  internal   Boolean            @default(false)
+  createdAt  DateTime           @default(now())
+
+  @@index([disputeId, createdAt])
+}
+
+/// Append-only risk/fraud signal log. Never edited or deleted from the UI.
+model RiskEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type      String
+  severity  String   @default("info") // info | warning | critical
+  decision  String? // allow | verify | hold | reject | block
+  amount    Decimal? @db.Decimal(18, 2)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([severity, createdAt])
+}
+
+/// Explicit permission grant on top of the role's default permission set.
+/// Used for the optional two-admin / finance exceptions without changing the
+/// user's primary role.
+model AdminPermissionGrant {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("AdminGrantsForUser", fields: [userId], references: [id], onDelete: Cascade)
+  permission  String
+  grantedById String?
+  grantedBy   User?    @relation("AdminGrantsByUser", fields: [grantedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, permission])
+  @@index([userId])
 }
 
 // ============================================================

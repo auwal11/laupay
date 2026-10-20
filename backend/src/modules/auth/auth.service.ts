@@ -18,6 +18,7 @@ import { MAIL_PROVIDER, MailProvider } from '../../common/mail/mail-provider.int
 import { ProfileStorageService } from '../../common/storage/profile-storage.service';
 import { normalizeFullName } from '../../common/utils/name.util';
 import { CreditsService } from '../credits/credits.service';
+import { ADMIN_ROLES, permissionsForRole } from '../../common/permissions';
 
 export interface AuthTokens {
   accessToken: string;
@@ -229,7 +230,7 @@ export class AuthService {
    * to hit /admin/login is rejected with 403 after the password is verified,
    * so this cannot be used to enumerate admin emails.
    */
-  async adminLogin(dto: LoginDto): Promise<AuthTokens & { role: UserRole }> {
+  async adminLogin(dto: LoginDto, ipAddress?: string): Promise<AuthTokens & { role: UserRole; permissions: string[] }> {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) {
       await this.recordFailedLogin(dto.email);
@@ -242,7 +243,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    if (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPPORT) {
+    if (!ADMIN_ROLES.includes(user.role)) {
       await this.prisma.auditLog.create({
         data: {
           actorId: user.id,
@@ -272,8 +273,12 @@ export class AuthService {
       },
     });
 
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), lastLoginIp: ipAddress ?? null },
+    });
     const tokens = await this.issueTokens(user.id, user.role);
-    return { ...tokens, role: user.role };
+    return { ...tokens, role: user.role, permissions: permissionsForRole(user.role) };
   }
 
   async forgotPassword(email: string) {

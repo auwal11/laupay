@@ -4,6 +4,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { PAYMENT_PROVIDER, PaymentProvider } from './providers/payment-provider.interface';
+import { SettingsService } from '../settings/settings.service';
+import { RiskService } from '../risk/risk.service';
 
 @Injectable()
 export class PaymentsService {
@@ -11,6 +13,8 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly config: AppConfigService,
+    private readonly settings: SettingsService,
+    private readonly risk: RiskService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
   ) {}
 
@@ -24,6 +28,11 @@ export class PaymentsService {
 
     const existingPayment = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
     if (existingPayment) return existingPayment;
+
+    // Operational kill switch + account/wallet/risk gate. A paused funding
+    // service (or a frozen account) must fail before any provider call.
+    await this.settings.assertServiceEnabled('wallet_funding', 'Wallet funding');
+    await this.risk.assertCanTransact({ userId, kind: 'wallet_funding', amount });
 
     const payment = await this.prisma.payment.create({
       data: {
@@ -50,7 +59,7 @@ export class PaymentsService {
         // Record the provider that actually handled this payment. Previously
         // hardcoded to 'mock', which mislabelled real Paystack/Monnify sandbox
         // payments in the ledger/audit trail.
-        providerName: this.config.paymentProvider,
+        providerName: await this.settings.effectivePaymentProvider(),
       },
     });
 

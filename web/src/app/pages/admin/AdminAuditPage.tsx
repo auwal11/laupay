@@ -108,8 +108,9 @@ export function AdminAuditPage() {
                     <Th>Actor</Th>
                     <Th>Action</Th>
                     <Th>Entity</Th>
+                    <Th>Reason</Th>
                     <Th>IP</Th>
-                    <Th>Metadata</Th>
+                    <Th>Change</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -141,9 +142,28 @@ export function AdminAuditPage() {
                       </Td>
                       <Td className="font-mono text-[11px] text-laupay-ink-muted">
                         {entry.ipAddress ?? "—"}
+                        {entry.userAgent && (
+                          <span className="block max-w-[140px] truncate text-[10px]">{entry.userAgent}</span>
+                        )}
                       </Td>
-                      <Td className="max-w-[240px] truncate font-mono text-[11px] text-laupay-ink-muted">
-                        {entry.metadata ? JSON.stringify(entry.metadata) : "—"}
+                      <Td className="max-w-[200px] text-xs text-laupay-ink">
+                        {entry.reason ?? <span className="text-laupay-ink-muted">—</span>}
+                      </Td>
+                      <Td className="max-w-[260px]">
+                        {entry.before || entry.after ? (
+                          <details>
+                            <summary className="cursor-pointer text-[11px] font-medium text-laupay-indigo">
+                              View change
+                            </summary>
+                            <pre className="mt-1 max-h-40 overflow-auto rounded bg-laupay-surface-muted p-2 text-[10px]">
+                              {JSON.stringify({ before: entry.before, after: entry.after }, null, 2)}
+                            </pre>
+                          </details>
+                        ) : (
+                          <span className="font-mono text-[11px] text-laupay-ink-muted">
+                            {entry.metadata ? JSON.stringify(entry.metadata) : "—"}
+                          </span>
+                        )}
                       </Td>
                     </tr>
                   ))}
