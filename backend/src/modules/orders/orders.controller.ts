@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
-import { IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
@@ -30,7 +30,13 @@ class CreateDataOrderDto {
   @IsString()
   phoneNumber!: string;
 
-  @IsUUID()
+  // DataPlan IDs are catalog-owned opaque strings (the seed/provider catalog
+  // may use codes such as MTN-seed-1gb), not necessarily UUIDs. The service
+  // still resolves the ID against the authenticated order flow and takes the
+  // price only from the database record.
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
   dataPlanId!: string;
 
   @IsString()
