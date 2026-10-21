@@ -21,6 +21,7 @@ import { ReceiptPage } from '@app/pages/customer/ReceiptPage';
 import { ProfilePage } from '@app/pages/customer/ProfilePage';
 import { SecurityPage } from '@app/pages/customer/SecurityPage';
 import { BeneficiariesPage } from '@app/pages/customer/BeneficiariesPage';
+import { WithdrawPage } from '@app/pages/customer/WithdrawPage';
 import { AdminLoginPage } from '@app/pages/admin/AdminLoginPage';
 import { AdminOverviewPage } from '@app/pages/admin/AdminOverviewPage';
 import { AdminUsersPage } from '@app/pages/admin/AdminUsersPage';
@@ -77,6 +78,7 @@ export const appRoutes = (
       <Route path="profile" element={<ProfilePage />} />
       <Route path="security" element={<SecurityPage />} />
       <Route path="beneficiaries" element={<BeneficiariesPage />} />
+      <Route path="withdraw" element={<WithdrawPage />} />
     </Route>
 
     {/* Admin console — its own session, isolated from the customer app. */}

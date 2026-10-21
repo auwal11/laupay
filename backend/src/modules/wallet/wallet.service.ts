@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus, Prisma } from '@prisma/client';
+import { OrderStatus, Prisma, WithdrawalStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
@@ -40,8 +40,19 @@ export class WalletService {
       ? await this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, type: true, status: true, network: true, phoneNumber: true } })
       : [];
     const byId = new Map(orders.map((order) => [order.id, order]));
+    const withdrawalIds = entries
+      .filter((entry) => entry.referenceType === 'Withdrawal' && entry.referenceId)
+      .map((entry) => entry.referenceId);
+    const withdrawals = withdrawalIds.length
+      ? await this.prisma.withdrawal.findMany({
+          where: { id: { in: withdrawalIds } },
+          select: { id: true, bankName: true, accountName: true, accountNumber: true, status: true, reference: true },
+        })
+      : [];
+    const withdrawalById = new Map(withdrawals.map((withdrawal) => [withdrawal.id, withdrawal]));
     return entries.map((entry) => {
       const order = entry.referenceId ? byId.get(entry.referenceId) : undefined;
+      const withdrawal = entry.referenceId ? withdrawalById.get(entry.referenceId) : undefined;
       const amount = new Prisma.Decimal(entry.amount);
       const balanceAfter = new Prisma.Decimal(entry.balanceAfter);
       const balanceBefore = entry.direction === 'CREDIT' ? balanceAfter.minus(amount) : balanceAfter.plus(amount);
@@ -51,10 +62,26 @@ export class WalletService {
         balanceBefore: balanceBefore.toFixed(2),
         balanceAfter: balanceAfter.toFixed(2),
         direction: entry.direction.toLowerCase(),
-        description: order ? `${order.type === 'AIRTIME' ? 'Airtime' : 'Data'} purchase` : entry.reason === 'WALLET_FUNDING' ? 'Wallet funding' : entry.reason === 'REVERSAL' || entry.reason === 'ORDER_REFUND' ? 'Wallet reversal' : entry.direction === 'CREDIT' ? 'Wallet credit' : 'Wallet debit',
-        status: order ? mapOrderStatus(order.status) : 'success',
+        description: withdrawal
+          ? `Withdrawal to ${withdrawal.bankName}`
+          : order
+            ? `${order.type === 'AIRTIME' ? 'Airtime' : 'Data'} purchase`
+            : entry.reason === 'WALLET_FUNDING'
+              ? 'Wallet funding'
+              : entry.reason === 'REVERSAL' || entry.reason === 'ORDER_REFUND'
+                ? 'Wallet reversal'
+                : entry.direction === 'CREDIT'
+                  ? 'Wallet credit'
+                  : 'Wallet debit',
+        status: withdrawal
+          ? mapWithdrawalStatus(withdrawal.status)
+          : order
+            ? mapOrderStatus(order.status)
+            : 'success',
         network: order?.network ?? undefined,
-        counterparty: order?.phoneNumber ?? undefined,
+        counterparty: withdrawal
+          ? `${withdrawal.accountName} • ${withdrawal.accountNumber.slice(-4).padStart(withdrawal.accountNumber.length, '•')}`
+          : order?.phoneNumber ?? undefined,
         orderType: order?.type?.toLowerCase() ?? undefined,
       };
     });
@@ -74,6 +101,14 @@ export class WalletService {
     if (wallet.ownerId !== requesterUserId) {
       throw new ForbiddenException('You do not have access to this wallet');
     }
+  }
+}
+
+function mapWithdrawalStatus(status: WithdrawalStatus): string {
+  switch (status) {
+    case WithdrawalStatus.PAID: return 'success';
+    case WithdrawalStatus.REJECTED: return 'failed';
+    default: return 'pending';
   }
 }
 

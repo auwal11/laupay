@@ -45,6 +45,8 @@ import {
   BlacklistDto,
   RiskListQueryDto,
   ReportQueryDto,
+  WithdrawalListQueryDto,
+  RejectWithdrawalDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -55,6 +57,7 @@ import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-
 import { ReconciliationService } from '../reconciliation/reconciliation.service';
 import { SettingsService } from '../settings/settings.service';
 import { RiskService } from '../risk/risk.service';
+import { WithdrawalsService } from '../withdrawals/withdrawals.service';
 import { permissionsForRole } from '../../common/permissions';
 
 /**
@@ -72,6 +75,7 @@ export class AdminController {
     private readonly reconciliationService: ReconciliationService,
     private readonly settings: SettingsService,
     private readonly risk: RiskService,
+    private readonly withdrawals: WithdrawalsService,
   ) {}
 
   private actor(user: AuthenticatedUser, req: Request): AdminActor {
@@ -280,6 +284,28 @@ export class AdminController {
   }
 
   // ---- Wallets ----
+  @Get('withdrawals')
+  @RequirePermissions('wallets.read')
+  listWithdrawals(@Query() q: WithdrawalListQueryDto) {
+    return this.withdrawals.listAll(q.status);
+  }
+
+  @Post('withdrawals/:id/approve')
+  @RequirePermissions('wallets.adjust')
+  approveWithdrawal(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.withdrawals.approve(user.userId, id);
+  }
+
+  @Post('withdrawals/:id/reject')
+  @RequirePermissions('wallets.adjust')
+  rejectWithdrawal(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RejectWithdrawalDto,
+  ) {
+    return this.withdrawals.reject(user.userId, id, dto.reason);
+  }
+
   @Get('wallets')
   @RequirePermissions('wallets.read')
   listWallets(@Query() q: WalletListQueryDto) {

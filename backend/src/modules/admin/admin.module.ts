@@ -12,6 +12,7 @@ import { ReconciliationModule } from '../reconciliation/reconciliation.module';
 import { LedgerModule } from '../ledger/ledger.module';
 import { OrdersModule } from '../orders/orders.module';
 import { RiskModule } from '../risk/risk.module';
+import { WithdrawalsModule } from '../withdrawals/withdrawals.module';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 
 @Module({
@@ -24,6 +25,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
     LedgerModule,
     OrdersModule,
     RiskModule,
+    WithdrawalsModule,
   ],
   controllers: [AdminAuthController, AdminController],
   providers: [AdminService, AdminOpsService, AdminBootstrapService, PermissionsGuard],

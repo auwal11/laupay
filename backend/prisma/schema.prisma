@@ -78,6 +78,7 @@ enum LedgerReason {
   REVERSAL
   ADMIN_ADJUSTMENT
   FEE
+  WITHDRAWAL
 }
 
 enum OrderType {
@@ -194,6 +195,7 @@ model User {
   permissionGrantsGiven AdminPermissionGrant[] @relation("AdminGrantsByUser")
   beneficiaries         Beneficiary[]
   virtualAccount        VirtualAccount?
+  withdrawals           Withdrawal[]
 
   createdAt DateTime @default(now())
 
@@ -206,6 +208,38 @@ model User {
 /// Binary fallback for profile photos when the Supabase Storage bucket is
 /// unavailable. Served read-only from GET /api/images/:id; rows are deleted
 /// when the owner replaces or removes their photo.
+enum WithdrawalStatus {
+  PENDING
+  PAID
+  REJECTED
+}
+
+/// A customer request to move wallet funds to their own bank account. Funds are
+/// debited (held) when the request is accepted and only released back via a
+/// reversal if it is rejected; approving marks it PAID. In test mode no real
+/// bank payout is initiated — the request intentionally stays PENDING.
+model Withdrawal {
+  id             String           @id @default(uuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reference      String           @unique
+  idempotencyKey String           @unique
+  amount         Decimal          @db.Decimal(18, 2)
+  bankName       String
+  accountName    String
+  accountNumber  String
+  status         WithdrawalStatus @default(PENDING)
+  ledgerEntryId  String?
+  failureReason  String?
+  processedBy    String?
+  processedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
 /// Dedicated Monnify reserved account used for wallet deposits. One per user;
 /// the account number is stable so customers can save it as a transfer
 /// beneficiary. Created on demand from the wallet deposit screen.

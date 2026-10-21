@@ -40,7 +40,7 @@ export function WalletPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-display text-xl font-semibold text-laupay-ink">Wallet</h1>
-      <BalanceCard onAddFund={openDeposit} />
+      <BalanceCard onAddFund={openDeposit} onWithdraw={() => navigate("/app/withdraw")} />
 
       <div ref={depositRef}>
         {showFund ? (

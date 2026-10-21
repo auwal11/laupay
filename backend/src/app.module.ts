@@ -21,6 +21,7 @@ import { CreditsModule } from './modules/credits/credits.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { BeneficiariesModule } from './modules/beneficiaries/beneficiaries.module';
+import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
 import { RiskModule } from './modules/risk/risk.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -50,6 +51,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     CreditsModule,
     DisputesModule,
     BeneficiariesModule,
+    WithdrawalsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

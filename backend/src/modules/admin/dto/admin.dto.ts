@@ -240,3 +240,11 @@ export class DisputeIdQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize?: number;
 }
+
+export class WithdrawalListQueryDto {
+  @IsOptional() @IsIn(['PENDING', 'PAID', 'REJECTED']) status?: 'PENDING' | 'PAID' | 'REJECTED';
+}
+
+export class RejectWithdrawalDto {
+  @IsString() @MinLength(3) @MaxLength(200) reason!: string;
+}

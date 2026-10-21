@@ -4,6 +4,7 @@ import { ordersService } from "./orders";
 import { securityService } from "./security";
 import { usersService } from "./users";
 import { beneficiariesService } from "./beneficiaries";
+import { withdrawalsService } from "./withdrawals";
 
 /**
  * Single service surface for the real backend adapters. The mock layer has
@@ -16,3 +17,4 @@ export const orders = ordersService;
 export const security = securityService;
 export const users = usersService;
 export const beneficiaries = beneficiariesService;
+export const withdrawals = withdrawalsService;

@@ -1,11 +1,11 @@
-import { Plus } from "lucide-react";
+import { ArrowUpRight, Plus } from "lucide-react";
 import { Card } from "@app/components/ui/Card";
 import { Skeleton } from "@app/components/ui/Skeleton";
 import { ErrorState } from "@app/components/ui/ErrorState";
 import { formatNaira } from "@app/lib/format";
 import { useWalletBalance } from "@app/hooks/useWallet";
 
-export function BalanceCard({ onAddFund }: { onAddFund?: () => void } = {}) {
+export function BalanceCard({ onAddFund, onWithdraw }: { onAddFund?: () => void; onWithdraw?: () => void } = {}) {
   const state = useWalletBalance();
 
   if (state.status === "loading") {
@@ -61,14 +61,27 @@ export function BalanceCard({ onAddFund }: { onAddFund?: () => void } = {}) {
             )}
           </div>
         ) : null}
-        {onAddFund && (
-          <button
-            type="button"
-            onClick={onAddFund}
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-laupay-indigo transition hover:bg-laupay-amber"
-          >
-            <Plus size={16} /> Add funds
-          </button>
+        {(onAddFund || onWithdraw) && (
+          <div className="mt-5 flex flex-wrap gap-2">
+            {onAddFund && (
+              <button
+                type="button"
+                onClick={onAddFund}
+                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-laupay-indigo transition hover:bg-laupay-amber focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                <Plus size={16} /> Add funds
+              </button>
+            )}
+            {onWithdraw && (
+              <button
+                type="button"
+                onClick={onWithdraw}
+                className="inline-flex items-center gap-2 rounded-full border border-white/25 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                <ArrowUpRight size={16} /> Withdraw
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
