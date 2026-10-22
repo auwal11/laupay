@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle2, CreditCard, Receipt, Smartphone, Store, Wallet, Wifi, X } from "lucide-react";
+import { CheckCircle2, CreditCard, Receipt, Smartphone, Wallet, Wifi, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { BalanceCard } from "@app/components/wallet/BalanceCard";
 import { TransactionList } from "@app/components/wallet/TransactionList";
@@ -14,7 +14,6 @@ const QUICK_ACTIONS: { to: string; icon: LucideIcon; label: string; ready: boole
   { to: "/app/data", icon: Wifi, label: "Data", ready: true },
   { to: "/app/wallet", icon: Wallet, label: "Wallet", ready: true },
   { to: "/app/transactions", icon: CreditCard, label: "Payments", ready: true },
-  { to: "/app/transactions", icon: Store, label: "POS", ready: false },
   { to: "/app/transactions", icon: Receipt, label: "Bills", ready: false },
 ];
 

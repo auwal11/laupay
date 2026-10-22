@@ -8,6 +8,7 @@ import { Input } from "@app/components/ui/Input";
 import { Card } from "@app/components/ui/Card";
 import { Skeleton } from "@app/components/ui/Skeleton";
 import { wallet, withdrawals } from "@app/services";
+import { formatNaira } from "@app/lib/format";
 import { generateIdempotencyKey } from "@app/lib/idempotency";
 import type { VirtualAccount } from "@app/types/wallet";
 

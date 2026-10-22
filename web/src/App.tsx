@@ -34,7 +34,7 @@ import { appRoutes } from './app/AppRoutes';
 import NotFound from './pages/not-found';
 
 type ThemeMode = 'light' | 'dark' | 'system';
-type ServiceKey = 'airtime' | 'data' | 'payments' | 'wallet' | 'pos';
+type ServiceKey = 'airtime' | 'data' | 'payments' | 'wallet';
 
 type Service = {
   key: ServiceKey;
@@ -88,23 +88,13 @@ const services: Service[] = [
     icon: WalletCards,
     accent: '#A7C997',
   },
-  {
-    key: 'pos',
-    label: 'POS',
-    description: 'Give customers a dependable local touchpoint.',
-    action: 'Explore POS',
-    amount: 'Ready to serve',
-    meta: 'Agent tools / Example settlement view',
-    icon: ScanLine,
-    accent: '#D8A2D0',
-  },
 ];
 
 const faqs = [
   {
     question: 'What can I explore on LAUPAY?',
     answer:
-      'Explore airtime, data, payments, wallet services, and POS journeys in one place.',
+      'Explore airtime, data, payments, and wallet services in one place.',
   },
   {
     question: 'What does “one simple flow” mean?',
@@ -197,12 +187,11 @@ const heroNodes = [
   { label: 'DATA', angle: 180 },
   { label: 'PAYMENTS', angle: 208 },
   { label: 'BILLS', angle: 332 },
-  { label: 'POS', angle: 0 },
   { label: 'WALLET', angle: 28 },
 ];
 
-// rotation order: AIRTIME -> DATA -> PAYMENTS -> WALLET -> POS -> BILLS
-const heroOrder = [0, 1, 2, 5, 4, 3];
+// rotation order follows the available digital services.
+const heroOrder = [0, 1, 2, 4, 3];
 
 function heroPos(angle: number, radius = HERO_R) {
   const rad = (angle * Math.PI) / 180;
@@ -768,7 +757,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
                 <div className="absolute left-7 top-7 text-[10px] font-bold uppercase tracking-[.15em] text-muted-foreground sm:left-10 sm:top-10">Now</div>
                 <div className="absolute right-7 top-7 text-[10px] font-bold uppercase tracking-[.15em] text-muted-foreground sm:right-10 sm:top-10">Next horizon</div>
                 <div className="relative mt-20 grid grid-cols-2 gap-5 sm:mt-28 sm:gap-10">
-                  <div><span className="font-mono text-3xl font-bold text-[#B17819] dark:text-[#F4B33F]">01</span><h3 className="mt-4 font-display text-xl font-extrabold tracking-[-.04em]">Useful today</h3><p className="mt-2 text-xs leading-5 text-muted-foreground">Airtime, data, payments, wallets, and POS — a clear starting point for everyday needs.</p></div>
+                  <div><span className="font-mono text-3xl font-bold text-[#B17819] dark:text-[#F4B33F]">01</span><h3 className="mt-4 font-display text-xl font-extrabold tracking-[-.04em]">Useful today</h3><p className="mt-2 text-xs leading-5 text-muted-foreground">Airtime, data, payments, and wallets — a clear starting point for everyday needs.</p></div>
                   <div><span className="font-mono text-3xl font-bold text-[#171A4A] dark:text-white">02</span><h3 className="mt-4 font-display text-xl font-extrabold tracking-[-.04em]">Ready for more</h3><p className="mt-2 text-xs leading-5 text-muted-foreground">A connected foundation for future digital services, without losing the simple flow.</p></div>
                 </div>
                 <div className="absolute bottom-7 left-7 right-7 rounded-xl bg-secondary px-4 py-3 text-xs font-bold sm:bottom-10 sm:left-10 sm:right-10"><span className="text-[#B17819] dark:text-[#F4B33F]">{story === 'today' ? 'TODAY' : 'TOMORROW'}</span><span className="ml-2 text-muted-foreground">{story === 'today' ? 'Start with the essentials.' : 'Keep the connection moving.'}</span></div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { ArrowUpRight, Check, Receipt, ScanLine, Smartphone, WalletCards, Wifi } from 'lucide-react';
+import { ArrowUpRight, Check, Receipt, Smartphone, WalletCards, Wifi } from 'lucide-react';
 
 type ShowcaseService = {
   key: string;
@@ -24,7 +24,6 @@ const activity = [
   { label: 'Data purchase', detail: 'MTN • 10GB', amount: '-₦3,500', icon: Wifi, tint: '#91B7FF', status: 'Successful' },
   { label: 'Airtime top-up', detail: 'MTN • 0803 XXX XXXX', amount: '-₦1,000', icon: Smartphone, tint: '#F4B33F', status: 'Successful' },
   { label: 'Wallet funding', detail: 'Bank transfer', amount: '+₦10,000', icon: WalletCards, tint: '#A7C997', status: 'Successful' },
-  { label: 'POS settlement', detail: 'Agent terminal', amount: '+₦18,200', icon: ScanLine, tint: '#D8A2D0', status: 'live' },
 ];
 
 function StatusChip({ label, tone }: { label: string; tone: 'ok' | 'pending' }) {
@@ -75,15 +74,6 @@ export function LookInsideShowcase({ active, stage }: { active: ShowcaseService;
         <span className="h-2 w-2 rounded-full bg-[#2E9B68]" />
         <span className="text-[10px] font-extrabold">Data purchase • Successful</span>
       </div>
-      <div
-        aria-hidden
-        className="showcase-item absolute -bottom-8 -left-9 z-10 hidden rounded-2xl border border-border bg-card p-4 shadow-[0_16px_36px_rgba(23,26,74,.12)] xl:block"
-        style={{ animation: 'bridge-drift 8s ease-in-out infinite reverse', transitionDelay: '.45s' }}
-      >
-        <p className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">POS settlement</p>
-        <p className="mt-1 font-display text-lg font-extrabold tracking-[-.04em]">+₦18,200</p>
-      </div>
-
       {/* main dashboard panel */}
       <div className="showcase-item relative overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-[0_28px_70px_rgba(23,26,74,.14)]" style={{ transitionDelay: '.05s' }}>
         <div className="flex items-center justify-between border-b border-border px-6 py-4">

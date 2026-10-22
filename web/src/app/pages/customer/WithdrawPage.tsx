@@ -308,8 +308,8 @@ export function WithdrawPage() {
           </Button>
 
           <p className="mt-3 text-xs leading-relaxed text-laupay-ink-muted">
-            Test mode: no real bank transfer is sent. Your request is recorded, the amount is held
-            from your available balance, and it stays pending for review.
+            Your request is recorded securely, and the amount is reserved from your available
+            balance while it is reviewed.
           </p>
         </Card>
       ) : (
@@ -461,8 +461,8 @@ function WithdrawalPending({ withdrawal }: { withdrawal: Withdrawal }) {
         </div>
 
         <p className="mt-4 text-xs leading-relaxed text-laupay-ink-muted">
-          Test mode: no real bank transfer is sent. The amount is held from your available balance
-          while the request is pending.
+          The amount remains reserved from your available balance while your request is pending
+          review. We will notify you when the status changes.
         </p>
       </Card>
     </div>
