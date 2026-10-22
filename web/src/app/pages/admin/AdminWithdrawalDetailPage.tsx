@@ -1,0 +1,22 @@
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { adminService } from "@app/admin/services";
+import { Button } from "@app/components/ui/Button";
+import { formatNaira } from "@app/lib/format";
+import { PageHeader, StatusBadge, useAsync } from "@app/admin/ui";
+
+export function AdminWithdrawalDetailPage() {
+  const { id = "" } = useParams(); const state = useAsync(() => adminService.withdrawal(id), [id]); const [busy, setBusy] = useState(false);
+  async function action(name: "approve" | "process" | "successful" | "failed" | "reject" | "refund") {
+    const reason = window.prompt("Enter the required reason for this action:"); if (!reason?.trim()) return;
+    const body: Record<string, string> = { reason };
+    if (name === "successful") { const reference = window.prompt("Enter verified provider/payment reference:"); const evidence = window.prompt("Enter verification evidence (provider status/manual evidence):"); if (!reference || !evidence) return; body.providerReference = reference; body.evidence = evidence; }
+    setBusy(true); await adminService.withdrawalAction(id, name, body); setBusy(false); state.reload();
+  }
+  if (state.status === "loading") return <p className="text-sm text-laupay-ink-muted">Loading withdrawal…</p>;
+  if (state.status === "error") return <p className="text-sm text-laupay-danger">{state.error.message}</p>;
+  const item = state.data;
+  return <div className="space-y-5"><Link to="/admin/withdrawals" className="text-sm font-medium text-laupay-indigo hover:underline">← Withdrawals</Link><PageHeader title={item.reference} description="Settlement requires verified payout evidence; approval alone never marks a withdrawal successful." />
+    <div className="grid gap-5 lg:grid-cols-[1fr_360px]"><section className="space-y-5"><div className="rounded-xl border border-laupay-border bg-white p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-wide text-laupay-ink-muted">Amount</p><p className="mt-1 text-3xl font-semibold text-laupay-ink">{formatNaira(item.amount)}</p></div><StatusBadge value={item.status} /></div><dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-laupay-ink-muted">User</dt><dd className="font-medium">{item.user?.fullName} · {item.user?.email}</dd></div><div><dt className="text-laupay-ink-muted">Destination</dt><dd className="font-medium">{item.bankName} · {item.accountNumber}</dd></div><div><dt className="text-laupay-ink-muted">Account name</dt><dd className="font-medium">{item.accountName}</dd></div><div><dt className="text-laupay-ink-muted">Provider reference</dt><dd className="font-mono text-xs">{item.providerReference ?? "Not settled"}</dd></div></dl></div><div className="rounded-xl border border-laupay-border bg-white p-5"><h2 className="font-semibold text-laupay-ink">Status timeline</h2><ol className="mt-4 space-y-3">{item.events.map((event) => <li key={`${event.createdAt}-${event.action}`} className="border-l-2 border-laupay-amber pl-3"><p className="text-sm font-medium">{event.action} · {event.toStatus}</p><p className="text-xs text-laupay-ink-muted">{event.reason} · {new Date(event.createdAt).toLocaleString("en-NG")}</p></li>)}</ol></div></section>
+      <aside className="rounded-xl border border-laupay-border bg-white p-5"><h2 className="font-semibold text-laupay-ink">Admin actions</h2><p className="mt-1 text-xs leading-relaxed text-laupay-ink-muted">Every action needs a reason and is recorded in the audit trail.</p><div className="mt-4 grid gap-2">{item.status === "PENDING" && <Button disabled={busy} onClick={() => void action("approve")}>Approve for processing</Button>}{item.status === "APPROVED" && <Button disabled={busy} onClick={() => void action("process")}>Start processing</Button>}{item.status === "PROCESSING" && <Button disabled={busy} onClick={() => void action("successful")}>Mark successful (verified)</Button>}{["APPROVED", "PROCESSING"].includes(item.status) && <Button variant="secondary" disabled={busy} onClick={() => void action("failed")}>Mark failed + refund</Button>}{item.status === "PENDING" && <Button variant="secondary" disabled={busy} onClick={() => void action("reject")}>Reject + release funds</Button>}{["SUCCESSFUL", "FAILED", "REVERSED"].includes(item.status) && <Button variant="secondary" disabled={busy} onClick={() => void action("refund")}>Issue wallet refund</Button>}</div></aside></div></div>;
+}

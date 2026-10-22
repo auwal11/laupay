@@ -106,7 +106,11 @@ export class WalletService {
 
 function mapWithdrawalStatus(status: WithdrawalStatus): string {
   switch (status) {
-    case WithdrawalStatus.PAID: return 'success';
+    case WithdrawalStatus.SUCCESSFUL: return 'success';
+    case WithdrawalStatus.REFUNDED: return 'refunded';
+    case WithdrawalStatus.REJECTED:
+    case WithdrawalStatus.FAILED:
+    case WithdrawalStatus.REVERSED: return 'failed';
     case WithdrawalStatus.REJECTED: return 'failed';
     default: return 'pending';
   }

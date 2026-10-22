@@ -47,6 +47,7 @@ import {
   ReportQueryDto,
   WithdrawalListQueryDto,
   RejectWithdrawalDto,
+  WithdrawalActionDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -287,23 +288,53 @@ export class AdminController {
   @Get('withdrawals')
   @RequirePermissions('wallets.read')
   listWithdrawals(@Query() q: WithdrawalListQueryDto) {
-    return this.withdrawals.listAll(q.status);
+    return this.withdrawals.listAll(q.status as any, q.search);
+  }
+
+  @Get('withdrawals/:id')
+  @RequirePermissions('withdrawals.read')
+  getWithdrawal(@Param('id', ParseUUIDPipe) id: string) {
+    return this.withdrawals.getAdmin(id);
   }
 
   @Post('withdrawals/:id/approve')
-  @RequirePermissions('wallets.adjust')
-  approveWithdrawal(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.withdrawals.approve(user.userId, id);
+  @RequirePermissions('withdrawals.manage')
+  approveWithdrawal(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: WithdrawalActionDto) {
+    return this.withdrawals.approve(user.userId, id, dto.reason);
+  }
+
+  @Post('withdrawals/:id/process')
+  @RequirePermissions('withdrawals.manage')
+  processWithdrawal(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: WithdrawalActionDto) {
+    return this.withdrawals.startProcessing(user.userId, id, dto.reason);
+  }
+
+  @Post('withdrawals/:id/successful')
+  @RequirePermissions('withdrawals.manage')
+  successfulWithdrawal(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: WithdrawalActionDto) {
+    return this.withdrawals.markSuccessful(user.userId, id, dto.reason, dto.providerReference ?? '', dto.evidence ?? '');
+  }
+
+  @Post('withdrawals/:id/failed')
+  @RequirePermissions('withdrawals.manage')
+  failedWithdrawal(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: WithdrawalActionDto) {
+    return this.withdrawals.markFailed(user.userId, id, dto.reason);
   }
 
   @Post('withdrawals/:id/reject')
-  @RequirePermissions('wallets.adjust')
+  @RequirePermissions('withdrawals.manage')
   rejectWithdrawal(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RejectWithdrawalDto,
   ) {
     return this.withdrawals.reject(user.userId, id, dto.reason);
+  }
+
+  @Post('withdrawals/:id/refund')
+  @RequirePermissions('withdrawals.refund')
+  refundWithdrawal(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: WithdrawalActionDto) {
+    return this.withdrawals.refund(user.userId, id, dto.reason);
   }
 
   @Get('wallets')

@@ -111,6 +111,28 @@ export class AppConfigService {
   readonly supabaseStorageBucket = optional('SUPABASE_STORAGE_BUCKET', 'profile-photos');
 
   /**
+   * Bank directory used by the withdrawal form. This must be populated from
+   * the configured payout provider's authoritative directory; an empty value
+   * intentionally disables withdrawals rather than presenting an unverified
+   * hard-coded list.
+   */
+  readonly withdrawalBanksJson = optional('WITHDRAWAL_BANKS_JSON', '[]');
+  get withdrawalBanks(): Array<{ code: string; name: string }> {
+    try {
+      const parsed = JSON.parse(this.withdrawalBanksJson) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(
+        (bank): bank is { code: string; name: string } =>
+          !!bank && typeof bank === 'object' &&
+          typeof (bank as { code?: unknown }).code === 'string' &&
+          typeof (bank as { name?: unknown }).name === 'string',
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * Guard evaluated at boot (see main.ts).
    *
    *  - In PRODUCTION: refuses to start with any mock/simulated provider, so a

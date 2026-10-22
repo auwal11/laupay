@@ -253,3 +253,10 @@ export interface AdminReport {
   byType: Array<{ type: string; count: number; amount: string }>;
   ledger: { debits: string; credits: string };
 }
+
+export interface AdminWithdrawal {
+  id: string; reference: string; amount: string; fee: string; bankName: string;
+  accountName: string; accountNumber: string; status: string; failureReason?: string;
+  refundAmount?: string; refundStatus?: string; providerReference?: string;
+  createdAt: string; updatedAt: string; user?: { id: string; email: string; fullName: string };
+}

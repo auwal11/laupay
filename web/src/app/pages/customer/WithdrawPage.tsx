@@ -17,30 +17,6 @@ type Step = "details" | "pin" | "pending";
 const MIN_WITHDRAWAL = 100;
 const MAX_WITHDRAWAL = 500_000;
 
-const BANKS = [
-  "Access Bank",
-  "Citibank",
-  "Ecobank",
-  "Fidelity Bank",
-  "First Bank",
-  "FCMB",
-  "GTBank",
-  "Keystone Bank",
-  "Kuda",
-  "Moniepoint",
-  "Opay",
-  "PalmPay",
-  "Polaris Bank",
-  "Providus Bank",
-  "Stanbic IBTC",
-  "Sterling Bank",
-  "UBA",
-  "Union Bank",
-  "Unity Bank",
-  "Wema Bank",
-  "Zenith Bank",
-];
-
 function maskAccount(accountNumber: string): string {
   return accountNumber.length > 4
     ? `${"•".repeat(accountNumber.length - 4)}${accountNumber.slice(-4)}`
@@ -52,6 +28,9 @@ export function WithdrawPage() {
   const [step, setStep] = useState<Step>("details");
   const [amount, setAmount] = useState("");
   const [bankName, setBankName] = useState("");
+  const [bankCode, setBankCode] = useState("");
+  const [banks, setBanks] = useState<Array<{ code: string; name: string }>>([]);
+  const [banksError, setBanksError] = useState<string | null>(null);
   const [accountName, setAccountName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [available, setAvailable] = useState<string | null>(null);
@@ -69,6 +48,13 @@ export function WithdrawPage() {
     wallet.getBalance().then((result) => {
       if (result.ok) setAvailable(result.data.ngnAvailableBalance ?? result.data.ngnBalance);
       setBalanceLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    void withdrawals.banks().then((result) => {
+      if (result.ok) setBanks(result.data);
+      else setBanksError(result.error.message);
     });
   }, []);
 
@@ -124,6 +110,7 @@ export function WithdrawPage() {
     const result = await withdrawals.request({
       amount,
       bankName: bankName.trim(),
+      bankCode,
       accountName: accountName.trim(),
       accountNumber,
       pin,
@@ -243,20 +230,15 @@ export function WithdrawPage() {
             <div className="border-t border-laupay-border pt-5">
               <h3 className="text-sm font-semibold text-laupay-ink">Destination account</h3>
               <div className="mt-3 flex flex-col gap-4">
-                <Input
-                  label="Bank name"
-                  list="ng-banks"
-                  value={bankName}
-                  onChange={(event) => setBankName(event.target.value)}
-                  placeholder="Select or type your bank"
-                  autoComplete="organization"
-                  className="h-[52px]"
-                />
-                <datalist id="ng-banks">
-                  {BANKS.map((bank) => (
-                    <option key={bank} value={bank} />
-                  ))}
-                </datalist>
+                <div>
+                  <label htmlFor="withdrawal-bank" className="mb-1.5 block text-sm font-medium text-laupay-ink">Bank</label>
+                  <select id="withdrawal-bank" value={bankCode} onChange={(event) => { const selected = banks.find((bank) => bank.code === event.target.value); setBankCode(event.target.value); setBankName(selected?.name ?? ""); }} className="h-[52px] w-full rounded-md border border-laupay-border bg-white px-3 text-sm text-laupay-ink focus:border-laupay-indigo focus:outline-none focus:ring-2 focus:ring-laupay-indigo/20" disabled={!banks.length}>
+                    <option value="">{banks.length ? "Select your bank" : "Bank directory unavailable"}</option>
+                    {banks.map((bank) => <option key={bank.code} value={bank.code}>{bank.name}</option>)}
+                  </select>
+                  {banksError && <p className="mt-1 text-xs text-laupay-danger">{banksError}</p>}
+                  {!banksError && !banks.length && <p className="mt-1 text-xs text-laupay-ink-muted">Withdrawals are temporarily unavailable because no verified bank directory is configured.</p>}
+                </div>
                 <Input
                   label="Account number"
                   inputMode="numeric"

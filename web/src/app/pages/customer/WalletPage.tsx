@@ -7,7 +7,7 @@ import { Button } from "@app/components/ui/Button";
 import { Input } from "@app/components/ui/Input";
 import { Card } from "@app/components/ui/Card";
 import { Skeleton } from "@app/components/ui/Skeleton";
-import { wallet } from "@app/services";
+import { wallet, withdrawals } from "@app/services";
 import { generateIdempotencyKey } from "@app/lib/idempotency";
 import type { VirtualAccount } from "@app/types/wallet";
 
@@ -56,8 +56,16 @@ export function WalletPage() {
         <h2 className="mb-3 text-sm font-semibold text-laupay-ink">Transaction history</h2>
         <TransactionList />
       </div>
+      <WithdrawalHistory />
     </div>
   );
+}
+
+function WithdrawalHistory() {
+  const [rows, setRows] = useState<import("@app/types/withdrawals").Withdrawal[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { void withdrawals.list().then((result) => { if (result.ok) setRows(result.data); setLoading(false); }); }, []);
+  return <div><h2 className="mb-3 text-sm font-semibold text-laupay-ink">Withdrawal history</h2>{loading ? <Skeleton className="h-16 w-full" /> : rows.length === 0 ? <p className="rounded-xl border border-dashed border-laupay-border bg-white p-4 text-sm text-laupay-ink-muted">No withdrawal requests yet.</p> : <div className="space-y-2">{rows.slice(0, 5).map((row) => <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-laupay-border bg-white p-4"><div><p className="font-medium text-laupay-ink">{row.bankName} · {row.accountNumber}</p><p className="text-xs text-laupay-ink-muted">{row.reference} · {new Date(row.createdAt).toLocaleString("en-NG")}</p></div><div className="text-right"><p className="font-semibold text-laupay-ink">{formatNaira(row.amount)}</p><span className="text-xs font-semibold uppercase tracking-wide text-laupay-pending">{row.status.replace(/_/g, " ")}</span>{row.refundAmount !== "0.00" && <p className="text-xs text-laupay-success">Refunded {formatNaira(row.refundAmount ?? "0")}</p>}</div></div>)}</div>}</div>;
 }
 
 function DepositPanel({ onDone }: { onDone: () => void }) {

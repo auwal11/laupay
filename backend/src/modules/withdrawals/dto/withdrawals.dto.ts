@@ -1,4 +1,4 @@
-import { IsNumber, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class RequestWithdrawalDto {
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -10,6 +10,11 @@ export class RequestWithdrawalDto {
   @MinLength(2)
   @MaxLength(60)
   bankName!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  bankCode?: string;
 
   @IsString()
   @MinLength(2)

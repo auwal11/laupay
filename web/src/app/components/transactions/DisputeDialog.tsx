@@ -6,7 +6,7 @@ import type { DisputeReason, TransactionDispute } from "@app/types/disputes";
 import type { Transaction } from "@app/types/wallet";
 import { formatDateTime, formatNaira } from "@app/lib/format";
 
-const REASONS: Array<[DisputeReason, string]> = [["SERVICE_NOT_DELIVERED", "I was charged but the service was not delivered."], ["FAILED_BUT_DEBITED", "The transaction failed but my wallet was debited."], ["WRONG_AMOUNT", "I was charged the wrong amount."], ["DUPLICATE_TRANSACTION", "This transaction is duplicated."], ["UNRECOGNIZED_TRANSACTION", "I do not recognize this transaction."], ["OTHER", "Other issue"]];
+const REASONS: Array<[DisputeReason, string]> = [["SERVICE_NOT_DELIVERED", "I was charged but the service was not delivered."], ["FAILED_BUT_DEBITED", "The transaction failed but my wallet was debited."], ["WITHDRAWAL_NOT_RECEIVED", "Money was deducted but my bank account was not credited."], ["TRANSFER_PENDING", "The transfer is pending for too long."], ["WRONG_AMOUNT", "I was charged the wrong amount."], ["DUPLICATE_TRANSACTION", "This transaction is duplicated."], ["UNRECOGNIZED_TRANSACTION", "I do not recognize this transaction."], ["OTHER", "Other issue"]];
 
 export function DisputeDialog({ transaction, onClose, onCreated }: { transaction: Transaction; onClose: () => void; onCreated: (dispute: TransactionDispute) => void }) {
   const [reason, setReason] = useState<DisputeReason>("SERVICE_NOT_DELIVERED"); const [details, setDetails] = useState(""); const [confirm, setConfirm] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);

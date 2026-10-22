@@ -29,7 +29,13 @@ export class DisputesService {
     // Only transactions that actually failed, are unresolved, or have been
     // pending beyond the operational window may be disputed. A successful
     // row must not offer a dispute action.
-    if (entry.referenceType === 'Order' && entry.referenceId) {
+    if (entry.referenceType === 'Withdrawal' && entry.referenceId) {
+      const withdrawal = await this.prisma.withdrawal.findUnique({ where: { id: entry.referenceId } });
+      if (!withdrawal) throw new NotFoundException('Withdrawal not found');
+      if (!['SUCCESSFUL', 'PROCESSING', 'PENDING', 'APPROVED'].includes(withdrawal.status)) {
+        throw new ForbiddenException('This withdrawal is not eligible for a new dispute');
+      }
+    } else if (entry.referenceType === 'Order' && entry.referenceId) {
       const order = await this.prisma.order.findUnique({ where: { id: entry.referenceId } });
       if (order) {
         const allowed = ['FULFILLMENT_FAILED', 'FULFILLMENT_UNKNOWN', 'REFUNDED'].includes(order.status);

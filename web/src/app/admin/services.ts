@@ -16,6 +16,7 @@ import type {
   AdminWallet,
   Paged,
   RiskEvent,
+  AdminWithdrawal,
 } from "./types";
 
 interface ListParams {
@@ -214,6 +215,16 @@ export const adminService = {
   // ---- Risk ----
   riskEvents(params: ListParams = {}): Promise<ApiResult<Paged<RiskEvent>>> {
     return adminRequest<Paged<RiskEvent>>(`/admin/risk/events${buildQuery(params)}`);
+  },
+
+  withdrawals(params: ListParams = {}): Promise<ApiResult<AdminWithdrawal[]>> {
+    return adminRequest<AdminWithdrawal[]>(`/admin/withdrawals${buildQuery(params)}`);
+  },
+  withdrawal(id: string): Promise<ApiResult<AdminWithdrawal & { events: Array<{ action: string; fromStatus?: string; toStatus: string; reason?: string; createdAt: string }> }>> {
+    return adminRequest(`/admin/withdrawals/${id}`);
+  },
+  withdrawalAction(id: string, action: "approve" | "process" | "successful" | "failed" | "reject" | "refund", body: Record<string, string>) {
+    return adminRequest(`/admin/withdrawals/${id}/${action}`, { method: "POST", body });
   },
 
   blacklistPhone(phone: string, reason: string) {

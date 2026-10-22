@@ -242,9 +242,16 @@ export class DisputeIdQueryDto {
 }
 
 export class WithdrawalListQueryDto {
-  @IsOptional() @IsIn(['PENDING', 'PAID', 'REJECTED']) status?: 'PENDING' | 'PAID' | 'REJECTED';
+  @IsOptional() @IsIn(['PENDING', 'APPROVED', 'PROCESSING', 'SUCCESSFUL', 'REJECTED', 'FAILED', 'REVERSED', 'REFUND_PENDING', 'REFUNDED', 'REFUND_FAILED']) status?: string;
+  @IsOptional() @IsString() search?: string;
 }
 
 export class RejectWithdrawalDto {
   @IsString() @MinLength(3) @MaxLength(200) reason!: string;
+}
+
+export class WithdrawalActionDto {
+  @IsString() @MinLength(3) @MaxLength(300) reason!: string;
+  @IsOptional() @IsString() @MaxLength(120) providerReference?: string;
+  @IsOptional() @IsString() @MaxLength(1000) evidence?: string;
 }

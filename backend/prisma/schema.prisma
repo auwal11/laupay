@@ -210,14 +210,26 @@ model User {
 /// when the owner replaces or removes their photo.
 enum WithdrawalStatus {
   PENDING
-  PAID
+  APPROVED
+  PROCESSING
+  SUCCESSFUL
   REJECTED
+  FAILED
+  REVERSED
+  REFUND_PENDING
+  REFUNDED
+  REFUND_FAILED
+}
+
+enum WithdrawalRefundStatus {
+  PENDING
+  REFUNDED
+  FAILED
 }
 
 /// A customer request to move wallet funds to their own bank account. Funds are
-/// debited (held) when the request is accepted and only released back via a
-/// reversal if it is rejected; approving marks it PAID. In test mode no real
-/// bank payout is initiated — the request intentionally stays PENDING.
+/// debited when accepted and can only be restored through an idempotent ledger
+/// reversal. Approval is never proof of settlement.
 model Withdrawal {
   id             String           @id @default(uuid())
   userId         String
@@ -225,19 +237,79 @@ model Withdrawal {
   reference      String           @unique
   idempotencyKey String           @unique
   amount         Decimal          @db.Decimal(18, 2)
+  fee            Decimal          @default(0) @db.Decimal(18, 2)
   bankName       String
+  bankCode       String?
   accountName    String
   accountNumber  String
+  accountVerified Boolean        @default(false)
   status         WithdrawalStatus @default(PENDING)
-  ledgerEntryId  String?
+  ledgerEntryId  String?         @unique
+  refundLedgerEntryId String?     @unique
+  providerReference String?
+  verificationEvidence String?
   failureReason  String?
   processedBy    String?
-  processedAt    DateTime?
+  approvedBy     String?
+  approvedAt     DateTime?
+  processingAt   DateTime?
+  settledAt      DateTime?
+  refundedAmount Decimal          @default(0) @db.Decimal(18, 2)
+  refundStatus   WithdrawalRefundStatus?
+  refundedAt     DateTime?
+  events         WithdrawalEvent[]
+  payoutAttempts WithdrawalPayoutAttempt[]
+  refunds        WithdrawalRefund[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+model WithdrawalEvent {
+  id           String           @id @default(uuid())
+  withdrawalId String
+  withdrawal   Withdrawal       @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+  action       String
+  fromStatus   WithdrawalStatus?
+  toStatus     WithdrawalStatus
+  reason       String?
+  actorId      String?
+  metadata     Json?
+  createdAt    DateTime         @default(now())
+
+  @@index([withdrawalId, createdAt])
+}
+
+model WithdrawalPayoutAttempt {
+  id                String    @id @default(uuid())
+  withdrawalId      String
+  withdrawal        Withdrawal @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+  idempotencyKey    String    @unique
+  status            String
+  providerReference String?
+  failureReason     String?
+  evidence          String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([withdrawalId, createdAt])
+}
+
+model WithdrawalRefund {
+  id           String                 @id @default(uuid())
+  withdrawalId String
+  withdrawal   Withdrawal             @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+  ledgerEntryId String                 @unique
+  amount       Decimal                @db.Decimal(18, 2)
+  status       WithdrawalRefundStatus @default(PENDING)
+  reason       String
+  actorId      String?
+  createdAt    DateTime               @default(now())
+  completedAt  DateTime?
+
+  @@index([withdrawalId, createdAt])
 }
 
 /// Dedicated Monnify reserved account used for wallet deposits. One per user;
