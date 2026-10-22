@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle2, CreditCard, History, Receipt, Smartphone, Wallet, Wifi, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, CreditCard, Receipt, Smartphone, Wallet, Wifi, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { BalanceCard } from "@app/components/wallet/BalanceCard";
 import { useAuth } from "@app/context/AuthContext";
@@ -13,7 +13,6 @@ const QUICK_ACTIONS: { to: string; icon: LucideIcon; label: string; ready: boole
   { to: "/app/data", icon: Wifi, label: "Data", ready: true },
   { to: "/app/wallet", icon: Wallet, label: "Wallet", ready: true },
   { to: "/app/transactions", icon: CreditCard, label: "Payments", ready: true },
-  { to: "/app/transactions", icon: History, label: "Transactions", ready: true },
   { to: "/app/transactions", icon: Receipt, label: "Bills", ready: false },
 ];
 
@@ -52,9 +51,24 @@ export function DashboardPage() {
         onWithdraw={() => navigate("/app/withdraw")}
       />
 
+      <Link
+        to="/app/transactions"
+        className="group flex min-h-[80px] w-full items-center gap-3 rounded-2xl border border-laupay-border bg-white px-4 py-3.5 shadow-card transition-all hover:border-laupay-indigo/40 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo active:scale-[0.99] sm:px-5"
+        aria-label="Open Transaction History"
+      >
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-laupay-indigo text-white shadow-sm">
+          <CreditCard size={21} strokeWidth={1.9} aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold text-laupay-ink sm:text-[15px]">Transaction History</span>
+          <span className="mt-0.5 block truncate text-xs text-laupay-ink-muted sm:text-sm">View all payments, transfers and withdrawals</span>
+        </span>
+        <ChevronRight size={20} className="shrink-0 text-laupay-indigo transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      </Link>
+
       <div>
         <h2 className="mb-3 text-sm font-semibold text-laupay-ink">Quick actions</h2>
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
           {QUICK_ACTIONS.map((action) => (
             <QuickAction key={action.label} {...action} />
           ))}
