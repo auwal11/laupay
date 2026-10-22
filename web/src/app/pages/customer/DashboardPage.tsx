@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle2, CreditCard, Receipt, Smartphone, Wallet, Wifi, X } from "lucide-react";
+import { CheckCircle2, CreditCard, History, Receipt, Smartphone, Wallet, Wifi, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { BalanceCard } from "@app/components/wallet/BalanceCard";
-import { TransactionList } from "@app/components/wallet/TransactionList";
 import { useAuth } from "@app/context/AuthContext";
 import { firstNameFrom } from "@app/lib/name";
 import { assetUrl } from "@app/lib/assets";
@@ -14,6 +13,7 @@ const QUICK_ACTIONS: { to: string; icon: LucideIcon; label: string; ready: boole
   { to: "/app/data", icon: Wifi, label: "Data", ready: true },
   { to: "/app/wallet", icon: Wallet, label: "Wallet", ready: true },
   { to: "/app/transactions", icon: CreditCard, label: "Payments", ready: true },
+  { to: "/app/transactions", icon: History, label: "Transactions", ready: true },
   { to: "/app/transactions", icon: Receipt, label: "Bills", ready: false },
 ];
 
@@ -61,15 +61,6 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-laupay-ink">Recent activity</h2>
-          <Link to="/app/transactions" className="text-sm font-medium text-laupay-indigo hover:underline">
-            See all
-          </Link>
-        </div>
-        <TransactionList limit={5} />
-      </div>
     </div>
   );
 }
