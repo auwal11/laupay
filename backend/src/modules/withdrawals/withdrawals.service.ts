@@ -59,7 +59,7 @@ export class WithdrawalsService {
 
   private async transition(adminId: string, id: string, from: WithdrawalStatus, to: WithdrawalStatus, action: string, reason: string, data: Prisma.WithdrawalUpdateInput) {
     if (!reason?.trim()) throw new BadRequestException('A reason is required');
-    const result = await this.prisma.withdrawal.updateMany({ where: { id, status: from }, data });
+    const result = await this.prisma.withdrawal.updateMany({ where: { id, status: from }, data: { ...data, status: to } });
     if (result.count !== 1) throw new ConflictException(`Withdrawal cannot move from ${from}`);
     await this.event(id, from, to, action, adminId, reason); await this.audit(adminId, id, { action, from, to, reason });
     const row = await this.prisma.withdrawal.findUniqueOrThrow({ where: { id } });

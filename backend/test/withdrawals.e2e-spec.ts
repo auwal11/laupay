@@ -8,6 +8,8 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { CreditsService } from '../src/modules/credits/credits.service';
 import { WithdrawalsService } from '../src/modules/withdrawals/withdrawals.service';
 
+process.env.WITHDRAWAL_BANKS_JSON = JSON.stringify([{ code: '058', name: 'GTBank' }]);
+
 async function registerVerified(
   server: App,
   prisma: PrismaService,
@@ -147,8 +149,8 @@ describe('Withdrawals (e2e)', () => {
       .set('Authorization', `Bearer ${session.accessToken}`)
       .send({ ...base, amount: 300, idempotencyKey: `wd-approve-${Date.now()}` })
       .expect(201);
-    const approved = await withdrawals.approve('admin-test', res.body.id);
-    expect(approved.status).toBe('PAID');
+    const approved = await withdrawals.approve('admin-test', res.body.id, 'Verified payout');
+    expect(approved.status).toBe('APPROVED');
     expect(await balance()).toBe(before - 300);
   });
 });

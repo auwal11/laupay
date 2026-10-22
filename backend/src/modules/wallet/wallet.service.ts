@@ -111,7 +111,6 @@ function mapWithdrawalStatus(status: WithdrawalStatus): string {
     case WithdrawalStatus.REJECTED:
     case WithdrawalStatus.FAILED:
     case WithdrawalStatus.REVERSED: return 'failed';
-    case WithdrawalStatus.REJECTED: return 'failed';
     default: return 'pending';
   }
 }
