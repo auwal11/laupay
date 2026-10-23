@@ -11,6 +11,7 @@ import {
   CircleAlert,
   ChartColumn,
   ArrowDownToLine,
+  LifeBuoy,
 } from "lucide-react";
 import { cn } from "@app/lib/cn";
 import { useAdminAuth } from "./AdminAuthContext";
@@ -27,6 +28,7 @@ const NAV = [
   { to: "/admin/reports", label: "Reports", icon: ChartColumn, end: false },
   { to: "/admin/audit", label: "Audit log", icon: ScrollText, end: false },
   { to: "/admin/settings", label: "Settings", icon: SettingsIcon, end: false },
+  { to: "/admin/support", label: "Support", icon: LifeBuoy, end: false },
 ];
 
 export function AdminLayout() {

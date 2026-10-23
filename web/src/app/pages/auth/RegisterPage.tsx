@@ -66,6 +66,7 @@ export function RegisterPage() {
         <p className="text-center text-xs text-laupay-ink-muted">LAUPAY · Ibrahim Lau Provision Shop</p>
       </form>}
       <p className="mt-6 border-t border-laupay-border pt-5 text-center text-sm text-laupay-ink-muted">Already have an account? <Link to="/login" className="font-medium text-laupay-indigo hover:underline">Log in</Link></p>
+      <p className="mt-3 text-center text-xs text-laupay-ink-muted">Registration problem? <Link to="/support" state={{ sourcePage: "/register", category: "REGISTRATION" }} className="font-semibold text-laupay-indigo underline">Report it to Support</Link></p>
     </AuthShell>
   );
 }

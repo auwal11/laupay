@@ -243,6 +243,18 @@ export const adminService = {
   },
 
   // ---- Reports ----
+  supportTickets(params: ListParams = {}) {
+    return adminRequest<any[]>(`/admin/support/tickets${buildQuery(params)}`);
+  },
+
+  supportTicket(id: string) {
+    return adminRequest<any>(`/admin/support/tickets/${id}`);
+  },
+
+  updateSupportTicket(id: string, body: Record<string, unknown>) {
+    return adminRequest<any>(`/admin/support/tickets/${id}`, { method: "POST", body });
+  },
+
   report(from?: string, to?: string): Promise<ApiResult<AdminReport>> {
     return adminRequest<AdminReport>(`/admin/reports/summary${buildQuery({ from, to })}`);
   },

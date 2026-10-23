@@ -23,6 +23,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { BeneficiariesModule } from './modules/beneficiaries/beneficiaries.module';
 import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
 import { RiskModule } from './modules/risk/risk.module';
+import { SupportModule } from './modules/support/support.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 @Module({
@@ -31,6 +32,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     PrismaModule,
     SettingsModule,
     RiskModule,
+    SupportModule,
     ScheduleModule.forRoot(),
     // Global default rate limit; specific routes (auth, webhooks) apply
     // stricter limits via @Throttle(...) — see security-model.md §4.

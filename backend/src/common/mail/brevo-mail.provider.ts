@@ -41,6 +41,10 @@ export class BrevoMailProvider implements MailProvider {
     await this.send(to, fullName, welcomeEmail(fullName), 'welcome');
   }
 
+  async sendSupportNotification({ to, subject, html }: { to: string; subject: string; html: string }): Promise<void> {
+    await this.send(to, 'LAUPAY Support', { subject, html }, 'support notification');
+  }
+
   /**
    * Single send path for every message: one place for the sender identity,
    * the allow-list handling and the "never leak a raw provider error" rule.

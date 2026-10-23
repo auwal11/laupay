@@ -103,6 +103,9 @@ export function LoginPage() {
           Create account
         </Link>
       </div>
+      <p className="mt-4 text-center text-xs text-laupay-ink-muted">
+        Having trouble logging in? <Link to="/support" state={{ sourcePage: "/login", category: "LOGIN" }} className="font-semibold text-laupay-indigo underline">Contact Support</Link>
+      </p>
     </AuthShell>
   );
 }

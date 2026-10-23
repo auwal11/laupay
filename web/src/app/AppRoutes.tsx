@@ -38,6 +38,8 @@ import { AdminSettingsPage } from '@app/pages/admin/AdminSettingsPage';
 import { AdminDisputesPage } from '@app/pages/admin/AdminDisputesPage';
 import { AdminWithdrawalsPage } from '@app/pages/admin/AdminWithdrawalsPage';
 import { AdminWithdrawalDetailPage } from '@app/pages/admin/AdminWithdrawalDetailPage';
+import { AdminSupportPage } from '@app/pages/admin/AdminSupportPage';
+import { SupportPage } from '@app/pages/support/SupportPage';
 import { AdminLayout } from '@app/admin/AdminLayout';
 import { AdminProtectedRoute } from '@app/admin/AdminProtectedRoute';
 
@@ -60,6 +62,7 @@ export const appRoutes = (
     <Route path="/reset-password" element={<ResetPasswordPage />} />
     <Route path="/terms" element={<TermsPage />} />
     <Route path="/privacy" element={<PrivacyPage />} />
+    <Route path="/support" element={<SupportPage />} />
     <Route path="/register-success" element={<ProtectedRoute><RegisterSuccessPage /></ProtectedRoute>} />
     <Route path="/setup-pin" element={<ProtectedRoute><SetupPinPage /></ProtectedRoute>} />
     <Route
@@ -81,6 +84,7 @@ export const appRoutes = (
       <Route path="security" element={<SecurityPage />} />
       <Route path="beneficiaries" element={<BeneficiariesPage />} />
       <Route path="withdraw" element={<WithdrawPage />} />
+      <Route path="support" element={<SupportPage />} />
     </Route>
 
     {/* Admin console — its own session, isolated from the customer app. */}
@@ -108,6 +112,7 @@ export const appRoutes = (
       <Route path="reports" element={<AdminReportsPage />} />
       <Route path="audit" element={<AdminAuditPage />} />
       <Route path="settings" element={<AdminSettingsPage />} />
+      <Route path="support" element={<AdminSupportPage />} />
     </Route>
   </>
 );

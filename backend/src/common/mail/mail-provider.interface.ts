@@ -16,6 +16,7 @@ export interface MailProvider {
   sendPasswordReset(message: { to: string; fullName: string; resetUrl: string }): Promise<void>;
   /** Optional, best-effort: sent once the account is activated. */
   sendWelcome(message: { to: string; fullName: string }): Promise<void>;
+  sendSupportNotification(message: { to: string; subject: string; html: string }): Promise<void>;
 }
 
 export const MAIL_PROVIDER = Symbol('MAIL_PROVIDER');

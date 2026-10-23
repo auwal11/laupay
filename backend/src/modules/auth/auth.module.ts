@@ -28,6 +28,6 @@ const mailProviderFactory = {
   imports: [JwtModule.register({}), CreditsModule],
   controllers: [AuthController],
   providers: [AuthService, OtpService, PasswordHasher, ProfileStorageService, mailProviderFactory],
-  exports: [PasswordHasher, AuthService],
+  exports: [PasswordHasher, AuthService, MAIL_PROVIDER],
 })
 export class AuthModule {}

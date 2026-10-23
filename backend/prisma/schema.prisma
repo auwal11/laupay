@@ -196,6 +196,10 @@ model User {
   beneficiaries         Beneficiary[]
   virtualAccount        VirtualAccount?
   withdrawals           Withdrawal[]
+  supportTickets        SupportTicket[] @relation("SupportReporter")
+  assignedSupportTickets SupportTicket[] @relation("SupportAssignee")
+  supportMessages       SupportMessage[] @relation("SupportMessageAuthor")
+  supportEvents         SupportEvent[] @relation("SupportEventActor")
 
   createdAt DateTime @default(now())
 
@@ -726,6 +730,79 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+// ============================================================
+// TECHNICAL SUPPORT
+// ============================================================
+
+/// Customer support issues. A ticket may be created before login, so userId
+/// is nullable; anonymous access is protected by a high-entropy token hash.
+model SupportTicket {
+  id                  String   @id @default(uuid())
+  ticketNumber        String   @unique
+  trackingTokenHash   String?  @unique
+  userId              String?
+  user                User?    @relation("SupportReporter", fields: [userId], references: [id], onDelete: SetNull)
+  contactEmail        String
+  contactName         String?
+  category            String
+  subject             String
+  description         String
+  status              String   @default("open")
+  priority            String   @default("normal")
+  sourcePage          String?
+  sourceUrl           String?
+  relatedTransactionId String?
+  transactionReference String?
+  errorCode           String?
+  attachmentMetadata  Json?
+  assignedAdminId     String?
+  assignedAdmin       User?    @relation("SupportAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  adminNotes          String?
+  resolutionSummary   String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  firstResponseAt     DateTime?
+  resolvedAt          DateTime?
+  closedAt            DateTime?
+
+  messages SupportMessage[]
+  events   SupportEvent[]
+
+  @@index([userId, createdAt])
+  @@index([status, priority, createdAt])
+  @@index([contactEmail, createdAt])
+}
+
+model SupportMessage {
+  id         String @id @default(uuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorType String // customer | admin | system
+  authorId   String?
+  author     User? @relation("SupportMessageAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  body       String
+  internal   Boolean @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model SupportEvent {
+  id         String @id @default(uuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User? @relation("SupportEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  fromStatus String?
+  toStatus   String?
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId, createdAt])
 }
 
 // ============================================================

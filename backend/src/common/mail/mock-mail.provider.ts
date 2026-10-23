@@ -22,6 +22,10 @@ export class MockMailProvider implements MailProvider {
     this.logger.debug(`[mock-mail] welcome email for ${to}`);
   }
 
+  async sendSupportNotification({ to, subject }: { to: string; subject: string; html: string }): Promise<void> {
+    this.logger.debug(`[mock-mail] support notification ${subject} for ${to}`);
+  }
+
   /** Last code sent to an address — used by the E2E suite. */
   static lastCodeFor(to: string): string | undefined {
     return [...MockMailProvider.sent].reverse().find((m) => m.to === to)?.code;

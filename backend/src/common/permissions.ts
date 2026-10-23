@@ -29,6 +29,8 @@ export const ALL_PERMISSIONS = [
   'reports.read',
   'risk.read',
   'risk.manage',
+  'support.read',
+  'support.manage',
   'admins.manage',
 ] as const;
 
@@ -55,6 +57,8 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'settings.read',
     'reports.read',
     'risk.read',
+    'support.read',
+    'support.manage',
   ],
   SUPPORT: [
     'overview.read',
@@ -72,6 +76,8 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'audit.read',
     'reports.read',
     'risk.read',
+    'support.read',
+    'support.manage',
   ],
   VIEWER: [...READ_ONLY],
 };

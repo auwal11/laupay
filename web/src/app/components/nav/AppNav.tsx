@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import {
   Home,
   LayoutDashboard,
+  LifeBuoy,
   PanelLeftClose,
   PanelLeftOpen,
   Receipt,
@@ -36,6 +37,7 @@ const CUSTOMER_ITEMS: NavItem[] = [
   { to: "/app/transactions", label: "Transactions", icon: Receipt },
   { to: "/app/security", label: "Security", icon: ShieldCheck },
   { to: "/app/profile", label: "Profile", icon: User },
+  { to: "/app/support", label: "Help & Support", icon: LifeBuoy },
 ];
 
 const AGENT_ITEMS: NavItem[] = [
@@ -45,6 +47,7 @@ const AGENT_ITEMS: NavItem[] = [
   { to: "/app/data", label: "Data", icon: Wifi },
   { to: "/app/transactions", label: "Transactions", icon: Receipt },
   { to: "/app/profile", label: "Profile", icon: User },
+  { to: "/app/support", label: "Help & Support", icon: LifeBuoy },
 ];
 
 const COLLAPSED_WIDTH = 76;
