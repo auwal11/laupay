@@ -16,12 +16,64 @@ function mask(value: string) { return value.length > 4 ? `••••${value.sl
 export class WithdrawalsService {
   constructor(private readonly prisma: PrismaService, private readonly ledger: LedgerService, private readonly security: SecurityService, private readonly notifications: NotificationsService, private readonly config: AppConfigService) {}
 
-  listBanks() { return this.config.withdrawalBanks; }
+  private cachedBanks?: { banks: Array<{ code: string; name: string }>; expiresAt: number };
+  private cachedToken?: { token: string; expiresAt: number };
+
+  /**
+   * Authoritative bank directory. Prefers WITHDRAWAL_BANKS_JSON when an ops
+   * team pins it; otherwise reads the configured provider's bank list and
+   * caches it for an hour. Withdrawals stay disabled when neither source is
+   * available rather than showing an unverified hard-coded directory.
+   */
+  async listBanks() {
+    if (this.config.withdrawalBanks.length) return this.config.withdrawalBanks;
+    if (this.cachedBanks && this.cachedBanks.expiresAt > Date.now()) return this.cachedBanks.banks;
+    if (!this.config.monnifyApiKey || !this.config.monnifySecretKey) return [];
+
+    try {
+      const token = await this.monnifyToken();
+      const response = await fetch(`${this.config.monnifyBaseUrl.replace(/\/$/, '')}/api/v1/banks`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'LAUPAY/1.0 (+https://laupay.app)',
+        },
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        requestSuccessful?: boolean;
+        responseBody?: Array<{ code?: string; name?: string }>;
+      };
+      const banks = (body.responseBody ?? [])
+        .filter((bank): bank is { code: string; name: string } => !!bank.code && !!bank.name)
+        .map((bank) => ({ code: bank.code, name: bank.name }));
+      if (!response.ok || !body.requestSuccessful || banks.length === 0) return [];
+      this.cachedBanks = { banks, expiresAt: Date.now() + 60 * 60 * 1000 };
+      return banks;
+    } catch {
+      return [];
+    }
+  }
+
+  private async monnifyToken(): Promise<string> {
+    if (this.cachedToken && this.cachedToken.expiresAt > Date.now() + 30_000) return this.cachedToken.token;
+    const credentials = Buffer.from(`${this.config.monnifyApiKey}:${this.config.monnifySecretKey}`).toString('base64');
+    const response = await fetch(`${this.config.monnifyBaseUrl.replace(/\/$/, '')}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${credentials}`, 'Content-Type': 'application/json', 'User-Agent': 'LAUPAY/1.0 (+https://laupay.app)' },
+      body: JSON.stringify({}),
+    });
+    const body = (await response.json().catch(() => ({}))) as { responseBody?: { accessToken?: string } };
+    const token = body.responseBody?.accessToken;
+    if (!response.ok || !token) throw new Error('Monnify auth failed');
+    this.cachedToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
+    return token;
+  }
 
   async request(userId: string, dto: RequestWithdrawalDto) {
     if (this.config.fulfillmentMode === 'live') throw new ServiceUnavailableException('Withdrawals are unavailable until a verified payout provider is configured');
-    const bank = this.config.withdrawalBanks.find((item) => item.code === dto.bankCode || item.name.toLowerCase() === dto.bankName.trim().toLowerCase());
-    if (!this.config.withdrawalBanks.length) throw new ServiceUnavailableException('Bank directory is temporarily unavailable');
+    const banks = await this.listBanks();
+    const bank = banks.find((item) => item.code === dto.bankCode || item.name.toLowerCase() === dto.bankName.trim().toLowerCase());
+    if (!banks.length) throw new ServiceUnavailableException('Bank directory is temporarily unavailable');
     if (!bank) throw new BadRequestException('Select a supported bank from the bank directory');
     const existing = await this.prisma.withdrawal.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
     if (existing) { if (existing.userId !== userId) throw new ConflictException('Invalid idempotency key'); return this.toView(existing); }
