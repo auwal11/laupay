@@ -329,6 +329,30 @@ export function AdminUserDetailPage() {
                   Freeze wallet
                 </Button>
               )}
+              {user.walletAccount.status === "ACTIVE" && Number(user.walletAccount.balance) > 0 && (
+                <Button
+                  className="mt-2"
+                  variant="danger"
+                  disabled={busy}
+                  onClick={() =>
+                    setPending({
+                      title: "Debit entire wallet balance",
+                      description: `This will debit the current available balance of ${formatNaira(user.walletAccount!.balance)} through the ledger. The balance is re-read and verified on the server. This cannot be undone except through a separately authorized ledger reversal.`,
+                      confirmLabel: "Debit entire balance",
+                      danger: true,
+                      requireToken: "DEBIT ALL",
+                      run: (reason) =>
+                        adminService.debitWalletBalance({
+                          userId: id,
+                          reason,
+                          idempotencyKey: crypto.randomUUID(),
+                        }),
+                    })
+                  }
+                >
+                  Debit entire balance
+                </Button>
+              )}
             </div>
           )}
         </Card>

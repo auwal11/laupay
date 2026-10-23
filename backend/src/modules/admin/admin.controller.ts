@@ -20,6 +20,7 @@ import { AdminOpsService, AdminActor } from './admin-ops.service';
 import {
   AuditListQueryDto,
   CreditTestFundsDto,
+  WalletDebitBalanceDto,
   OrderListQueryDto,
   TransactionListQueryDto,
   UpdateSettingsDto,
@@ -231,6 +232,17 @@ export class AdminController {
     @Req() req: Request,
   ) {
     return this.ops.debitWallet(dto.userId, dto.amount, dto.reason, dto.note, this.actor(user, req), dto.idempotencyKey);
+  }
+
+  @Post('wallets/debit-balance')
+  @RequirePermissions('wallets.adjust')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  debitWalletBalance(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: WalletDebitBalanceDto,
+    @Req() req: Request,
+  ) {
+    return this.ops.debitWalletBalance(dto.userId, dto.reason, dto.note, this.actor(user, req), dto.idempotencyKey);
   }
 
   @Post('ledger/:id/reverse')

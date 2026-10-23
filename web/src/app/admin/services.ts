@@ -92,6 +92,13 @@ export const adminService = {
     );
   },
 
+  debitWalletBalance(body: { userId: string; reason: string; note?: string; idempotencyKey?: string }) {
+    return adminRequest<{ entryId: string; balanceAfter: string; wasAlreadyApplied: boolean }>(
+      "/admin/wallets/debit-balance",
+      { method: "POST", body },
+    );
+  },
+
   reverseEntry(id: string, reason: string) {
     return adminRequest(`/admin/ledger/${id}/reverse`, { method: "POST", body: { reason } });
   },

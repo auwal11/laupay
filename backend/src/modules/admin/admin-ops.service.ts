@@ -381,6 +381,13 @@ export class AdminOpsService {
     return entry;
   }
 
+  async debitWalletBalance(userId: string, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey?: string) {
+    const wallet = await this.walletFor(userId);
+    const amount = Number(wallet.balance);
+    if (!(amount > 0)) throw new BadRequestException('This wallet has no available balance to debit');
+    return this.debitWallet(userId, amount, reason, note, actor, idempotencyKey);
+  }
+
   async reverseEntry(entryId: string, reason: string, actor: AdminActor) {
     this.requireReason(reason);
     const original = await this.prisma.ledgerEntry.findUnique({

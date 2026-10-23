@@ -157,6 +157,20 @@ export class WalletCreditDto extends ReasonDto {
 
 export class WalletDebitDto extends WalletCreditDto {}
 
+export class WalletDebitBalanceDto extends ReasonDto {
+  @IsUUID()
+  userId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
+}
+
 export class ReverseEntryDto extends ReasonDto {}
 
 export class OrderReasonDto extends ReasonDto {}
