@@ -56,10 +56,13 @@ export class AppConfigService {
   readonly paystackWebhookSecret = this.requiredIf(this.paystackEnabled, 'PAYSTACK_WEBHOOK_SECRET');
 
   readonly monnifyEnabled = this.paymentProvider === 'monnify';
-  readonly monnifyApiKey = this.requiredIf(this.monnifyEnabled, 'MONNIFY_API_KEY');
-  readonly monnifySecretKey = this.requiredIf(this.monnifyEnabled, 'MONNIFY_SECRET_KEY');
+  // Monnify reserved accounts run alongside Paystack checkout, so these keys
+  // must load even when PAYMENT_PROVIDER=paystack. They are only mandatory
+  // when Monnify itself is the checkout provider.
+  readonly monnifyApiKey = this.monnifyEnabled ? required('MONNIFY_API_KEY') : optional('MONNIFY_API_KEY', '');
+  readonly monnifySecretKey = this.monnifyEnabled ? required('MONNIFY_SECRET_KEY') : optional('MONNIFY_SECRET_KEY', '');
   readonly monnifyBaseUrl = optional('MONNIFY_BASE_URL', 'https://sandbox.monnify.com');
-  readonly monnifyContractCode = this.requiredIf(this.monnifyEnabled, 'MONNIFY_CONTRACT_CODE');
+  readonly monnifyContractCode = this.monnifyEnabled ? required('MONNIFY_CONTRACT_CODE') : optional('MONNIFY_CONTRACT_CODE', '');
   /**
    * Reserved (virtual) accounts are created independently of PAYMENT_PROVIDER,
    * so the Monnify keys are read even when Paystack handles checkout. In
