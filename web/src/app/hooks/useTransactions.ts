@@ -19,12 +19,19 @@ export function useTransactions(): AsyncState<Transaction[]> {
       }
     });
     void load();
-    // Orders can move from confirming to a terminal provider result after the
-    // initial ledger read. Refresh while this screen is open so status pills
-    // and debit totals reflect the backend ledger without a manual reload.
-    const refresh = window.setInterval(() => { void load(); }, 15000);
+    // Withdrawals and orders can move through several backend-controlled
+    // states after the initial ledger read. Refresh while this screen is open
+    // and when the customer returns to the tab so the history reflects admin
+    // actions without requiring a manual reload.
+    const refreshOnFocus = () => void load();
+    const refreshOnVisible = () => { if (document.visibilityState === "visible") void load(); };
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnVisible);
+    const refresh = window.setInterval(() => { void load(); }, 8000);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnVisible);
       window.clearInterval(refresh);
     };
   }, []);

@@ -6,6 +6,7 @@ type Status = TransactionState;
 const STATUS_STYLES: Record<Status, string> = {
   created: "bg-indigo-50 text-laupay-indigo-soft",
   pending: "bg-amber-50 text-laupay-pending",
+  approved: "bg-indigo-50 text-laupay-indigo-soft",
   auth_required: "bg-amber-50 text-laupay-pending",
   processing: "bg-indigo-50 text-laupay-indigo-soft",
   success: "bg-green-50 text-laupay-success",
@@ -19,6 +20,7 @@ const STATUS_STYLES: Record<Status, string> = {
 const STATUS_LABEL: Record<Status, string> = {
   created: "Created",
   pending: "Pending",
+  approved: "Approved",
   auth_required: "Verification needed",
   processing: "Processing",
   success: "Successful",

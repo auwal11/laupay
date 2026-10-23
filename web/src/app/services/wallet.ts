@@ -149,6 +149,7 @@ function mapTransactionStatus(status?: string): Transaction["status"] {
     case "FAILED":
     case "CANCELLED": return "failed";
     case "REFUNDED": return "refunded";
+    case "APPROVED": return "approved";
     case "FULFILLMENT_UNKNOWN":
     case "UNKNOWN": return "unknown";
     case "FULFILLING":

@@ -10,6 +10,7 @@
 export type TransactionState =
   | "created"
   | "pending"
+  | "approved"
   | "auth_required"
   | "processing"
   | "success"
