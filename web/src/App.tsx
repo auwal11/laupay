@@ -11,6 +11,8 @@ import {
   Database,
   Globe2,
   LockKeyhole,
+  Mail,
+  MapPin,
   Menu,
   Moon,
   MoveRight,
@@ -801,10 +803,24 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
       </main>
 
       <footer className="bg-[#11142A] py-10 text-white">
-        <div className="section-shell flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
-          <div className="flex items-center gap-2.5"><FlowMark inverse /><span className="font-display text-[17px] font-extrabold tracking-[-.06em]">LAUPAY</span></div>
-          <div className="flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-bold text-white/45"><a className="hover:text-white" href="#services">Services</a><a className="hover:text-white" href="#security">Security</a><a className="hover:text-white" href="#future">Our horizon</a><a href={`${CUSTOMER_APP_ORIGIN}/login`} className="hover:text-white">Login</a></div>
-           <p className="text-[10px] font-semibold text-white/30">
+        <div className="section-shell grid gap-9 md:grid-cols-[1.1fr_.9fr_.9fr] md:gap-12">
+          <div>
+            <div className="flex items-center gap-2.5"><FlowMark inverse /><span className="font-display text-[17px] font-extrabold tracking-[-.06em]">LAUPAY</span></div>
+            <p className="mt-4 max-w-xs text-sm leading-6 text-white/55">Simple digital services for everyday life, operated by Ibrahim Lau Provision Shop.</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-extrabold uppercase tracking-[.16em] text-[#F4B33F]">Explore</p>
+            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-bold text-white/45"><a className="hover:text-white" href="#services">Services</a><a className="hover:text-white" href="#security">Security</a><a className="hover:text-white" href="#future">Our horizon</a><a href={`${CUSTOMER_APP_ORIGIN}/login`} className="hover:text-white">Login</a></div>
+          </div>
+          <div>
+            <p className="text-[11px] font-extrabold uppercase tracking-[.16em] text-[#F4B33F]">Contact us</p>
+            <div className="mt-4 flex flex-col gap-3 text-sm text-white/65">
+              <a href="mailto:support.laupay@gmail.com" className="flex items-start gap-2.5 transition-colors hover:text-white"><Mail size={16} className="mt-0.5 shrink-0 text-[#F4B33F]" aria-hidden="true" /><span>support.laupay@gmail.com</span></a>
+              <a href="tel:+2347045648248" className="flex items-start gap-2.5 transition-colors hover:text-white"><Phone size={16} className="mt-0.5 shrink-0 text-[#F4B33F]" aria-hidden="true" /><span>0704 564 8248</span></a>
+              <div className="flex items-start gap-2.5"><MapPin size={16} className="mt-0.5 shrink-0 text-[#F4B33F]" aria-hidden="true" /><span>33 Palace Way, Jalingo</span></div>
+            </div>
+          </div>
+          <p className="text-[10px] font-semibold text-white/30 md:col-span-3">
             © 2026 LAUPAY — a service of Ibrahim Lau Provision Shop
           </p>
         </div>
