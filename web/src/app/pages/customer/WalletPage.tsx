@@ -65,8 +65,56 @@ export function WalletPage() {
 function WithdrawalHistory() {
   const [rows, setRows] = useState<import("@app/types/withdrawals").Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { void withdrawals.list().then((result) => { if (result.ok) setRows(result.data); setLoading(false); }); }, []);
-  return <div><h2 className="mb-3 text-sm font-semibold text-laupay-ink">Withdrawal history</h2>{loading ? <Skeleton className="h-16 w-full" /> : rows.length === 0 ? <p className="rounded-xl border border-dashed border-laupay-border bg-white p-4 text-sm text-laupay-ink-muted">No withdrawal requests yet.</p> : <div className="space-y-2">{rows.slice(0, 5).map((row) => <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-laupay-border bg-white p-4"><div><p className="font-medium text-laupay-ink">{row.bankName} · {row.accountNumber}</p><p className="text-xs text-laupay-ink-muted">{row.reference} · {new Date(row.createdAt).toLocaleString("en-NG")}</p></div><div className="text-right"><p className="font-semibold text-laupay-ink">{formatNaira(row.amount)}</p><span className="text-xs font-semibold uppercase tracking-wide text-laupay-pending">{row.status.replace(/_/g, " ")}</span>{row.refundAmount !== "0.00" && <p className="text-xs text-laupay-success">Refunded {formatNaira(row.refundAmount ?? "0")}</p>}</div></div>)}</div>}</div>;
+  const load = useCallback(async () => {
+    const result = await withdrawals.list();
+    if (result.ok) setRows(result.data);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const refreshOnFocus = () => void load();
+    window.addEventListener("focus", refreshOnFocus);
+    const interval = window.setInterval(() => {
+      if (rows.some((row) => ["PENDING", "APPROVED", "PROCESSING", "REFUND_PENDING"].includes(row.status))) {
+        void load();
+      }
+    }, 8000);
+    return () => {
+      window.removeEventListener("focus", refreshOnFocus);
+      window.clearInterval(interval);
+    };
+  }, [load, rows]);
+
+  return <div><h2 className="mb-3 text-sm font-semibold text-laupay-ink">Withdrawal history</h2>{loading ? <Skeleton className="h-16 w-full" /> : rows.length === 0 ? <p className="rounded-xl border border-dashed border-laupay-border bg-white p-4 text-sm text-laupay-ink-muted">No withdrawal requests yet.</p> : <div className="space-y-2">{rows.slice(0, 5).map((row) => <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-laupay-border bg-white p-4"><div><p className="font-medium text-laupay-ink">{row.bankName} · {row.accountNumber}</p><p className="text-xs text-laupay-ink-muted">{row.reference} · {new Date(row.createdAt).toLocaleString("en-NG")}</p></div><div className="text-right"><p className="font-semibold text-laupay-ink">{formatNaira(row.amount)}</p><WithdrawalStatusBadge status={row.status} />{row.refundAmount !== "0.00" && <p className="text-xs text-laupay-success">Refunded {formatNaira(row.refundAmount ?? "0")}</p>}</div></div>)}</div>}</div>;
+}
+
+function WithdrawalStatusBadge({ status }: { status: import("@app/types/withdrawals").WithdrawalStatus }) {
+  const styles: Record<string, string> = {
+    PENDING: "bg-laupay-amber/20 text-laupay-pending",
+    APPROVED: "bg-laupay-indigo/10 text-laupay-indigo",
+    PROCESSING: "bg-laupay-indigo/10 text-laupay-indigo",
+    SUCCESSFUL: "bg-laupay-success/10 text-laupay-success",
+    REFUNDED: "bg-laupay-success/10 text-laupay-success",
+    REFUND_PENDING: "bg-laupay-amber/20 text-laupay-pending",
+    FAILED: "bg-red-50 text-red-700",
+    REJECTED: "bg-red-50 text-red-700",
+    REVERSED: "bg-red-50 text-red-700",
+    REFUND_FAILED: "bg-red-50 text-red-700",
+  };
+  const labels: Record<string, string> = {
+    PENDING: "Pending",
+    APPROVED: "Approved",
+    PROCESSING: "Processing",
+    SUCCESSFUL: "Successful",
+    REFUNDED: "Refunded",
+    REFUND_PENDING: "Refund pending",
+    FAILED: "Failed",
+    REJECTED: "Rejected",
+    REVERSED: "Reversed",
+    REFUND_FAILED: "Refund failed",
+  };
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status] ?? "bg-slate-100 text-slate-700"}`}>{labels[status] ?? status}</span>;
 }
 
 function DepositPanel({ onDone }: { onDone: () => void }) {

@@ -23,4 +23,8 @@ export const withdrawalsService = {
   async list(): Promise<ApiResult<Withdrawal[]>> {
     return request<Withdrawal[]>("/withdrawals");
   },
+
+  async detail(id: string): Promise<ApiResult<Withdrawal>> {
+    return request<Withdrawal>(`/withdrawals/${encodeURIComponent(id)}`);
+  },
 };

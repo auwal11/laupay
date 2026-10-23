@@ -388,6 +388,37 @@ export function WithdrawPage() {
 
 function WithdrawalPending({ withdrawal }: { withdrawal: Withdrawal }) {
   const navigate = useNavigate();
+  const [current, setCurrent] = useState(withdrawal);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const result = await withdrawals.detail(withdrawal.id);
+      if (!cancelled && result.ok) setCurrent(result.data);
+    };
+    void load();
+    const interval = window.setInterval(load, 8000);
+    window.addEventListener("focus", load);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", load);
+    };
+  }, [withdrawal.id]);
+
+  const statusCopy: Record<string, { title: string; message: string; tone: string }> = {
+    PENDING: { title: "Withdrawal pending", message: "Your request has been received and is awaiting admin review.", tone: "bg-laupay-amber/15 text-laupay-pending" },
+    APPROVED: { title: "Withdrawal approved", message: "Your request was approved and is queued for processing.", tone: "bg-laupay-indigo/10 text-laupay-indigo" },
+    PROCESSING: { title: "Withdrawal processing", message: "Your bank payout is being processed. We will update this screen when it is confirmed.", tone: "bg-laupay-indigo/10 text-laupay-indigo" },
+    SUCCESSFUL: { title: "Withdrawal successful", message: "Your bank payout has been confirmed.", tone: "bg-laupay-success/10 text-laupay-success" },
+    REFUNDED: { title: "Withdrawal refunded", message: "The withdrawal did not complete and the reserved amount has been returned to your wallet.", tone: "bg-laupay-success/10 text-laupay-success" },
+    REFUND_PENDING: { title: "Refund pending", message: "Your withdrawal failed and the wallet refund is being processed.", tone: "bg-laupay-amber/15 text-laupay-pending" },
+    FAILED: { title: "Withdrawal failed", message: current.failureReason ?? "The bank payout could not be completed.", tone: "bg-red-50 text-red-700" },
+    REJECTED: { title: "Withdrawal rejected", message: current.failureReason ?? "The withdrawal request was rejected.", tone: "bg-red-50 text-red-700" },
+    REVERSED: { title: "Withdrawal reversed", message: "The payout was reversed. Check your wallet for the returned funds.", tone: "bg-red-50 text-red-700" },
+    REFUND_FAILED: { title: "Refund needs attention", message: current.failureReason ?? "The wallet refund could not be completed yet.", tone: "bg-red-50 text-red-700" },
+  };
+  const copy = statusCopy[current.status] ?? statusCopy.PENDING;
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 pb-6">
       <Link
@@ -399,48 +430,47 @@ function WithdrawalPending({ withdrawal }: { withdrawal: Withdrawal }) {
 
       <Card className="rounded-2xl p-6">
         <div className="flex items-start gap-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-laupay-amber/15 text-laupay-pending">
+          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${copy.tone}`}>
             <Clock3 size={22} />
           </span>
           <div>
             <h1 className="font-display text-xl font-semibold text-laupay-ink">
-              Withdrawal pending
+              {copy.title}
             </h1>
             <p className="mt-1 text-sm text-laupay-ink-muted">
-              Your request has been received and is awaiting review. We'll notify you when it is
-              processed.
+              {copy.message}
             </p>
           </div>
         </div>
 
         <p className="mt-5 font-display text-4xl font-semibold tabular-nums text-laupay-ink">
-          {formatNaira(withdrawal.amount)}
+          {formatNaira(current.amount)}
         </p>
 
         <dl className="mt-4 divide-y divide-laupay-border rounded-xl border border-laupay-border px-4 text-sm">
           <div className="flex items-center justify-between gap-4 py-3">
             <dt className="text-laupay-ink-muted">Bank</dt>
-            <dd className="font-medium text-laupay-ink">{withdrawal.bankName}</dd>
+            <dd className="font-medium text-laupay-ink">{current.bankName}</dd>
           </div>
           <div className="flex items-center justify-between gap-4 py-3">
             <dt className="text-laupay-ink-muted">Account</dt>
             <dd className="font-medium tabular-nums text-laupay-ink">
-              {maskAccount(withdrawal.accountNumber)}
+              {current.accountNumber}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-4 py-3">
             <dt className="text-laupay-ink-muted">Account name</dt>
-            <dd className="text-right font-medium text-laupay-ink">{withdrawal.accountName}</dd>
+            <dd className="text-right font-medium text-laupay-ink">{current.accountName}</dd>
           </div>
           <div className="flex items-center justify-between gap-4 py-3">
             <dt className="text-laupay-ink-muted">Reference</dt>
-            <dd className="font-mono text-xs text-laupay-ink">{withdrawal.reference}</dd>
+            <dd className="font-mono text-xs text-laupay-ink">{current.reference}</dd>
           </div>
           <div className="flex items-center justify-between gap-4 py-3">
             <dt className="text-laupay-ink-muted">Status</dt>
             <dd>
-              <span className="inline-flex rounded-full bg-laupay-amber/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-laupay-pending">
-                Pending
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${copy.tone}`}>
+                {current.status.replace(/_/g, " ")}
               </span>
             </dd>
           </div>
@@ -461,8 +491,9 @@ function WithdrawalPending({ withdrawal }: { withdrawal: Withdrawal }) {
         </div>
 
         <p className="mt-4 text-xs leading-relaxed text-laupay-ink-muted">
-          The amount remains reserved from your available balance while your request is pending
-          review. We will notify you when the status changes.
+          {current.status === "PENDING" || current.status === "APPROVED" || current.status === "PROCESSING"
+            ? "This page refreshes automatically while your withdrawal is being reviewed or processed."
+            : "Your withdrawal status is based on the latest confirmed update from LAUPAY."}
         </p>
       </Card>
     </div>
