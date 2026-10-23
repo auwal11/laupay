@@ -26,7 +26,14 @@ export function AdminWithdrawalDetailPage() {
     if (reason.trim().length < 3) { setError("Enter a clear reason before continuing."); return; }
     if (action === "successful" && (!providerReference.trim() || !evidence.trim())) { setError("Provider reference and verification evidence are required before marking successful."); return; }
     setBusy(true); setError(null);
-    const result = await adminService.withdrawalAction(id, action, { reason: reason.trim(), providerReference: providerReference.trim(), evidence: evidence.trim() });
+    const body: Record<string, string> = { reason: reason.trim() };
+    // The API intentionally rejects fields that do not belong to an action.
+    // Provider evidence is only valid when confirming a verified payout.
+    if (action === "successful") {
+      body.providerReference = providerReference.trim();
+      body.evidence = evidence.trim();
+    }
+    const result = await adminService.withdrawalAction(id, action, body);
     setBusy(false);
     if (!result.ok) { setError(result.error.message); return; }
     setAction(null); setReason(""); state.reload();
