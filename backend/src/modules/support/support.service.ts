@@ -76,13 +76,14 @@ export class SupportService {
 
   async adminList(query: { search?: string; status?: string; category?: string; priority?: string }) {
     const rows = await (this.prisma as any).supportTicket.findMany({ where: { ...(query.status ? { status: query.status } : {}), ...(query.category ? { category: query.category } : {}), ...(query.priority ? { priority: query.priority } : {}), ...(query.search ? { OR: [{ ticketNumber: { contains: query.search, mode: 'insensitive' } }, { subject: { contains: query.search, mode: 'insensitive' } }, { contactEmail: { contains: query.search, mode: 'insensitive' } }, { transactionReference: { contains: query.search, mode: 'insensitive' } }] } : {}) }, orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 100, include: { user: { select: { id: true, fullName: true, email: true } }, assignedAdmin: { select: { id: true, fullName: true, email: true } } } });
-    return rows;
+    return rows.map(({ trackingTokenHash, ...row }: any) => row);
   }
 
   async adminGet(id: string) {
     const row = await (this.prisma as any).supportTicket.findUnique({ where: { id }, include: { user: { select: { id: true, fullName: true, email: true } }, assignedAdmin: { select: { id: true, fullName: true, email: true } }, messages: { orderBy: { createdAt: 'asc' } }, events: { orderBy: { createdAt: 'asc' } } } });
     if (!row) throw new NotFoundException('Support ticket not found');
-    return row;
+    const { trackingTokenHash, ...safe } = row;
+    return safe;
   }
 
   async adminUpdate(id: string, adminId: string, dto: AdminSupportUpdateDto) {
