@@ -5,11 +5,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SupportController } from './support.controller';
+import { AdminSupportController } from './admin-support.controller';
 import { SupportService } from './support.service';
 
 @Module({
   imports: [JwtModule.register({}), AuthModule, NotificationsModule],
-  controllers: [SupportController],
+  controllers: [SupportController, AdminSupportController],
   providers: [SupportService, PermissionsGuard, RolesGuard],
 })
 export class SupportModule {}

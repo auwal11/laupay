@@ -1,12 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { UserRole } from '@prisma/client';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { AdminSupportUpdateDto, CreateSupportTicketDto, SupportListQueryDto, SupportMessageDto } from './dto/support.dto';
 import { SupportService } from './support.service';
 
@@ -37,22 +32,4 @@ export class SupportController {
   @Get('track')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   track(@Query('ticketNumber') ticketNumber: string, @Query('token') token: string) { return this.support.track(ticketNumber, token); }
-
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPPORT, UserRole.FINANCE, UserRole.VIEWER)
-  @RequirePermissions('support.read')
-  @Get('/admin/tickets')
-  adminList(@Query() query: SupportListQueryDto) { return this.support.adminList(query); }
-
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPPORT, UserRole.FINANCE, UserRole.VIEWER)
-  @RequirePermissions('support.read')
-  @Get('/admin/tickets/:id')
-  adminGet(@Param('id') id: string) { return this.support.adminGet(id); }
-
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPPORT, UserRole.FINANCE)
-  @RequirePermissions('support.manage')
-  @Post('/admin/tickets/:id')
-  adminUpdate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: AdminSupportUpdateDto) { return this.support.adminUpdate(id, user.userId, dto); }
 }
