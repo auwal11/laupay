@@ -417,6 +417,29 @@ export class AdminOpsService {
       include: { walletAccount: true },
     });
     if (!original) throw new NotFoundException('Ledger entry not found');
+    if (original.reason === LedgerReason.REVERSAL) {
+      throw new ConflictException('A reversal entry cannot be reversed again');
+    }
+    const priorReversal = await this.prisma.ledgerEntry.findFirst({
+      where: {
+        reason: LedgerReason.REVERSAL,
+        OR: [
+          { referenceType: 'LedgerEntry', referenceId: original.id },
+          ...(original.referenceType && original.referenceId
+            ? [{ referenceType: original.referenceType, referenceId: original.referenceId }]
+            : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (priorReversal) throw new ConflictException('This ledger entry has already been reversed or refunded');
+    if (original.referenceType === 'Order' && original.referenceId) {
+      const disputeRefund = await this.prisma.transactionDispute.findFirst({
+        where: { ledgerEntryId: original.id, refundEntryId: { not: null } },
+        select: { id: true },
+      });
+      if (disputeRefund) throw new ConflictException('This transaction has already been refunded through a dispute');
+    }
     const result = await this.ledger.reverse(original.id, `ledger:reversal:${original.id}:admin`);
     await this.writeAudit(actor, {
       action: AuditAction.WALLET_ADJUSTMENT,

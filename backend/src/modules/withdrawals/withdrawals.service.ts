@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { AuditAction, LedgerReason, Prisma, WithdrawalStatus, WithdrawalRefundStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { AppConfigService } from '../../config/app-config.service';
@@ -111,6 +111,9 @@ export class WithdrawalsService {
 
   private async transition(adminId: string, id: string, from: WithdrawalStatus, to: WithdrawalStatus, action: string, reason: string, data: Prisma.WithdrawalUpdateInput) {
     if (!reason?.trim()) throw new BadRequestException('A reason is required');
+    const existing = await this.prisma.withdrawal.findUnique({ where: { id }, select: { userId: true } });
+    if (!existing) throw new NotFoundException('Withdrawal not found');
+    if (existing.userId === adminId) throw new ForbiddenException('An administrator cannot approve their own withdrawal');
     const result = await this.prisma.withdrawal.updateMany({ where: { id, status: from }, data: { ...data, status: to } });
     if (result.count !== 1) throw new ConflictException(`Withdrawal cannot move from ${from}`);
     await this.event(id, from, to, action, adminId, reason); await this.audit(adminId, id, { action, from, to, reason });
@@ -121,6 +124,9 @@ export class WithdrawalsService {
 
   private async refundAndTransition(adminId: string, id: string, allowed: WithdrawalStatus[], finalStatus: WithdrawalStatus, reason: string, action: string) {
     if (!reason?.trim()) throw new BadRequestException('A reason is required');
+    const existing = await this.prisma.withdrawal.findUnique({ where: { id }, select: { userId: true } });
+    if (!existing) throw new NotFoundException('Withdrawal not found');
+    if (existing.userId === adminId) throw new ForbiddenException('An administrator cannot refund their own withdrawal');
     const claimed = await this.prisma.withdrawal.updateMany({ where: { id, status: { in: allowed } }, data: { status: WithdrawalStatus.REFUND_PENDING, failureReason: reason, processedBy: adminId } });
     if (claimed.count !== 1) throw new ConflictException('Withdrawal is not eligible for this action');
     const row = await this.prisma.withdrawal.findUniqueOrThrow({ where: { id } });
