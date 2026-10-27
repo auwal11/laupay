@@ -77,8 +77,14 @@ function paginate(page = 1, pageSize = 25) {
 
 function csvEscape(value: unknown): string {
   if (value === null || value === undefined) return '';
-  const s = String(value);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  let s = String(value);
+  // Exported values can contain attacker-controlled profile names, phone
+  // numbers, narratives, or failure reasons. Prefix formula-leading cells so
+  // Excel/Sheets cannot evaluate a value such as =HYPERLINK(...) when an admin
+  // opens the CSV. The apostrophe is a standard spreadsheet text marker and
+  // remains harmless in other CSV consumers.
+  if (/^\s*[=+\-@]/.test(s)) s = `'${s}`;
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>, columns: string[]): string {
