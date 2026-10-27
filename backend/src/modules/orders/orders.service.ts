@@ -319,8 +319,12 @@ export class OrdersService {
       include: {
         user: { select: { id: true, email: true, fullName: true, phone: true, status: true } },
         dataPlan: { select: { id: true, label: true, externalCode: true, priceNaira: true } },
-        vtuTransaction: true,
-        payments: true,
+        // Do not expose the provider's raw response through the admin detail
+        // API. It is an untrusted, provider-controlled payload that may carry
+        // customer PII or fields not intended for the console. The UI only
+        // needs this allow-listed operational view.
+        vtuTransaction: { select: { id: true, status: true, provider: true, providerReference: true, createdAt: true, updatedAt: true } },
+        payments: { select: { id: true, status: true, amount: true, providerName: true, providerReference: true, createdAt: true, updatedAt: true } },
       },
     });
     if (!order) throw new NotFoundException('Order not found');
