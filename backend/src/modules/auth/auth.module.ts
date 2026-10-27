@@ -4,6 +4,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
 import { PasswordHasher } from './password-hasher.service';
+import { LoginThrottleService } from './login-throttle.service';
 import { MAIL_PROVIDER } from '../../common/mail/mail-provider.interface';
 import { BrevoMailProvider } from '../../common/mail/brevo-mail.provider';
 import { MockMailProvider } from '../../common/mail/mock-mail.provider';
@@ -27,7 +28,7 @@ const mailProviderFactory = {
 @Module({
   imports: [JwtModule.register({}), CreditsModule],
   controllers: [AuthController],
-  providers: [AuthService, OtpService, PasswordHasher, ProfileStorageService, mailProviderFactory],
+  providers: [AuthService, OtpService, PasswordHasher, ProfileStorageService, LoginThrottleService, mailProviderFactory],
   exports: [PasswordHasher, AuthService, MAIL_PROVIDER],
 })
 export class AuthModule {}

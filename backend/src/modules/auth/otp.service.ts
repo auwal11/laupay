@@ -103,6 +103,11 @@ export class OtpService {
     this.logger.log(`OTP verified for user ${userId}`);
   }
 
+  async assertVerifyAllowed(email: string, ip: string): Promise<void> {
+    await this.checkRate(`verify:email:${email.trim().toLowerCase()}`, 'otp_verify_email', 20, RESEND_WINDOW_MS, 0);
+    await this.checkRate(`verify:ip:${ip}`, 'otp_verify_ip', 30, RESEND_WINDOW_MS, 0);
+  }
+
   async assertResendAllowed(email: string, ip: string): Promise<void> {
     await this.checkRate(`resend:email:${email.trim().toLowerCase()}`, 'otp_resend_email', 5, RESEND_WINDOW_MS, RESEND_COOLDOWN_MS);
     await this.checkRate(`resend:ip:${ip}`, 'otp_resend_ip', 10, RESEND_WINDOW_MS, 0);

@@ -14,6 +14,7 @@ import { AppConfigService } from '../../config/app-config.service';
 import { PasswordHasher } from './password-hasher.service';
 import { RegisterDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
 import { OtpService } from './otp.service';
+import { LoginThrottleService } from './login-throttle.service';
 import { Inject } from '@nestjs/common';
 import { MAIL_PROVIDER, MailProvider } from '../../common/mail/mail-provider.interface';
 import { ProfileStorageService } from '../../common/storage/profile-storage.service';
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly config: AppConfigService,
     private readonly passwordHasher: PasswordHasher,
     private readonly otp: OtpService,
+    private readonly loginThrottle: LoginThrottleService,
     @Inject(MAIL_PROVIDER) private readonly mail: MailProvider,
     private readonly profileStorage: ProfileStorageService,
     private readonly credits: CreditsService,
@@ -45,7 +47,8 @@ export class AuthService {
    * Verifies the emailed code, flips PENDING_VERIFICATION -> ACTIVE and only
    * then issues tokens (requirements 3 + 4). No code, no tokens.
    */
-  async verifyEmail(dto: VerifyOtpDto, _ip?: string) {
+  async verifyEmail(dto: VerifyOtpDto, ip?: string) {
+    await this.otp.assertVerifyAllowed(dto.email, ip ?? 'unknown');
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     // Same message whether the email exists or the code is wrong.
     if (!user) throw new UnauthorizedException('Invalid or expired verification code');
@@ -194,18 +197,23 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, ipAddress?: string) {
+    const ip = ipAddress ?? 'unknown';
+    await this.loginThrottle.assertAllowed(dto.email, ip, 'customer');
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) {
+      await this.loginThrottle.recordFailure(dto.email, ip, 'customer');
       await this.recordFailedLogin(dto.email);
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const passwordOk = await this.passwordHasher.verify(user.passwordHash, dto.password);
     if (!passwordOk) {
+      await this.loginThrottle.recordFailure(dto.email, ip, 'customer');
       await this.recordFailedLogin(dto.email, user.id);
       throw new UnauthorizedException('Invalid email or password');
     }
+    await this.loginThrottle.recordSuccess(dto.email, 'customer');
 
     // Requirement 3/4: an unverified account may never receive tokens.
     // The message is intentionally identical to the wrong-password case so
@@ -232,17 +240,22 @@ export class AuthService {
    * so this cannot be used to enumerate admin emails.
    */
   async adminLogin(dto: LoginDto, ipAddress?: string): Promise<AuthTokens & { role: UserRole; permissions: string[] }> {
+    const ip = ipAddress ?? 'unknown';
+    await this.loginThrottle.assertAllowed(dto.email, ip, 'admin');
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) {
+      await this.loginThrottle.recordFailure(dto.email, ip, 'admin');
       await this.recordFailedLogin(dto.email);
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const passwordOk = await this.passwordHasher.verify(user.passwordHash, dto.password);
     if (!passwordOk) {
+      await this.loginThrottle.recordFailure(dto.email, ip, 'admin');
       await this.recordFailedLogin(dto.email, user.id);
       throw new UnauthorizedException('Invalid email or password');
     }
+    await this.loginThrottle.recordSuccess(dto.email, 'admin');
 
     if (!ADMIN_ROLES.includes(user.role)) {
       await this.prisma.auditLog.create({
