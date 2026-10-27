@@ -10,6 +10,7 @@ import { AppConfigService } from './config/app-config.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  app.disable('x-powered-by');
   const config = app.get(AppConfigService);
   // Refuse to boot with a dangerous provider/credential combination (mock in
   // production, or a live key in staging) before accepting any traffic.
@@ -31,7 +32,20 @@ async function bootstrap() {
 
   app.use(helmet());
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
-  app.enableCors({ origin: config.adminWebOrigin, credentials: true });
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Server-to-server requests have no Origin header; auth/RBAC still apply.
+      if (!origin || config.allowedWebOrigins.includes(origin.replace(/\/$/, ''))) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
+    maxAge: 600,
+  });
 
   // Strips/rejects any field not explicitly declared on a DTO — this is
   // what prevents a client from smuggling in fields like `balance` or

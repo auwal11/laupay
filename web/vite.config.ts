@@ -51,6 +51,13 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
+    // Never ship source maps: they would expose the full React source.
+    sourcemap: false,
+    // Strip client diagnostics in production; server audit logs remain intact.
+    minify: 'esbuild',
+    esbuild: {
+      drop: ['console', 'debugger'],
+    },
   },
   server: {
     host: '0.0.0.0',

@@ -37,6 +37,14 @@ export class AppConfigService {
   );
 
   readonly adminWebOrigin = optional('ADMIN_WEB_ORIGIN', 'http://localhost:5173');
+  /** Explicit comma-separated browser origins allowed to call the API. */
+  readonly allowedWebOrigins = (() => {
+    const configured = process.env.ALLOWED_WEB_ORIGINS
+      ?.split(',')
+      .map((origin) => origin.trim().replace(/\/$/, ''))
+      .filter(Boolean);
+    return configured?.length ? configured : [this.adminWebOrigin.replace(/\/$/, '')];
+  })();
 
   readonly paymentProvider = optional('PAYMENT_PROVIDER', 'mock');
   readonly vtuProvider = optional('VTU_PROVIDER', 'mock');

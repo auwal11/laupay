@@ -1,0 +1,41 @@
+name: Web security build
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**']
+  pull_request:
+    branches: [main]
+    paths: ['web/**']
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build production bundle
+        run: npm run build
+      - name: Reject source maps and client secret patterns
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find dist -type f -name '*.map' -print -quit | grep -q .; then
+            echo 'Production source maps must not be published.' >&2
+            exit 1
+          fi
+          if rg -n -i 'sk_(live|test)_[A-Za-z0-9]|whsec_[A-Za-z0-9]|xkeysib-[A-Za-z0-9]|SUPABASE_SERVICE_ROLE_KEY|DATABASE_URL|JWT_ACCESS_SECRET' dist; then
+            echo 'A server secret pattern was found in the web bundle.' >&2
+            exit 1
+          fi
