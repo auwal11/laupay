@@ -105,6 +105,11 @@ export class DisputeListQueryDto {
 export class UpdateDisputeDto {
   @IsIn(['OPEN', 'IN_REVIEW', 'RESOLVED', 'REJECTED', 'CLOSED'])
   status!: string;
+
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  reason!: string;
 }
 
 

@@ -203,7 +203,7 @@ export function AdminDisputeDetailPage() {
                   title: "Start review",
                   description: "Marks this case as actively being investigated.",
                   confirmLabel: "Start review",
-                  run: () => adminService.updateDispute(id, "IN_REVIEW"),
+                  run: (reason) => adminService.updateDispute(id, "IN_REVIEW", reason),
                 })}
               >
                 Start review
@@ -263,7 +263,7 @@ export function AdminDisputeDetailPage() {
                 title: "Close case",
                 description: "Archives this case as closed.",
                 confirmLabel: "Close case",
-                run: () => adminService.updateDispute(id, "CLOSED"),
+                run: (reason) => adminService.updateDispute(id, "CLOSED", reason),
               })}
             >
               Close case

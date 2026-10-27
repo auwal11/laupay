@@ -513,7 +513,7 @@ export class AdminController {
     @Body() dto: UpdateDisputeDto,
     @Req() req: Request,
   ) {
-    return this.admin.updateDispute(id, dto.status, this.actor(user, req), 'Status changed from admin console');
+    return this.admin.updateDispute(id, dto.status, this.actor(user, req), dto.reason);
   }
 
   // ---- Audit ----

@@ -178,8 +178,8 @@ export const adminService = {
     return adminRequest(`/admin/disputes/${id}/reject`, { method: "POST", body: { reason, note } });
   },
 
-  updateDispute(id: string, status: string): Promise<ApiResult<AdminDispute>> {
-    return adminRequest<AdminDispute>(`/admin/disputes/${id}`, { method: "PATCH", body: { status } });
+  updateDispute(id: string, status: string, reason: string): Promise<ApiResult<AdminDispute>> {
+    return adminRequest<AdminDispute>(`/admin/disputes/${id}`, { method: "PATCH", body: { status, reason } });
   },
 
   // ---- Audit ----
