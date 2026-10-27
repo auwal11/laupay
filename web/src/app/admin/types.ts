@@ -4,6 +4,7 @@ export interface AdminSession {
   email: string;
   role: AdminRole;
   permissions?: string[];
+  mustChangePassword?: boolean;
 }
 
 export interface AdminLoginResponse {
@@ -11,6 +12,7 @@ export interface AdminLoginResponse {
   refreshToken?: string;
   role: AdminRole;
   permissions?: string[];
+  mustChangePassword?: boolean;
 }
 
 export type AdminPermission =

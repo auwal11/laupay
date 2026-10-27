@@ -20,13 +20,13 @@ export function AdminLoginPage() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const failure = await login(email, password);
+    const outcome = await login(email, password);
     setSubmitting(false);
-    if (failure) {
-      setError(failure.message);
+    if (outcome.error) {
+      setError(outcome.error.message);
       return;
     }
-    navigate(from, { replace: true });
+    navigate(outcome.mustChangePassword ? "/admin/change-password" : from, { replace: true });
   }
 
   return (

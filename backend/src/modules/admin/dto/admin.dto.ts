@@ -25,6 +25,24 @@ export class AdminLoginDto {
   password!: string;
 }
 
+export class CreateStaffAccountDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  fullName!: string;
+
+  @IsIn(['SUPPORT', 'FINANCE', 'VIEWER'])
+  role!: 'SUPPORT' | 'FINANCE' | 'VIEWER';
+
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  reason!: string;
+}
+
 export class CreditTestFundsDto {
   @IsUUID()
   userId!: string;

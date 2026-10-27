@@ -31,13 +31,16 @@ export class JwtAuthGuard implements CanActivate {
       // role change.
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, role: true, status: true, sessionsRevokedAt: true } as any,
-      }) as ({ id: string; role: any; status: UserStatus; sessionsRevokedAt: Date | null } | null);
+        select: { id: true, role: true, status: true, sessionsRevokedAt: true, mustChangePassword: true } as any,
+      }) as ({ id: string; role: any; status: UserStatus; sessionsRevokedAt: Date | null; mustChangePassword?: boolean } | null);
       if (!user || user.status !== UserStatus.ACTIVE) {
         throw new UnauthorizedException('Account is not active');
       }
       if (user.sessionsRevokedAt && payload.iat * 1000 <= user.sessionsRevokedAt.getTime()) {
         throw new UnauthorizedException('Session has been revoked');
+      }
+      if (user.mustChangePassword && !String(request.path ?? '').endsWith('/auth/change-password')) {
+        throw new UnauthorizedException('Password change required');
       }
 
       request.user = { userId: user.id, role: user.role };

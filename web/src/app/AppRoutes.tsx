@@ -39,6 +39,7 @@ import { AdminDisputesPage } from '@app/pages/admin/AdminDisputesPage';
 import { AdminWithdrawalsPage } from '@app/pages/admin/AdminWithdrawalsPage';
 import { AdminWithdrawalDetailPage } from '@app/pages/admin/AdminWithdrawalDetailPage';
 import { AdminSupportPage } from '@app/pages/admin/AdminSupportPage';
+import { AdminChangePasswordPage } from '@app/pages/admin/AdminChangePasswordPage';
 import { SupportPage } from '@app/pages/support/SupportPage';
 import { AdminLayout } from '@app/admin/AdminLayout';
 import { AdminProtectedRoute } from '@app/admin/AdminProtectedRoute';
@@ -98,6 +99,7 @@ export const appRoutes = (
       }
     >
       <Route index element={<AdminOverviewPage />} />
+      <Route path="change-password" element={<AdminChangePasswordPage />} />
       <Route path="users" element={<AdminUsersPage />} />
       <Route path="users/:id" element={<AdminUserDetailPage />} />
       <Route path="transactions" element={<AdminTransactionsPage />} />

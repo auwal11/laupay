@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { adminService } from "@app/admin/services";
+import { useAdminAuth } from "@app/admin/AdminAuthContext";
 import {
   LoadingRows,
   PageHeader,
@@ -21,6 +22,7 @@ import { Input } from "@app/components/ui/Input";
 import { formatNaira } from "@app/lib/format";
 
 export function AdminUsersPage() {
+  const { hasPermission } = useAdminAuth();
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
@@ -32,6 +34,14 @@ export function AdminUsersPage() {
   const [fundBusy, setFundBusy] = useState(false);
   const [fundNotice, setFundNotice] = useState<string | null>(null);
   const [fundError, setFundError] = useState<string | null>(null);
+
+  const [staffEmail, setStaffEmail] = useState("");
+  const [staffName, setStaffName] = useState("");
+  const [staffRole, setStaffRole] = useState<"SUPPORT" | "FINANCE" | "VIEWER">("SUPPORT");
+  const [staffReason, setStaffReason] = useState("");
+  const [staffBusy, setStaffBusy] = useState(false);
+  const [staffError, setStaffError] = useState<string | null>(null);
+  const [staffResult, setStaffResult] = useState<{ email: string; role: string; temporaryPassword: string; warning: string } | null>(null);
 
   const state = useAsync(
     () => adminService.users({ search: search || undefined, role: role || undefined, status: status || undefined, page, pageSize: 20 }),
@@ -76,9 +86,81 @@ export function AdminUsersPage() {
     state.reload();
   }
 
+  async function submitStaff(e: FormEvent) {
+    e.preventDefault();
+    setStaffBusy(true);
+    setStaffError(null);
+    setStaffResult(null);
+    const result = await adminService.createStaff({
+      email: staffEmail.trim().toLowerCase(),
+      fullName: staffName.trim(),
+      role: staffRole,
+      reason: staffReason.trim(),
+    });
+    setStaffBusy(false);
+    if (!result.ok) {
+      setStaffError(result.error.message);
+      return;
+    }
+    setStaffResult({
+      email: result.data.user.email,
+      role: result.data.user.role,
+      temporaryPassword: result.data.temporaryPassword,
+      warning: result.data.warning,
+    });
+    setStaffEmail("");
+    setStaffName("");
+    setStaffReason("");
+    state.reload();
+  }
+
   return (
     <div>
       <PageHeader title="Users" description="Every registered account and its wallet." />
+
+      {hasPermission("admins.manage") && (
+        <Card className="mb-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-laupay-ink">Create staff account</h2>
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-laupay-ink-muted">
+                Create a restricted Support, Finance, or Viewer login. The generated password is shown once and is never stored in plain text.
+              </p>
+            </div>
+            {staffResult && (
+              <button type="button" onClick={() => setStaffResult(null)} className="text-xs font-medium text-laupay-ink-muted hover:underline">
+                Hide credentials
+              </button>
+            )}
+          </div>
+          <form onSubmit={submitStaff} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <Input label="Full name" value={staffName} onChange={(e) => setStaffName(e.target.value)} autoComplete="name" required />
+            <Input label="Email" type="email" value={staffEmail} onChange={(e) => setStaffEmail(e.target.value)} autoComplete="email" required />
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-laupay-ink">
+              <span>Role</span>
+              <select value={staffRole} onChange={(e) => setStaffRole(e.target.value as typeof staffRole)} className={selectClass}>
+                <option value="SUPPORT">Support</option>
+                <option value="FINANCE">Finance</option>
+                <option value="VIEWER">Viewer</option>
+              </select>
+            </label>
+            <Input label="Reason" value={staffReason} onChange={(e) => setStaffReason(e.target.value)} minLength={5} maxLength={500} placeholder="Why is access needed?" required />
+            <Button type="submit" loading={staffBusy} className="self-end">Create login</Button>
+          </form>
+          {staffError && <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-laupay-danger">{staffError}</p>}
+          {staffResult && (
+            <div className="mt-4 rounded-lg border border-laupay-gold/50 bg-laupay-gold/10 p-4" role="status">
+              <p className="text-sm font-semibold text-laupay-ink">Staff account created</p>
+              <p className="mt-1 text-xs text-laupay-ink-muted">{staffResult.email} · {staffResult.role}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <code className="rounded-md bg-white px-3 py-2 text-sm font-semibold tracking-wide text-laupay-ink">{staffResult.temporaryPassword}</code>
+                <Button type="button" variant="secondary" onClick={() => void navigator.clipboard?.writeText(staffResult.temporaryPassword)}>Copy temporary password</Button>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-laupay-ink-muted">{staffResult.warning} Do not send it through an insecure public channel.</p>
+            </div>
+          )}
+        </Card>
+      )}
 
       {fundUser && (
         <Card className="mb-4">

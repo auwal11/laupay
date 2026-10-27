@@ -49,6 +49,17 @@ export const adminService = {
     return adminRequest<Paged<AdminUserRow>>(`/admin/users${buildQuery(params)}`);
   },
 
+  createStaff(body: { email: string; fullName: string; role: "SUPPORT" | "FINANCE" | "VIEWER"; reason: string }) {
+    return adminRequest<{ user: { id: string; email: string; fullName: string; role: string; status: string }; temporaryPassword: string; warning: string }>("/admin/staff", { method: "POST", body });
+  },
+
+  changePassword(currentPassword: string, newPassword: string) {
+    return adminRequest<{ changed: true }>("/auth/change-password", {
+      method: "POST",
+      body: { currentPassword, newPassword },
+    });
+  },
+
   user(id: string): Promise<ApiResult<AdminUserDetail>> {
     return adminRequest<AdminUserDetail>(`/admin/users/${id}`);
   },

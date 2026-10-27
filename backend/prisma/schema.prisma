@@ -179,6 +179,8 @@ model User {
   phoneVerifiedAt  DateTime?
   twoFactorSecret  String?
   twoFactorEnabled Boolean   @default(false)
+  /// Temporary staff credentials must be replaced after the first login.
+  mustChangePassword Boolean @default(false)
 
   // Agent-specific profile fields live in AgentProfile (1:1, optional)
   agentProfile AgentProfile?

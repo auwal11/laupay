@@ -1,19 +1,22 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   AuditAction,
   LedgerDirection,
   LedgerReason,
   OrderStatus,
   Prisma,
+  UserRole,
   UserStatus,
   WalletStatus,
 } from '@prisma/client';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { CreditsService } from '../credits/credits.service';
 import { SettingsService } from '../settings/settings.service';
 import { RiskService } from '../risk/risk.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PasswordHasher } from '../auth/password-hasher.service';
 
 const FULFILLMENT_RESOLVING = 'FULFILLMENT_RESOLVING' as unknown as OrderStatus;
 
@@ -46,7 +49,64 @@ export class AdminService {
     private readonly settings: SettingsService,
     private readonly risk: RiskService,
     private readonly notifications: NotificationsService,
+    private readonly passwordHasher: PasswordHasher,
   ) {}
+
+  async createStaffAccount(
+    emailInput: string,
+    fullNameInput: string,
+    roleInput: 'SUPPORT' | 'FINANCE' | 'VIEWER',
+    reason: string,
+    actorId: string,
+    ipAddress?: string,
+  ) {
+    if (!this.config.superAdminIds.has(actorId)) {
+      throw new ForbiddenException('Only a configured super administrator can create staff accounts');
+    }
+    if (!reason?.trim() || reason.trim().length < 5) {
+      throw new BadRequestException('A written reason of at least 5 characters is required');
+    }
+    const email = emailInput.trim().toLowerCase();
+    const fullName = fullNameInput.trim().replace(/\s+/g, ' ');
+    if (!email || !fullName) throw new BadRequestException('Email and full name are required');
+    const role = roleInput as UserRole;
+    if (!( [UserRole.SUPPORT, UserRole.FINANCE, UserRole.VIEWER] as UserRole[]).includes(role)) {
+      throw new BadRequestException('Only SUPPORT, FINANCE or VIEWER staff accounts can be created');
+    }
+    const existing = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (existing) throw new ConflictException('An account with this email already exists');
+
+    // The plain temporary password is returned once to the authenticated
+    // super-admin and is never persisted or written to the audit log.
+    const temporaryPassword = randomBytes(18).toString('base64url');
+    const passwordHash = await this.passwordHasher.hash(temporaryPassword);
+    const created = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          fullName,
+          passwordHash,
+          role,
+          status: UserStatus.ACTIVE,
+          mustChangePassword: true,
+        } as any,
+        select: { id: true, email: true, fullName: true, role: true, status: true, createdAt: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.CREATE,
+          entityType: 'User',
+          entityId: user.id,
+          ipAddress,
+          reason: reason.trim(),
+          metadata: { action: 'staff.create', role: user.role, email: user.email },
+        },
+      });
+      return user;
+    });
+    return { user: { ...created, mustChangePassword: true }, temporaryPassword, warning: 'Show this temporary password only through a secure channel. It must be changed after first login.' };
+  }
 
   // -----------------------------------------------------------------
   // Overview

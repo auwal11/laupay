@@ -49,6 +49,7 @@ import {
   WithdrawalListQueryDto,
   RejectWithdrawalDto,
   WithdrawalActionDto,
+  CreateStaffAccountDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -115,6 +116,17 @@ export class AdminController {
   @RequirePermissions('users.read')
   listUsers(@Query() q: UserListQueryDto) {
     return this.admin.listUsers(q);
+  }
+
+  @Post('staff')
+  @RequirePermissions('admins.manage')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  createStaff(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateStaffAccountDto,
+    @Req() req: Request,
+  ) {
+    return this.admin.createStaffAccount(dto.email, dto.fullName, dto.role, dto.reason, user.userId, req.ip);
   }
 
   @Get('users/:id')

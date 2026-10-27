@@ -12,7 +12,7 @@ interface AdminAuthValue {
   status: AdminStatus;
   permissions: string[];
   hasPermission: (permission: string) => boolean;
-  login: (email: string, password: string) => Promise<ApiError | null>;
+  login: (email: string, password: string) => Promise<{ error: ApiError | null; mustChangePassword: boolean }>;
   logout: () => void;
 }
 
@@ -53,6 +53,15 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       setStatus("anonymous");
       return;
     }
+    // A newly provisioned staff member is intentionally restricted to the
+    // password-change screen. Keep that screen usable after a refresh; the
+    // change-password request still validates the token and current password
+    // on the backend.
+    if (stored.mustChangePassword) {
+      setSession(stored);
+      setStatus("authenticated");
+      return;
+    }
     adminService.overview().then((result) => {
       if (cancelled) return;
       if (result.ok) {
@@ -71,15 +80,20 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const result = await adminService.login(email, password);
-    if (!result.ok) return result.error;
+    if (!result.ok) return { error: result.error, mustChangePassword: false };
     setAdminToken(result.data.accessToken);
-    const next: AdminSession = { email, role: result.data.role, permissions: result.data.permissions ?? [] };
+    const next: AdminSession = {
+      email,
+      role: result.data.role,
+      permissions: result.data.permissions ?? [],
+      mustChangePassword: result.data.mustChangePassword,
+    };
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(next));
     }
     setSession(next);
     setStatus("authenticated");
-    return null;
+    return { error: null, mustChangePassword: Boolean(result.data.mustChangePassword) };
   }, []);
 
   const logout = useCallback(() => {

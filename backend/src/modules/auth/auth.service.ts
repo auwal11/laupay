@@ -246,7 +246,7 @@ export class AuthService {
    * to hit /admin/login is rejected with 403 after the password is verified,
    * so this cannot be used to enumerate admin emails.
    */
-  async adminLogin(dto: LoginDto, ipAddress?: string): Promise<AuthTokens & { role: UserRole; permissions: string[] }> {
+  async adminLogin(dto: LoginDto, ipAddress?: string): Promise<AuthTokens & { role: UserRole; permissions: string[]; mustChangePassword: boolean }> {
     const ip = ipAddress ?? 'unknown';
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) {
@@ -300,7 +300,7 @@ export class AuthService {
       data: { lastLoginAt: new Date(), lastLoginIp: ipAddress ?? null },
     });
     const tokens = await this.issueTokens(user.id, user.role);
-    return { ...tokens, role: user.role, permissions: permissionsForRole(user.role) };
+    return { ...tokens, role: user.role, permissions: permissionsForRole(user.role), mustChangePassword: Boolean((user as User & { mustChangePassword?: boolean }).mustChangePassword) };
   }
 
   async forgotPassword(email: string, ipAddress?: string) {
@@ -327,7 +327,7 @@ export class AuthService {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: record.userId } });
     const sessionsRevokedAt = new Date();
     await this.prisma.$transaction([
-      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash, sessionsRevokedAt, ...(user.status === 'PENDING_VERIFICATION' ? { status: 'ACTIVE' } : {}) } as any }),
+      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash, sessionsRevokedAt, mustChangePassword: false, ...(user.status === 'PENDING_VERIFICATION' ? { status: 'ACTIVE' } : {}) } as any }),
       this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: sessionsRevokedAt } }),
       this.prisma.refreshToken.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: sessionsRevokedAt } }),
     ]);
@@ -355,7 +355,7 @@ export class AuthService {
     const passwordHash = await this.passwordHasher.hash(newPassword);
     const sessionsRevokedAt = new Date();
     await this.prisma.$transaction([
-      this.prisma.user.update({ where: { id: userId }, data: { passwordHash, sessionsRevokedAt } as any }),
+      this.prisma.user.update({ where: { id: userId }, data: { passwordHash, sessionsRevokedAt, mustChangePassword: false } as any }),
       this.prisma.refreshToken.updateMany({
         where: { userId, revokedAt: null },
         data: { revokedAt: sessionsRevokedAt },
