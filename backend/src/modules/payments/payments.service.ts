@@ -200,10 +200,22 @@ export class PaymentsService {
 
     if (newStatus === payment.status) return payment;
 
-    const updated = await this.prisma.payment.update({
-      where: { id: payment.id },
+    // Payment settlement is monotonic: once SUCCESS or FAILED is committed,
+    // a late concurrent re-query must not overwrite the terminal outcome.
+    // This also ensures only the request that wins the transition can credit
+    // the wallet.
+    const transitioned = await this.prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        status: { in: [PaymentStatus.PENDING, PaymentStatus.PROCESSING, PaymentStatus.UNKNOWN] },
+      },
       data: { status: newStatus },
     });
+    if (transitioned.count !== 1) {
+      return this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    }
+
+    const updated = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
 
     if (newStatus === PaymentStatus.SUCCESS) {
       await this.creditWalletForPayment(updated.id, updated.userId, Number(updated.amount));
