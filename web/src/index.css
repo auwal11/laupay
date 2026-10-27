@@ -183,3 +183,66 @@ button { font: inherit; }
   .laupay-loader-mark { animation: laupay-loader-fade 1.8s ease-in-out infinite !important; transform: none !important; }
   .laupay-loader-ring { animation: none !important; }
 }
+
+/* Admin glass system: scoped to the protected console so customer flows keep
+   their existing surfaces and financial controls remain high contrast. */
+.admin-shell {
+  position: relative;
+  isolation: isolate;
+  overflow-x: hidden;
+  color: #171a36;
+  background: #f5f6fa;
+}
+.admin-shell::before,
+.admin-shell::after {
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  border-radius: 999px;
+  filter: blur(70px);
+  opacity: .28;
+}
+.admin-shell::before { top: -150px; right: 8%; width: 420px; height: 300px; background: #dfe5ff; }
+.admin-shell::after { bottom: -160px; left: 18%; width: 360px; height: 280px; background: #f9dfaa; }
+.admin-sidebar {
+  position: relative;
+  z-index: 2;
+  box-shadow: 12px 0 36px rgba(25, 25, 71, .11);
+  transition: width .22s ease;
+}
+.admin-header {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, .72);
+  border-color: rgba(255, 255, 255, .8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 1px 0 rgba(255,255,255,.65);
+}
+.admin-main { position: relative; z-index: 0; }
+.admin-shell .admin-card {
+  border-color: rgba(255, 255, 255, .86);
+  background: rgba(255, 255, 255, .74);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(25, 25, 71, .07), inset 0 1px 0 rgba(255,255,255,.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.admin-shell .admin-card .border-laupay-border { border-color: rgba(220, 224, 238, .8); }
+.admin-shell .admin-control { background: rgba(255,255,255,.78); border-color: rgba(214,219,235,.9); }
+.admin-shell .admin-status { box-shadow: inset 0 1px 0 rgba(255,255,255,.5); }
+.admin-nav-item { position: relative; }
+.admin-nav-item[aria-current="page"]::before { position: absolute; left: -1px; width: 3px; height: 20px; content: ""; border-radius: 999px; background: #f4b942; }
+.admin-nav-item:hover, .admin-nav-item[aria-current="page"] { background: rgba(255,255,255,.13); }
+@media (max-width: 767px) {
+  .admin-sidebar { box-shadow: 0 8px 24px rgba(25,25,71,.12); }
+  .admin-sidebar nav { scrollbar-width: none; }
+  .admin-sidebar nav::-webkit-scrollbar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-sidebar { transition: none; }
+}
+@supports not ((backdrop-filter: blur(1px))) {
+  .admin-header, .admin-shell .admin-card { background: #fff; }
+}

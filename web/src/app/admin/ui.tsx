@@ -63,7 +63,7 @@ export function StatusBadge({ value }: { value: string | null | undefined }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
+        "admin-status inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
         TONE[value] ?? "bg-laupay-surface-muted text-laupay-ink-muted",
       )}
     >
@@ -82,7 +82,7 @@ export function RoleBadge({ value }: { value: string }) {
           ? "bg-amber-50 text-laupay-pending"
           : "bg-laupay-surface-muted text-laupay-ink-muted";
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", tone)}>
+    <span className={cn("admin-status inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", tone)}>
       {value}
     </span>
   );
@@ -97,7 +97,7 @@ export function ModeBadge({ mode }: { mode: string | null | undefined }) {
         ? "bg-amber-50 text-laupay-pending"
         : "bg-laupay-surface-muted text-laupay-ink-muted";
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", tone)}>
+    <span className={cn("admin-status inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", tone)}>
       {mode.replace(/_/g, " ")}
     </span>
   );
@@ -203,7 +203,7 @@ export function Td({ children, className }: { children?: ReactNode; className?: 
 }
 
 export const selectClass =
-  "rounded-md border border-laupay-border bg-white px-3 py-2.5 text-sm text-laupay-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo";
+  "admin-control rounded-md border border-laupay-border bg-white px-3 py-2.5 text-sm text-laupay-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo";
 
 
 /**
