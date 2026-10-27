@@ -145,6 +145,10 @@ export class AdminOpsService {
     this.requireReason(reason);
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
+    const targetIsStaff = ([UserRole.ADMIN, UserRole.SUPPORT, UserRole.FINANCE, UserRole.VIEWER] as UserRole[]).includes(user.role as UserRole);
+    if (targetIsStaff && !this.config.superAdminIds.has(actor.adminId)) {
+      throw new ForbiddenException('Only a configured super administrator can change staff account status');
+    }
     if (user.role !== UserRole.CUSTOMER && user.role !== UserRole.AGENT && status === UserStatus.CLOSED) {
       throw new ForbiddenException('Admin accounts cannot be closed from this screen');
     }
