@@ -2,6 +2,8 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { OrderStatus, Prisma, WithdrawalStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
+const FULFILLMENT_RESOLVING = 'FULFILLMENT_RESOLVING' as unknown as OrderStatus;
+
 /**
  * Read-only. WalletService NEVER mutates a balance — all mutations go
  * through LedgerService. See docs/architecture/wallet-ledger-model.md.
@@ -125,6 +127,7 @@ function mapOrderStatus(status: OrderStatus): string {
     case OrderStatus.CANCELLED: return 'failed';
     case OrderStatus.FULFILLMENT_UNKNOWN: return 'unknown';
     case OrderStatus.FULFILLING:
+    case FULFILLMENT_RESOLVING:
     case OrderStatus.PAID: return 'processing';
     default: return 'pending';
   }

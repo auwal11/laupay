@@ -15,6 +15,8 @@ import { SettingsService } from '../settings/settings.service';
 import { RiskService } from '../risk/risk.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
+const FULFILLMENT_RESOLVING = 'FULFILLMENT_RESOLVING' as unknown as OrderStatus;
+
 function startOfToday(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -121,6 +123,7 @@ export class AdminService {
             OrderStatus.PAID,
             OrderStatus.FULFILLING,
             OrderStatus.FULFILLMENT_UNKNOWN,
+            FULFILLMENT_RESOLVING,
           ],
         },
         createdAt: { lt: timeoutCutoff },

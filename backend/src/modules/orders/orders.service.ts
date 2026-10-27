@@ -24,6 +24,7 @@ const TERMINAL_STATUSES: OrderStatus[] = [
  * "insufficient funds" warning from this instead of a generic cancellation.
  */
 const INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS';
+const FULFILLMENT_RESOLVING = 'FULFILLMENT_RESOLVING' as unknown as OrderStatus;
 
 @Injectable()
 export class OrdersService {
@@ -254,7 +255,17 @@ export class OrdersService {
   private async applyVtuOutcome(orderId: string, vtuStatus: string) {
     const finalStatus = this.mapVtuStatusToOrderStatus(vtuStatus);
 
-    if (finalStatus === OrderStatus.FULFILLMENT_FAILED) {
+    // Claim the order before reversing or settling the wallet debit. This
+    // prevents a provider callback and timeout worker resolving it in
+    // opposite directions concurrently.
+    const claimed = await this.prisma.order.updateMany({
+      where: { id: orderId, status: { in: [OrderStatus.PAID, OrderStatus.FULFILLING, OrderStatus.FULFILLMENT_UNKNOWN] } },
+      data: { status: FULFILLMENT_RESOLVING },
+    });
+    if (claimed.count !== 1) return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+
+    try {
+      if (finalStatus === OrderStatus.FULFILLMENT_FAILED) {
       // Reverse the debit — the customer was charged but the network never
       // delivered the airtime/data. See wallet-ledger-model.md §6.
       const ledgerIdempotencyKey = `ledger:order:${orderId}`;
@@ -271,16 +282,20 @@ export class OrdersService {
           `Order ${orderId} resolved FULFILLMENT_FAILED but no original debit ledger entry was found — wallet was never reversed`,
         );
       }
-      const updated = await this.prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.REFUNDED } });
+      const updated = await this.prisma.order.update({ where: { id: orderId, status: FULFILLMENT_RESOLVING }, data: { status: OrderStatus.REFUNDED } });
       await this.createOrderNotification(updated.userId, 'Purchase failed', 'Your purchase could not be fulfilled and the debit was reversed.', updated.id, updated.status);
       return updated;
-    }
+      }
 
-    const updated = await this.prisma.order.update({ where: { id: orderId }, data: { status: finalStatus } });
-    if (finalStatus === OrderStatus.FULFILLED) {
-      await this.createOrderNotification(updated.userId, 'Purchase successful', 'Your digital service purchase was completed successfully.', updated.id, updated.status);
+      const updated = await this.prisma.order.update({ where: { id: orderId, status: FULFILLMENT_RESOLVING }, data: { status: finalStatus } });
+      if (finalStatus === OrderStatus.FULFILLED) {
+        await this.createOrderNotification(updated.userId, 'Purchase successful', 'Your digital service purchase was completed successfully.', updated.id, updated.status);
+      }
+      return updated;
+    } catch (error) {
+      await this.prisma.order.updateMany({ where: { id: orderId, status: FULFILLMENT_RESOLVING }, data: { status: OrderStatus.FULFILLMENT_UNKNOWN } }).catch(() => undefined);
+      throw error;
     }
-    return updated;
   }
 
   private async createOrderNotification(userId: string, title: string, body: string, orderId: string, status: OrderStatus): Promise<void> {
@@ -356,15 +371,31 @@ export class OrdersService {
       throw new BadRequestException('Provider confirmation is required before manual success');
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: OrderStatus.FULFILLED,
-        failureReason: null,
-        settledBy: adminId,
-        settledAt: new Date(),
-      },
+    const claimed = await this.prisma.order.updateMany({
+      where: { id: orderId, status: { in: [OrderStatus.PAID, OrderStatus.FULFILLING, OrderStatus.FULFILLMENT_UNKNOWN] } },
+      data: { status: FULFILLMENT_RESOLVING },
     });
+    if (claimed.count !== 1) {
+      const current = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+      if (current.status === OrderStatus.FULFILLED) return current;
+      throw new BadRequestException('This order is already being resolved');
+    }
+
+    let updated;
+    try {
+      updated = await this.prisma.order.update({
+        where: { id: orderId, status: FULFILLMENT_RESOLVING },
+        data: {
+          status: OrderStatus.FULFILLED,
+          failureReason: null,
+          settledBy: adminId,
+          settledAt: new Date(),
+        },
+      });
+    } catch (error) {
+      await this.prisma.order.updateMany({ where: { id: orderId, status: FULFILLMENT_RESOLVING }, data: { status: OrderStatus.FULFILLMENT_UNKNOWN } }).catch(() => undefined);
+      throw error;
+    }
     if (order.vtuTransaction) {
       await this.prisma.vtuTransaction.update({
         where: { id: order.vtuTransaction.id },
@@ -402,7 +433,7 @@ export class OrdersService {
     const stale = await this.prisma.order.findMany({
       where: {
         status: {
-          in: [OrderStatus.CREATED, OrderStatus.PAID, OrderStatus.FULFILLING, OrderStatus.FULFILLMENT_UNKNOWN],
+          in: [OrderStatus.CREATED, OrderStatus.PAID, OrderStatus.FULFILLING, OrderStatus.FULFILLMENT_UNKNOWN, FULFILLMENT_RESOLVING],
         },
         createdAt: { lt: cutoff },
       },
@@ -421,7 +452,7 @@ export class OrdersService {
         }
         const fresh = await this.prisma.order.findUnique({ where: { id: order.id } });
         if (fresh && !TERMINAL_STATUSES.includes(fresh.status)) {
-          await this.failOrder(fresh, null, 'Order timed out without a provider outcome', undefined, 'TIMEOUT');
+          await this.failOrder(fresh, null, 'Order timed out without a provider outcome', undefined, 'TIMEOUT', cutoff);
         }
       } catch (err) {
         this.logger.error(`Failed to resolve stale order ${order.id}: ${String(err)}`);
@@ -437,7 +468,20 @@ export class OrdersService {
     reason: string,
     ipAddress: string | undefined,
     failureReason: string,
+    staleBefore?: Date,
   ) {
+    const claimed = await this.prisma.order.updateMany({
+      where: {
+        id: order.id,
+        OR: [
+          { status: { in: [OrderStatus.CREATED, OrderStatus.PAID, OrderStatus.FULFILLING, OrderStatus.FULFILLMENT_UNKNOWN] } },
+          ...(staleBefore ? [{ status: FULFILLMENT_RESOLVING, updatedAt: { lt: staleBefore } }] : []),
+        ],
+      },
+      data: { status: FULFILLMENT_RESOLVING },
+    });
+    if (claimed.count !== 1) return this.prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+
     const ledgerIdempotencyKey = `ledger:order:${order.id}`;
     const originalEntry = await this.prisma.ledgerEntry.findUnique({
       where: { idempotencyKey: ledgerIdempotencyKey },
@@ -449,7 +493,7 @@ export class OrdersService {
     }
 
     const updated = await this.prisma.order.update({
-      where: { id: order.id },
+      where: { id: order.id, status: FULFILLMENT_RESOLVING },
       data: {
         status: reversed ? OrderStatus.REFUNDED : OrderStatus.FULFILLMENT_FAILED,
         failureReason,
