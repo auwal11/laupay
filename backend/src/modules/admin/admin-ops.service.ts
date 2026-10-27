@@ -301,6 +301,12 @@ export class AdminOpsService {
     }
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
+    if (this.config.superAdminIds.has(id) && !this.config.superAdminIds.has(actor.adminId)) {
+      throw new ForbiddenException('Only a configured super administrator can change another super administrator');
+    }
+    if (id === actor.adminId && role !== user.role) {
+      throw new ForbiddenException('An administrator cannot change their own role');
+    }
     const sessionsRevokedAt = new Date();
     const updated = await this.prisma.user.update({ where: { id }, data: { role: role as UserRole, sessionsRevokedAt } as any });
     await this.writeAudit(actor, {
