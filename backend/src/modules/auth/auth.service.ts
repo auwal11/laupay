@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -200,18 +202,19 @@ export class AuthService {
 
   async login(dto: LoginDto, ipAddress?: string) {
     const ip = ipAddress ?? 'unknown';
-    await this.loginThrottle.assertAllowed(dto.email, ip, 'customer');
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) {
-      await this.loginThrottle.recordFailure(dto.email, ip, 'customer');
+      const failure = await this.loginThrottle.recordFailure(dto.email, ip, 'customer');
       await this.recordFailedLogin(dto.email);
+      if (failure.blocked) throw this.tooManyLogins();
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const passwordOk = await this.passwordHasher.verify(user.passwordHash, dto.password);
     if (!passwordOk) {
-      await this.loginThrottle.recordFailure(dto.email, ip, 'customer');
+      const failure = await this.loginThrottle.recordFailure(dto.email, ip, 'customer');
       await this.recordFailedLogin(dto.email, user.id);
+      if (failure.blocked) throw this.tooManyLogins();
       throw new UnauthorizedException('Invalid email or password');
     }
     await this.loginThrottle.recordSuccess(dto.email, 'customer');
@@ -242,18 +245,19 @@ export class AuthService {
    */
   async adminLogin(dto: LoginDto, ipAddress?: string): Promise<AuthTokens & { role: UserRole; permissions: string[] }> {
     const ip = ipAddress ?? 'unknown';
-    await this.loginThrottle.assertAllowed(dto.email, ip, 'admin');
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) {
-      await this.loginThrottle.recordFailure(dto.email, ip, 'admin');
+      const failure = await this.loginThrottle.recordFailure(dto.email, ip, 'admin');
       await this.recordFailedLogin(dto.email);
+      if (failure.blocked) throw this.tooManyLogins();
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const passwordOk = await this.passwordHasher.verify(user.passwordHash, dto.password);
     if (!passwordOk) {
-      await this.loginThrottle.recordFailure(dto.email, ip, 'admin');
+      const failure = await this.loginThrottle.recordFailure(dto.email, ip, 'admin');
       await this.recordFailedLogin(dto.email, user.id);
+      if (failure.blocked) throw this.tooManyLogins();
       throw new UnauthorizedException('Invalid email or password');
     }
     await this.loginThrottle.recordSuccess(dto.email, 'admin');
@@ -414,6 +418,10 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
+
+  private tooManyLogins() {
+    return new HttpException('Too many login attempts. Please try again later.', HttpStatus.TOO_MANY_REQUESTS);
+  }
 
   private async recordFailedLogin(email: string, userId?: string): Promise<void> {
     await this.prisma.auditLog.create({

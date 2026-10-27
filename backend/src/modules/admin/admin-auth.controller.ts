@@ -1,6 +1,5 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
-import { Throttle } from '@nestjs/throttler';
 import { AuthService } from '../auth/auth.service';
 import { AdminLoginDto } from './dto/admin.dto';
 
@@ -13,7 +12,7 @@ import { AdminLoginDto } from './dto/admin.dto';
 export class AdminAuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  // Database-backed lockout lives in AuthService; see LoginThrottleService.
   @Post('login')
   login(@Body() dto: AdminLoginDto, @Req() req: Request) {
     return this.authService.adminLogin(dto, req.ip);

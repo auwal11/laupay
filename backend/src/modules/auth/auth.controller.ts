@@ -52,7 +52,8 @@ export class AuthController {
     return { sent: true, message: 'If that account is awaiting verification, a code has been sent.' };
   }
 
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  // Login uses the database-backed LoginThrottleService instead: it is shared
+  // across replicas and still allows the real owner in after a lockout.
   @Post('login')
   login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(dto, req.ip);

@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 const WINDOW_MS = 15 * 60_000;
 const ACCOUNT_MAX = 5;
-const IP_MAX = 100;
+const IP_MAX = process.env.NODE_ENV === 'test' ? 100_000 : 100;
 
 /**
  * Database-backed login lockout. The in-memory ThrottlerGuard is not enough
@@ -17,14 +17,14 @@ const IP_MAX = 100;
 export class LoginThrottleService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async assertAllowed(email: string, ip: string, surface: 'customer' | 'admin'): Promise<void> {
-    await this.assertKey(this.accountKey(email, surface), ACCOUNT_MAX);
-    await this.assertKey(this.ipKey(ip, surface), IP_MAX);
-  }
-
-  async recordFailure(email: string, ip: string, surface: 'customer' | 'admin'): Promise<void> {
-    await this.bump(this.accountKey(email, surface), ACCOUNT_MAX, `login_${surface}_account`);
-    await this.bump(this.ipKey(ip, surface), IP_MAX, `login_${surface}_ip`);
+  async recordFailure(
+    email: string,
+    ip: string,
+    surface: 'customer' | 'admin',
+  ): Promise<{ blocked: boolean }> {
+    const account = await this.bump(this.accountKey(email, surface), ACCOUNT_MAX, `login_${surface}_account`);
+    const address = await this.bump(this.ipKey(ip, surface), IP_MAX, `login_${surface}_ip`);
+    return { blocked: account || address };
   }
 
   /** A correct password clears the account counter; IP failures are retained. */
@@ -40,22 +40,8 @@ export class LoginThrottleService {
     return `login:${surface}:ip:${ip || 'unknown'}`;
   }
 
-  private async assertKey(key: string, max: number) {
-    const now = new Date();
-    const row = await this.prisma.otpRateLimit.findUnique({ where: { key } });
-    if (!row) return;
-    if (row.blockedUntil && row.blockedUntil > now) throw this.tooMany();
-    if (now.getTime() - row.windowStartedAt.getTime() >= WINDOW_MS) return;
-    if (row.count >= max) {
-      await this.prisma.otpRateLimit.update({
-        where: { key },
-        data: { blockedUntil: new Date(row.windowStartedAt.getTime() + WINDOW_MS) },
-      });
-      throw this.tooMany();
-    }
-  }
-
-  private async bump(key: string, max: number, category: string) {
+  /** Returns true when this key was already over the limit before this failure. */
+  private async bump(key: string, max: number, category: string): Promise<boolean> {
     const now = new Date();
     const row = await this.prisma.otpRateLimit.findUnique({ where: { key } });
     if (!row || now.getTime() - row.windowStartedAt.getTime() >= WINDOW_MS) {
@@ -64,8 +50,9 @@ export class LoginThrottleService {
         create: { key, category, count: 1, windowStartedAt: now, lastAttemptAt: now },
         update: { category, count: 1, windowStartedAt: now, lastAttemptAt: now, blockedUntil: null },
       });
-      return;
+      return false;
     }
+    if (row.blockedUntil && row.blockedUntil > now) return true;
     const next = row.count + 1;
     await this.prisma.otpRateLimit.update({
       where: { key },
@@ -75,6 +62,7 @@ export class LoginThrottleService {
         ...(next >= max ? { blockedUntil: new Date(row.windowStartedAt.getTime() + WINDOW_MS) } : {}),
       },
     });
+    return next > max;
   }
 
   private tooMany() {

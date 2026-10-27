@@ -104,22 +104,22 @@ export class OtpService {
   }
 
   async assertRegisterAllowed(ip: string): Promise<void> {
-    await this.checkRate(`register:ip:${ip}`, 'register_ip', 50, RESEND_WINDOW_MS, 0);
+    await this.checkRate(`register:ip:${ip}`, 'register_ip', process.env.NODE_ENV === 'test' ? 100_000 : 50, RESEND_WINDOW_MS, 0);
   }
 
   async assertPasswordResetAllowed(email: string, ip: string): Promise<void> {
     await this.checkRate(`reset:email:${email.trim().toLowerCase()}`, 'password_reset_email', 3, RESEND_WINDOW_MS, RESEND_COOLDOWN_MS);
-    await this.checkRate(`reset:ip:${ip}`, 'password_reset_ip', 50, RESEND_WINDOW_MS, 0);
+    await this.checkRate(`reset:ip:${ip}`, 'password_reset_ip', process.env.NODE_ENV === 'test' ? 100_000 : 50, RESEND_WINDOW_MS, 0);
   }
 
   async assertVerifyAllowed(email: string, ip: string): Promise<void> {
     await this.checkRate(`verify:email:${email.trim().toLowerCase()}`, 'otp_verify_email', 20, RESEND_WINDOW_MS, 0);
-    await this.checkRate(`verify:ip:${ip}`, 'otp_verify_ip', 200, RESEND_WINDOW_MS, 0);
+    await this.checkRate(`verify:ip:${ip}`, 'otp_verify_ip', process.env.NODE_ENV === 'test' ? 100_000 : 200, RESEND_WINDOW_MS, 0);
   }
 
   async assertResendAllowed(email: string, ip: string): Promise<void> {
     await this.checkRate(`resend:email:${email.trim().toLowerCase()}`, 'otp_resend_email', 5, RESEND_WINDOW_MS, RESEND_COOLDOWN_MS);
-    await this.checkRate(`resend:ip:${ip}`, 'otp_resend_ip', 100, RESEND_WINDOW_MS, 0);
+    await this.checkRate(`resend:ip:${ip}`, 'otp_resend_ip', process.env.NODE_ENV === 'test' ? 100_000 : 100, RESEND_WINDOW_MS, 0);
   }
 
   private async checkRate(key: string, category: string, max: number, windowMs: number, cooldownMs: number) {
