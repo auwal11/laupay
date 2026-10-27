@@ -114,6 +114,13 @@ export class AppConfigService {
   readonly adminBootstrapEmail = optional('ADMIN_EMAIL', '');
   readonly adminBootstrapPassword = optional('ADMIN_PASSWORD', '');
   readonly adminBootstrapName = optional('ADMIN_NAME', 'LAUPAY Admin');
+  /** Only these immutable user IDs may grant the ADMIN role. */
+  readonly superAdminIds = new Set(
+    (process.env.SUPER_ADMIN_IDS ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean),
+  );
 
   /** Base URL of THIS API, used to build the OTP link emailed to users. */
   readonly publicApiBaseUrl = optional('PUBLIC_API_BASE_URL', 'http://localhost:3000');

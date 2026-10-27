@@ -292,6 +292,9 @@ export class AdminOpsService {
     if (role === UserRole.CUSTOMER || role === UserRole.AGENT) {
       throw new BadRequestException('Use customer/agent onboarding flows to change non-admin roles');
     }
+    if (role === UserRole.ADMIN && !this.config.superAdminIds.has(actor.adminId)) {
+      throw new ForbiddenException('Only a configured super administrator can grant the ADMIN role');
+    }
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
     const sessionsRevokedAt = new Date();
