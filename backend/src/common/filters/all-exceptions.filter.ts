@@ -25,7 +25,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest();
+    const request = ctx.getRequest<{ method: string; url: string; requestId?: string }>();
+    const requestId = request.requestId ?? 'unavailable';
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal server error';
@@ -45,6 +46,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = 'Invalid amount';
     }
 
+    // Never return internal exception messages for server failures. Keep
+    // expected, user-actionable 4xx validation messages intact.
+    if (this.config.isProduction && status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      message = 'Internal server error';
+    }
+
     this.logger.error(
       `${request.method} ${request.url} -> ${status}: ${
         exception instanceof Error ? exception.stack : String(exception)
@@ -54,6 +61,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     response.status(status).json({
       statusCode: status,
       message,
+      requestId,
       // Full error detail only ever included outside production, and even
       // then only in the log above, not by default in the body.
       ...(this.config.isProduction ? {} : { debug: String(exception) }),

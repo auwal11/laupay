@@ -5,6 +5,7 @@ import * as bodyParser from 'body-parser';
 import type { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import { join } from 'path';
+import { randomUUID } from 'crypto';
 import { AppModule } from './app.module';
 import { AppConfigService } from './config/app-config.service';
 
@@ -15,6 +16,15 @@ async function bootstrap() {
   // Refuse to boot with a dangerous provider/credential combination (mock in
   // production, or a live key in staging) before accepting any traffic.
   config.assertStagingSafety();
+
+  // Give each request a non-sensitive correlation ID. It lets support locate
+  // a server-side error without exposing stack traces or database details.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const requestId = randomUUID();
+    res.setHeader('X-Request-Id', requestId);
+    (req as Request & { requestId?: string }).requestId = requestId;
+    next();
+  });
 
   // Paystack signs the exact bytes received over HTTP. Capture them before
   // JSON parsing; re-serialising req.body can change whitespace/key order.
