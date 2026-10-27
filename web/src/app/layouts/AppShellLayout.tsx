@@ -61,11 +61,11 @@ export function AppShellLayout() {
   if (!user) return null; // ProtectedRoute guarantees this, but keeps TS happy.
 
   return (
-    <div className="flex min-h-screen bg-laupay-surface-muted">
+    <div className="customer-shell flex min-h-screen bg-laupay-surface-muted">
       <AppNav role={user.role} mobileOpen={mobileOpen} onCloseMobile={closeMobileNav} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="relative flex items-center justify-between gap-3 border-b border-laupay-border bg-white px-5 py-3.5">
+        <header className="customer-header relative flex items-center justify-between gap-3 border-b border-laupay-border bg-white px-5 py-3.5">
           <div className="flex items-center gap-2">
             <button
               ref={menuButtonRef}
@@ -128,7 +128,7 @@ function NotificationPanel({
 }) {
   return (
     <div
-      className="absolute right-4 top-14 z-50 w-[min(92vw,380px)] rounded-xl border border-laupay-border bg-white p-4 shadow-raised"
+      className="customer-glass-panel absolute right-4 top-14 z-50 w-[min(92vw,380px)] rounded-xl border border-laupay-border bg-white p-4 shadow-raised"
       role="dialog"
       aria-label="Notifications"
     >

@@ -9,7 +9,7 @@ export function BalanceCard({ onAddFund, onWithdraw }: { onAddFund?: () => void;
 
   if (state.status === "loading") {
     return (
-      <div className="rounded-2xl bg-laupay-indigo p-6 shadow-raised">
+      <div className="customer-balance rounded-2xl bg-laupay-indigo p-6 shadow-raised">
         <Skeleton className="h-3 w-32 bg-white/15" />
         <Skeleton className="mt-4 h-9 w-44 bg-white/20" />
       </div>
@@ -23,7 +23,7 @@ export function BalanceCard({ onAddFund, onWithdraw }: { onAddFund?: () => void;
   if (state.status !== "success") return null;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-laupay-indigo p-6 text-white shadow-raised">
+    <div className="customer-balance relative overflow-hidden rounded-2xl bg-laupay-indigo p-6 text-white shadow-raised">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full border border-white/10"

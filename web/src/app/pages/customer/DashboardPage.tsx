@@ -32,7 +32,7 @@ export function DashboardPage() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="customer-dashboard flex flex-col gap-7">
       <div className="flex items-center gap-3">
         <ProfileAvatar name={user?.fullName ?? "LAUPAY"} photo={assetUrl(user?.profilePhotoUrl)} />
         <div>
@@ -53,7 +53,7 @@ export function DashboardPage() {
 
       <Link
         to="/app/transactions"
-        className="group flex min-h-[80px] w-full items-center gap-3 rounded-2xl border border-laupay-border bg-white px-4 py-3.5 shadow-card transition-all hover:border-laupay-indigo/40 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo active:scale-[0.99] sm:px-5"
+        className="customer-glass-panel group flex min-h-[80px] w-full items-center gap-3 rounded-2xl border border-laupay-border bg-white px-4 py-3.5 shadow-card transition-all hover:border-laupay-indigo/40 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo active:scale-[0.99] sm:px-5"
         aria-label="Open Transaction History"
       >
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-laupay-indigo text-white shadow-sm">
@@ -148,7 +148,7 @@ function QuickAction({
   return (
     <Link
       to={to}
-      className="group flex flex-col items-center gap-2 rounded-xl border border-laupay-border bg-white px-2 py-4 shadow-card transition-colors hover:border-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo"
+      className="customer-glass-panel group flex flex-col items-center gap-2 rounded-xl border border-laupay-border bg-white px-2 py-4 shadow-card transition-colors hover:border-laupay-indigo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-indigo"
     >
       {inner}
     </Link>

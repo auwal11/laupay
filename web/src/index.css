@@ -246,3 +246,46 @@ button { font: inherit; }
 @supports not ((backdrop-filter: blur(1px))) {
   .admin-header, .admin-shell .admin-card { background: #fff; }
 }
+
+/* Customer dashboard glass accents. These are intentionally scoped so the
+   service purchase flows keep their calmer, high-contrast form surfaces. */
+.customer-shell {
+  position: relative;
+  isolation: isolate;
+  overflow-x: hidden;
+  background: #f5f6fa;
+}
+.customer-shell::before,
+.customer-shell::after {
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  border-radius: 999px;
+  filter: blur(68px);
+  opacity: .22;
+}
+.customer-shell::before { top: 4%; right: -80px; width: 280px; height: 250px; background: #dfe5ff; }
+.customer-shell::after { bottom: -100px; left: 12%; width: 300px; height: 220px; background: #f9dfaa; }
+.customer-header {
+  background: rgba(255,255,255,.72);
+  border-color: rgba(255,255,255,.8);
+  box-shadow: 0 1px 0 rgba(255,255,255,.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.customer-glass-panel {
+  border-color: rgba(255,255,255,.88);
+  background: rgba(255,255,255,.72);
+  box-shadow: 0 8px 28px rgba(25,25,71,.06), inset 0 1px 0 rgba(255,255,255,.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.customer-glass-panel:hover { box-shadow: 0 12px 30px rgba(25,25,71,.09), inset 0 1px 0 rgba(255,255,255,.78); }
+.customer-balance { box-shadow: 0 14px 34px rgba(23,26,74,.18), inset 0 1px 0 rgba(255,255,255,.1); }
+@supports not ((backdrop-filter: blur(1px))) {
+  .customer-header, .customer-glass-panel { background: #fff; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .customer-glass-panel { transition: none !important; }
+}
