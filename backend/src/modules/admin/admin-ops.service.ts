@@ -317,8 +317,9 @@ export class AdminOpsService {
     return wallet;
   }
 
-  async creditWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey?: string) {
+  async creditWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
+    this.requireIdempotencyKey(idempotencyKey);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
     const mode = await this.settings.effectiveFulfillmentMode();
@@ -332,7 +333,7 @@ export class AdminOpsService {
       adminId: actor.adminId,
       referenceType: 'AdminAdjustment',
       referenceId: actor.adminId,
-      idempotencyKey: idempotencyKey ?? `ledger:admin-credit:${wallet.id}:${randomUUID()}`,
+      idempotencyKey: `ledger:admin-credit:${idempotencyKey}`,
     });
     await this.notifications
       .create({
@@ -358,8 +359,9 @@ export class AdminOpsService {
     return entry;
   }
 
-  async debitWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey?: string) {
+  async debitWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
+    this.requireIdempotencyKey(idempotencyKey);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
     const entry = await this.ledger.debit({
@@ -371,7 +373,7 @@ export class AdminOpsService {
       adminId: actor.adminId,
       referenceType: 'AdminAdjustment',
       referenceId: actor.adminId,
-      idempotencyKey: idempotencyKey ?? `ledger:admin-debit:${wallet.id}:${randomUUID()}`,
+      idempotencyKey: `ledger:admin-debit:${idempotencyKey}`,
     });
     await this.notifications
       .create({
@@ -394,11 +396,18 @@ export class AdminOpsService {
     return entry;
   }
 
-  async debitWalletBalance(userId: string, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey?: string) {
+  async debitWalletBalance(userId: string, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
+    this.requireIdempotencyKey(idempotencyKey);
     const wallet = await this.walletFor(userId);
     const amount = Number(wallet.balance);
     if (!(amount > 0)) throw new BadRequestException('This wallet has no available balance to debit');
     return this.debitWallet(userId, amount, reason, note, actor, idempotencyKey);
+  }
+
+  private requireIdempotencyKey(value: string) {
+    if (!value || value.trim().length < 16 || value.length > 128) {
+      throw new BadRequestException('A unique idempotency key is required for wallet adjustments');
+    }
   }
 
   async reverseEntry(entryId: string, reason: string, actor: AdminActor) {
@@ -611,7 +620,10 @@ export class AdminOpsService {
       include: { ledgerEntry: true },
     });
     if (!dispute) throw new NotFoundException('Dispute not found');
-    if (dispute.status === 'RESOLVED') throw new ConflictException('This dispute is already resolved');
+    if (!['OPEN', 'IN_REVIEW'].includes(dispute.status)) {
+      throw new ConflictException('This dispute is not eligible for a refund');
+    }
+    if (dispute.refundEntryId) throw new ConflictException('This dispute has already been refunded');
     const wallet = await this.walletFor(dispute.userId);
     const amount = dispute.ledgerEntry.amount.toString();
     const entry = await this.ledger.credit({
@@ -625,8 +637,8 @@ export class AdminOpsService {
       referenceId: dispute.id,
       idempotencyKey: `ledger:dispute:${dispute.id}:refund`,
     });
-    const updated = await this.prisma.transactionDispute.update({
-      where: { id },
+    const claimed = await this.prisma.transactionDispute.updateMany({
+      where: { id, status: { in: ['OPEN', 'IN_REVIEW'] }, refundEntryId: null },
       data: {
         status: 'RESOLVED',
         resolvedAt: new Date(),
@@ -635,6 +647,8 @@ export class AdminOpsService {
         refundEntryId: entry.entryId,
       },
     });
+    if (claimed.count !== 1) throw new ConflictException('This dispute was already resolved or refunded');
+    const updated = await this.prisma.transactionDispute.findUniqueOrThrow({ where: { id } });
     await this.notifications
       .create({
         userId: dispute.userId,

@@ -525,7 +525,7 @@ model TransactionDispute {
   status          DisputeStatus @default(OPEN)
   assignedAdminId String?
   resolutionNote  String?
-  refundEntryId   String?
+  refundEntryId   String? @unique
   lastActivityAt  DateTime      @default(now())
   resolvedAt      DateTime?
   createdAt       DateTime      @default(now())

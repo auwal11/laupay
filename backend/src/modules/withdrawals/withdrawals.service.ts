@@ -107,7 +107,7 @@ export class WithdrawalsService {
   markSuccessful(adminId: string, id: string, reason: string, providerReference: string, evidence: string) { if (!providerReference?.trim() || !evidence?.trim()) throw new BadRequestException('Provider reference and verification evidence are required'); return this.transition(adminId, id, WithdrawalStatus.PROCESSING, WithdrawalStatus.SUCCESSFUL, 'SETTLED', reason, { processedBy: adminId, settledAt: new Date(), providerReference: providerReference.trim(), verificationEvidence: evidence.trim() }); }
   reject(adminId: string, id: string, reason: string) { return this.refundAndTransition(adminId, id, [WithdrawalStatus.PENDING], WithdrawalStatus.REJECTED, reason, 'REJECTED'); }
   markFailed(adminId: string, id: string, reason: string) { return this.refundAndTransition(adminId, id, [WithdrawalStatus.PROCESSING, WithdrawalStatus.APPROVED], WithdrawalStatus.FAILED, reason, 'FAILED'); }
-  refund(adminId: string, id: string, reason: string) { return this.refundAndTransition(adminId, id, [WithdrawalStatus.SUCCESSFUL, WithdrawalStatus.FAILED, WithdrawalStatus.REVERSED], WithdrawalStatus.REFUNDED, reason, 'REFUNDED'); }
+  refund(adminId: string, id: string, reason: string) { return this.refundAndTransition(adminId, id, [WithdrawalStatus.SUCCESSFUL, WithdrawalStatus.FAILED, WithdrawalStatus.REVERSED, WithdrawalStatus.REFUND_FAILED], WithdrawalStatus.REFUNDED, reason, 'REFUNDED'); }
 
   private async transition(adminId: string, id: string, from: WithdrawalStatus, to: WithdrawalStatus, action: string, reason: string, data: Prisma.WithdrawalUpdateInput) {
     if (!reason?.trim()) throw new BadRequestException('A reason is required');

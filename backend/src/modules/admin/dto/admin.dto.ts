@@ -34,9 +34,10 @@ export class CreditTestFundsDto {
   amount!: number;
 
   /** Optional client-supplied key so a double-submit cannot credit twice. */
-  @IsOptional()
   @IsString()
-  idempotencyKey?: string;
+  @MinLength(16)
+  @MaxLength(128)
+  idempotencyKey!: string;
 }
 
 export class UpdateSettingsDto {
@@ -150,9 +151,10 @@ export class WalletCreditDto extends ReasonDto {
   @MaxLength(500)
   note?: string;
 
-  @IsOptional()
   @IsString()
-  idempotencyKey?: string;
+  @MinLength(16)
+  @MaxLength(128)
+  idempotencyKey!: string;
 }
 
 export class WalletDebitDto extends WalletCreditDto {}
@@ -166,9 +168,10 @@ export class WalletDebitBalanceDto extends ReasonDto {
   @MaxLength(500)
   note?: string;
 
-  @IsOptional()
   @IsString()
-  idempotencyKey?: string;
+  @MinLength(16)
+  @MaxLength(128)
+  idempotencyKey!: string;
 }
 
 export class ReverseEntryDto extends ReasonDto {}
