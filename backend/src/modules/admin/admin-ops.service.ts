@@ -32,6 +32,37 @@ export interface AdminActor {
 
 const ADMIN_ROLES: UserRole[] = [UserRole.ADMIN, UserRole.SUPPORT, UserRole.FINANCE, UserRole.VIEWER];
 
+/**
+ * Admin action responses must never serialize the full Prisma User model.
+ * In particular, passwordHash, twoFactorSecret and session revocation
+ * internals are not needed by the console and must not leave the API.
+ */
+function adminUserView(user: {
+  id: string;
+  email: string;
+  phone: string | null;
+  fullName: string;
+  profilePhotoUrl: string | null;
+  role: UserRole;
+  status: UserStatus;
+  emailVerifiedAt: Date | null;
+  phoneVerifiedAt: Date | null;
+  updatedAt: Date;
+}) {
+  return {
+    id: user.id,
+    email: user.email,
+    phone: user.phone,
+    fullName: user.fullName,
+    profilePhotoUrl: user.profilePhotoUrl,
+    role: user.role,
+    status: user.status,
+    emailVerifiedAt: user.emailVerifiedAt,
+    phoneVerifiedAt: user.phoneVerifiedAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
 function startOfToday(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -194,7 +225,7 @@ export class AdminOpsService {
       after: { status },
       metadata: { action },
     });
-    return updated;
+    return adminUserView(updated);
   }
 
   /** Invalidates the customer's transaction PIN; they must set a new one. */
@@ -269,7 +300,7 @@ export class AdminOpsService {
       after: { [field === 'email' ? 'emailVerifiedAt' : 'phoneVerifiedAt']: new Date().toISOString() },
       metadata: { action: 'user.mark_verified', field },
     });
-    return updated;
+    return adminUserView(updated);
   }
 
   async addNote(id: string, body: string, actor: AdminActor) {
@@ -318,7 +349,7 @@ export class AdminOpsService {
       after: { role },
       metadata: { action: 'user.set_role' },
     });
-    return updated;
+    return adminUserView(updated);
   }
 
   // =================================================================
