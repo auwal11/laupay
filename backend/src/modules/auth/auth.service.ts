@@ -9,7 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AuditAction, Prisma, User, UserRole, WalletOwnerType } from '@prisma/client';
+import { AuditAction, Prisma, User, UserRole, UserStatus, WalletOwnerType } from '@prisma/client';
 import { randomUUID, randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
@@ -55,9 +55,12 @@ export class AuthService {
     // Same message whether the email exists or the code is wrong.
     if (!user) throw new UnauthorizedException('Invalid or expired verification code');
 
-    if (user.status === 'ACTIVE') {
-      await this.tryAutoTestCredit(user.id);
-      return this.issueTokens(user.id, user.role);
+    // OTP verification is only a registration transition. An already-active
+    // account must authenticate through password login; accepting any code
+    // here would be a complete account-takeover bypass. Suspended, frozen,
+    // and closed accounts must never be reactivated through OTP either.
+    if (user.status !== UserStatus.PENDING_VERIFICATION) {
+      throw new UnauthorizedException('Invalid or expired verification code');
     }
 
     await this.otp.consume(user.id, dto.code);
