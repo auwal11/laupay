@@ -1,5 +1,5 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditAction, LedgerReason, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { AuditAction, LedgerReason, OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -33,7 +33,10 @@ export class PaymentsService {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
     const existingPayment = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
-    if (existingPayment) return existingPayment;
+    if (existingPayment) {
+      if (existingPayment.userId !== userId) throw new BadRequestException('Invalid idempotency key');
+      return existingPayment;
+    }
 
     // Operational kill switch + account/wallet/risk gate. A paused funding
     // service (or a frozen account) must fail before any provider call.
@@ -103,11 +106,17 @@ export class PaymentsService {
    */
   async confirmAgentCash(agentUserId: string, orderId: string) {
     const idempotencyKey = `agent-cash:${orderId}`;
-    const existingPayment = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
-    if (existingPayment) return existingPayment;
-
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found');
+    if (order.agentId !== agentUserId) {
+      throw new ForbiddenException('This order is not assigned to the requesting agent');
+    }
+    if (order.status !== OrderStatus.CREATED) {
+      throw new BadRequestException('Only a new agent order can be confirmed as cash collected');
+    }
+
+    const existingPayment = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
+    if (existingPayment) return existingPayment;
 
     const agentDebitAmount = await this.computeAgentDebitAmount(order);
 

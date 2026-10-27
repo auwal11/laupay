@@ -56,7 +56,10 @@ export class OrdersService {
   ) {
     await this.security.verifyPin(userId, pin);
     const existing = await this.prisma.order.findUnique({ where: { idempotencyKey } });
-    if (existing) return existing;
+    if (existing) {
+      if (existing.userId !== userId) throw new ForbiddenException('Invalid idempotency key');
+      return existing;
+    }
 
     await this.settings.assertServiceEnabled('airtime', 'Airtime purchases');
     await this.risk.assertCanTransact({ userId, kind: 'airtime', amount, phoneNumber });
@@ -105,7 +108,10 @@ export class OrdersService {
   ) {
     await this.security.verifyPin(userId, pin);
     const existing = await this.prisma.order.findUnique({ where: { idempotencyKey } });
-    if (existing) return existing;
+    if (existing) {
+      if (existing.userId !== userId) throw new ForbiddenException('Invalid idempotency key');
+      return existing;
+    }
 
     const plan = await this.prisma.dataPlan.findUniqueOrThrow({ where: { id: dataPlanId } });
     if (!plan.isActive) {
@@ -339,6 +345,16 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { vtuTransaction: true } });
     if (!order) throw new NotFoundException('Order not found');
     if (order.status === OrderStatus.FULFILLED) return order;
+    if (!([OrderStatus.PAID, OrderStatus.FULFILLING, OrderStatus.FULFILLMENT_UNKNOWN] as OrderStatus[]).includes(order.status)) {
+      throw new BadRequestException('Only a paid or unresolved fulfillment can be manually confirmed');
+    }
+    const debit = await this.prisma.ledgerEntry.findUnique({ where: { idempotencyKey: `ledger:order:${orderId}` } });
+    if (!debit || debit.direction !== 'DEBIT') {
+      throw new BadRequestException('This order has no verified wallet debit');
+    }
+    if (!order.vtuTransaction?.providerReference) {
+      throw new BadRequestException('Provider confirmation is required before manual success');
+    }
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
