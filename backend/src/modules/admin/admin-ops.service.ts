@@ -734,8 +734,8 @@ export class AdminOpsService {
     const dispute = await this.prisma.transactionDispute.findUnique({ where: { id } });
     if (!dispute) throw new NotFoundException('Dispute not found');
     if (['RESOLVED', 'REJECTED'].includes(dispute.status)) throw new ConflictException('Dispute already closed');
-    const updated = await this.prisma.transactionDispute.update({
-      where: { id },
+    const claimed = await this.prisma.transactionDispute.updateMany({
+      where: { id, status: { in: ['OPEN', 'IN_REVIEW'] }, refundEntryId: null },
       data: {
         status: 'REJECTED',
         resolvedAt: new Date(),
@@ -743,6 +743,8 @@ export class AdminOpsService {
         resolutionNote: note?.trim() || reason.trim(),
       },
     });
+    if (claimed.count !== 1) throw new ConflictException('This dispute is already being processed or resolved');
+    const updated = await this.prisma.transactionDispute.findUniqueOrThrow({ where: { id } });
     await this.notifications
       .create({
         userId: dispute.userId,

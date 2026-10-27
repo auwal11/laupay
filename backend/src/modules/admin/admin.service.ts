@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   AuditAction,
   LedgerDirection,
@@ -561,12 +561,18 @@ export class AdminService {
     if (!allowed.includes(status)) throw new NotFoundException('Invalid dispute status');
     const existing = await this.prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT * FROM "TransactionDispute" WHERE "id" = ${id} LIMIT 1`);
     if (!existing[0]) throw new NotFoundException('Dispute not found');
+    if (String(existing[0].status) === 'REFUND_PENDING') {
+      throw new ConflictException('This dispute refund is being processed');
+    }
     const resolvedAt = ['RESOLVED', 'REJECTED', 'CLOSED'].includes(status) ? new Date() : null;
     const updated = await this.prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
       UPDATE "TransactionDispute" SET "status" = ${status}::"DisputeStatus", "resolvedAt" = ${resolvedAt}, "updatedAt" = NOW()
       WHERE "id" = ${id}
+        AND "status" = ${String(existing[0].status)}::"DisputeStatus"
+        AND "refundEntryId" IS NULL
       RETURNING *
     `);
+    if (!updated[0]) throw new ConflictException('This dispute was changed by another admin');
     await this.prisma.auditLog.create({
       data: {
         actorId: actor.adminId,
