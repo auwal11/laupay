@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 const WINDOW_MS = 15 * 60_000;
 const ACCOUNT_MAX = 5;
-const IP_MAX = 25;
+const IP_MAX = 100;
 
 /**
  * Database-backed login lockout. The in-memory ThrottlerGuard is not enough
