@@ -101,7 +101,8 @@ export class AuthService {
     }
   }
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, ipAddress?: string) {
+    await this.otp.assertRegisterAllowed(ipAddress ?? 'unknown');
     if (dto.termsAccepted !== true) throw new ForbiddenException('Terms acceptance is required');
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
@@ -295,7 +296,8 @@ export class AuthService {
     return { ...tokens, role: user.role, permissions: permissionsForRole(user.role) };
   }
 
-  async forgotPassword(email: string) {
+  async forgotPassword(email: string, ipAddress?: string) {
+    await this.otp.assertPasswordResetAllowed(email, ipAddress ?? 'unknown');
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (user) {
       const token = randomUUID() + randomBytes(32).toString('hex');

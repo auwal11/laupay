@@ -22,8 +22,8 @@ export class AuthController {
   // stuffing / brute force per docs/security/security-model.md §4.
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  register(@Body() dto: RegisterDto, @Req() req: Request) {
+    return this.authService.register(dto, req.ip);
   }
 
   /**
@@ -59,7 +59,7 @@ export class AuthController {
   }
 
   @Post('forgot-password')
-  forgotPassword(@Body() dto: ForgotPasswordDto) { return this.authService.forgotPassword(dto.email); }
+  forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) { return this.authService.forgotPassword(dto.email, req.ip); }
 
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) { return this.authService.resetPassword(dto.token, dto.password); }
