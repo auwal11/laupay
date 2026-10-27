@@ -325,7 +325,12 @@ export class AuthService {
     // the password they just set (otherwise login keeps returning the generic
     // "Invalid email or password" for PENDING_VERIFICATION accounts).
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: record.userId } });
-    await this.prisma.$transaction([this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash, ...(user.status === 'PENDING_VERIFICATION' ? { status: 'ACTIVE' } : {}) } }), this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }), this.prisma.refreshToken.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: new Date() } })]);
+    const sessionsRevokedAt = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash, sessionsRevokedAt, ...(user.status === 'PENDING_VERIFICATION' ? { status: 'ACTIVE' } : {}) } as any }),
+      this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: sessionsRevokedAt } }),
+      this.prisma.refreshToken.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: sessionsRevokedAt } }),
+    ]);
     return { reset: true };
   }
 
@@ -348,11 +353,12 @@ export class AuthService {
     }
 
     const passwordHash = await this.passwordHasher.hash(newPassword);
+    const sessionsRevokedAt = new Date();
     await this.prisma.$transaction([
-      this.prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+      this.prisma.user.update({ where: { id: userId }, data: { passwordHash, sessionsRevokedAt } as any }),
       this.prisma.refreshToken.updateMany({
         where: { userId, revokedAt: null },
-        data: { revokedAt: new Date() },
+        data: { revokedAt: sessionsRevokedAt },
       }),
       this.prisma.auditLog.create({
         data: {
@@ -377,6 +383,9 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: stored.userId } });
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Account is not active');
+    }
 
     // Rotate: revoke the used token and issue a brand new pair. A refresh
     // token that gets used twice (theft/replay) will fail on its second use

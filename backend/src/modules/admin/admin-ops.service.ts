@@ -151,7 +151,11 @@ export class AdminOpsService {
 
     const updated = await this.prisma.user.update({
       where: { id },
-      data: { status, frozenReason: status === UserStatus.FROZEN ? reason : null },
+      data: {
+        status,
+        frozenReason: status === UserStatus.FROZEN ? reason : null,
+        sessionsRevokedAt: new Date(),
+      } as any,
     });
 
     // A frozen/closed account must not keep live sessions.
@@ -194,11 +198,15 @@ export class AdminOpsService {
     this.requireReason(reason);
     const security = await this.prisma.userSecurity.findUnique({ where: { userId: id } });
     if (!security) throw new NotFoundException('This user has no PIN record');
-    await this.prisma.userSecurity.update({
-      where: { userId: id },
-      data: { pinHash: null, pinSetAt: null, failedPinAttempts: 0, pinLockedUntil: null },
-    });
-    await this.prisma.refreshToken.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+    const revokedAt = new Date();
+    await this.prisma.$transaction([
+      this.prisma.userSecurity.update({
+        where: { userId: id },
+        data: { pinHash: null, pinSetAt: null, failedPinAttempts: 0, pinLockedUntil: null },
+      }),
+      this.prisma.refreshToken.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt } }),
+      this.prisma.user.update({ where: { id }, data: { sessionsRevokedAt: revokedAt } as any }),
+    ]);
     await this.notifications
       .create({
         userId: id,
@@ -221,10 +229,14 @@ export class AdminOpsService {
 
   async forceLogout(id: string, actor: AdminActor, reason: string) {
     this.requireReason(reason);
-    const result = await this.prisma.refreshToken.updateMany({
-      where: { userId: id, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    const revokedAt = new Date();
+    const [result] = await this.prisma.$transaction([
+      this.prisma.refreshToken.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt },
+      }),
+      this.prisma.user.update({ where: { id }, data: { sessionsRevokedAt: revokedAt } as any }),
+    ]);
     await this.writeAudit(actor, {
       action: AuditAction.ADMIN_ACTION,
       entityType: 'User',
@@ -282,7 +294,8 @@ export class AdminOpsService {
     }
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
-    const updated = await this.prisma.user.update({ where: { id }, data: { role: role as UserRole } });
+    const sessionsRevokedAt = new Date();
+    const updated = await this.prisma.user.update({ where: { id }, data: { role: role as UserRole, sessionsRevokedAt } as any });
     await this.writeAudit(actor, {
       action: AuditAction.ADMIN_ACTION,
       entityType: 'User',
