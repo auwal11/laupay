@@ -387,14 +387,17 @@ export class AuthService {
       throw new UnauthorizedException('Account is not active');
     }
 
-    // Rotate: revoke the used token and issue a brand new pair. A refresh
-    // token that gets used twice (theft/replay) will fail on its second use
-    // because it was already revoked on its first — this is the detection
-    // mechanism described in docs/security/security-model.md §1.
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
+    // Rotate atomically. A plain findUnique followed by update is vulnerable
+    // to two concurrent refresh requests both observing the token as live and
+    // both minting a new session. The conditional update is the single-use
+    // claim; exactly one request may win it.
+    const claimed = await this.prisma.refreshToken.updateMany({
+      where: { id: stored.id, tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
       data: { revokedAt: new Date() },
     });
+    if (claimed.count !== 1) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
 
     return this.issueTokens(user.id, user.role);
   }
