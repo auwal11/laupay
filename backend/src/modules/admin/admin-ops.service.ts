@@ -320,6 +320,7 @@ export class AdminOpsService {
   async creditWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
     this.requireIdempotencyKey(idempotencyKey);
+    this.rejectSelfFinancialAction(userId, actor.adminId);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
     const mode = await this.settings.effectiveFulfillmentMode();
@@ -362,6 +363,7 @@ export class AdminOpsService {
   async debitWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
     this.requireIdempotencyKey(idempotencyKey);
+    this.rejectSelfFinancialAction(userId, actor.adminId);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
     const entry = await this.ledger.debit({
@@ -410,6 +412,10 @@ export class AdminOpsService {
     }
   }
 
+  private rejectSelfFinancialAction(userId: string, adminId: string) {
+    if (userId === adminId) throw new ForbiddenException('An administrator cannot adjust their own wallet');
+  }
+
   async reverseEntry(entryId: string, reason: string, actor: AdminActor) {
     this.requireReason(reason);
     const original = await this.prisma.ledgerEntry.findUnique({
@@ -417,6 +423,9 @@ export class AdminOpsService {
       include: { walletAccount: true },
     });
     if (!original) throw new NotFoundException('Ledger entry not found');
+    if (original.walletAccount.ownerId === actor.adminId) {
+      throw new ForbiddenException('An administrator cannot reverse their own wallet entry');
+    }
     if (original.reason === LedgerReason.REVERSAL) {
       throw new ConflictException('A reversal entry cannot be reversed again');
     }
@@ -643,25 +652,52 @@ export class AdminOpsService {
       include: { ledgerEntry: true },
     });
     if (!dispute) throw new NotFoundException('Dispute not found');
-    if (!['OPEN', 'IN_REVIEW'].includes(dispute.status)) {
+    if (dispute.userId === actor.adminId) throw new ForbiddenException('An administrator cannot refund their own dispute');
+    if (!['OPEN', 'IN_REVIEW', 'REFUND_PENDING'].includes(dispute.status)) {
       throw new ConflictException('This dispute is not eligible for a refund');
     }
     if (dispute.refundEntryId) throw new ConflictException('This dispute has already been refunded');
+
+    // Claim the dispute before touching the wallet. Without this claim-first
+    // transition, a concurrent reject/status change could leave an orphan
+    // wallet credit even though the dispute was no longer refundable.
+    if ((dispute.status as string) !== 'REFUND_PENDING') {
+      const claimed = await this.prisma.transactionDispute.updateMany({
+        where: { id, status: { in: ['OPEN', 'IN_REVIEW'] }, refundEntryId: null },
+        data: { status: 'REFUND_PENDING' as any, lastActivityAt: new Date() },
+      });
+      if (claimed.count !== 1) throw new ConflictException('This dispute is already being processed or resolved');
+    } else {
+      const existingRefund = await this.prisma.ledgerEntry.findUnique({
+        where: { idempotencyKey: `ledger:dispute:${dispute.id}:refund` },
+        select: { id: true },
+      });
+      if (!existingRefund) throw new ConflictException('This dispute refund is already being processed');
+    }
     const wallet = await this.walletFor(dispute.userId);
     const amount = dispute.ledgerEntry.amount.toString();
-    const entry = await this.ledger.credit({
-      walletAccountId: wallet.id,
-      amount,
-      reason: LedgerReason.ORDER_REFUND,
-      narrative: note?.trim() || `Dispute refund — ${dispute.caseReference}`,
-      source: 'dispute_refund',
-      adminId: actor.adminId,
-      referenceType: 'TransactionDispute',
-      referenceId: dispute.id,
-      idempotencyKey: `ledger:dispute:${dispute.id}:refund`,
-    });
-    const claimed = await this.prisma.transactionDispute.updateMany({
-      where: { id, status: { in: ['OPEN', 'IN_REVIEW'] }, refundEntryId: null },
+    let entry;
+    try {
+      entry = await this.ledger.credit({
+        walletAccountId: wallet.id,
+        amount,
+        reason: LedgerReason.ORDER_REFUND,
+        narrative: note?.trim() || `Dispute refund — ${dispute.caseReference}`,
+        source: 'dispute_refund',
+        adminId: actor.adminId,
+        referenceType: 'TransactionDispute',
+        referenceId: dispute.id,
+        idempotencyKey: `ledger:dispute:${dispute.id}:refund`,
+      });
+    } catch (error) {
+      await this.prisma.transactionDispute.updateMany({
+        where: { id, status: 'REFUND_PENDING' as any, refundEntryId: null },
+        data: { status: 'IN_REVIEW', lastActivityAt: new Date() },
+      }).catch(() => undefined);
+      throw error;
+    }
+    const completed = await this.prisma.transactionDispute.updateMany({
+      where: { id, status: 'REFUND_PENDING' as any, refundEntryId: null },
       data: {
         status: 'RESOLVED',
         resolvedAt: new Date(),
@@ -670,7 +706,7 @@ export class AdminOpsService {
         refundEntryId: entry.entryId,
       },
     });
-    if (claimed.count !== 1) throw new ConflictException('This dispute was already resolved or refunded');
+    if (completed.count !== 1) throw new ConflictException('This dispute was already resolved or refunded');
     const updated = await this.prisma.transactionDispute.findUniqueOrThrow({ where: { id } });
     await this.notifications
       .create({

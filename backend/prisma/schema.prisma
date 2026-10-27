@@ -141,6 +141,7 @@ enum AuditAction {
 enum DisputeStatus {
   OPEN
   IN_REVIEW
+  REFUND_PENDING
   RESOLVED
   REJECTED
   CLOSED
