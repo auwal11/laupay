@@ -97,6 +97,8 @@ export function AdminTransactionsPage() {
           >
             <option value="">All sources</option>
             <option value="test_allocation">Test allocation</option>
+            <option value="admin_test_credit">Admin test credit</option>
+            <option value="test_balance_clear">Test balance clear reversal</option>
             <option value="order_payment">Order payment</option>
           </select>
         </div>

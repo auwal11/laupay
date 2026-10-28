@@ -17,7 +17,7 @@ export interface AdminLoginResponse {
 
 export type AdminPermission =
   | "overview.read" | "users.read" | "users.freeze" | "users.credit" | "users.manage"
-  | "wallets.read" | "wallets.adjust" | "ledger.reverse" | "orders.read" | "orders.settle"
+  | "wallets.read" | "wallets.adjust" | "wallets.clear_test_balances" | "ledger.reverse" | "orders.read" | "orders.settle"
   | "disputes.read" | "disputes.manage" | "disputes.refund" | "audit.read"
   | "settings.read" | "settings.write" | "providers.switch_live"
   | "reports.read" | "risk.read" | "risk.manage" | "admins.manage";

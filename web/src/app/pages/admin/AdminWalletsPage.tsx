@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { adminService } from "@app/admin/services";
+import { useAdminAuth } from "@app/admin/AdminAuthContext";
 import {
   LoadingRows,
   PageHeader,
@@ -21,6 +22,7 @@ import { ErrorState } from "@app/components/ui/ErrorState";
 import { formatNaira, formatDateTime } from "@app/lib/format";
 
 export function AdminWalletsPage() {
+  const { hasPermission } = useAdminAuth();
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -35,6 +37,8 @@ export function AdminWalletsPage() {
   const [adjustReason, setAdjustReason] = useState("");
   const [adjustBusy, setAdjustBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [clearTestPending, setClearTestPending] = useState(false);
+  const [clearTestBusy, setClearTestBusy] = useState(false);
 
   const float = useAsync(() => adminService.float(), []);
 
@@ -106,6 +110,25 @@ export function AdminWalletsPage() {
     if (err) setError(err.message);
   }
 
+  async function clearTestBalances(reason: string) {
+    setClearTestBusy(true);
+    setError(null);
+    const result = await adminService.clearTestBalances({ reason, idempotencyKey: crypto.randomUUID() });
+    setClearTestBusy(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setClearTestPending(false);
+    setNotice(
+      result.data.usersAffected === 0
+        ? "No remaining customer or agent test balances were found."
+        : `Removed ${formatNaira(result.data.totalRemoved)} from ${result.data.usersAffected} user${result.data.usersAffected === 1 ? "" : "s"}. Ledger history was preserved.`,
+    );
+    state.reload();
+    float.reload();
+  }
+
   return (
     <div>
       <PageHeader
@@ -134,6 +157,20 @@ export function AdminWalletsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {hasPermission("wallets.clear_test_balances") && (
+        <Card className="mb-4 border-amber-200 bg-amber-50/60">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-laupay-ink">Clear all remaining test balances</h2>
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-laupay-ink-muted">
+                Removes available test-credit funds from every customer and agent wallet. Financial and audit history is retained.
+              </p>
+            </div>
+            <Button variant="danger" onClick={() => setClearTestPending(true)}>Clear test balances</Button>
+          </div>
+        </Card>
       )}
 
       {adjust && (
@@ -330,6 +367,17 @@ export function AdminWalletsPage() {
         busy={busyId !== null}
         onCancel={() => setPending(null)}
         onConfirm={(reason) => void toggle(reason)}
+      />
+      <ReasonDialog
+        open={clearTestPending}
+        title="Clear all remaining test balances?"
+        description="This posts audited reversal entries for currently available test funds. It does not delete transaction history or real payment credits. Type the phrase to confirm."
+        confirmLabel="Clear all test balances"
+        requireToken="CLEAR TEST BALANCES"
+        danger
+        busy={clearTestBusy}
+        onCancel={() => setClearTestPending(false)}
+        onConfirm={(reason) => void clearTestBalances(reason)}
       />
     </div>
   );
