@@ -64,7 +64,7 @@ export class UpdateSettingsDto {
 export class UserListQueryDto {
   @IsOptional() @IsString() search?: string;
   @IsOptional() @IsIn(['CUSTOMER', 'AGENT', 'ADMIN', 'SUPPORT']) role?: string;
-  @IsOptional() @IsIn(['ACTIVE', 'SUSPENDED', 'PENDING_VERIFICATION']) status?: string;
+  @IsOptional() @IsIn(['ACTIVE', 'SUSPENDED', 'FROZEN', 'CLOSED', 'PENDING_VERIFICATION']) status?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize?: number;
 }

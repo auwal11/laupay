@@ -257,6 +257,8 @@ export function AdminUsersPage() {
             <option value="ACTIVE">Active</option>
             <option value="PENDING_VERIFICATION">Pending verification</option>
             <option value="SUSPENDED">Suspended</option>
+            <option value="FROZEN">Frozen</option>
+            <option value="CLOSED">Closed — can reopen</option>
           </select>
         </div>
         <Button type="submit">Search</Button>
