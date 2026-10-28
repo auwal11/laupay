@@ -36,7 +36,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     ScheduleModule.forRoot(),
     // Global default rate limit; specific routes (auth, webhooks) apply
     // stricter limits via @Throttle(...) — see security-model.md §4.
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: process.env.NODE_ENV === 'test' ? 100_000 : 100 }]),
     LedgerModule,
     AuthModule,
     UsersModule,

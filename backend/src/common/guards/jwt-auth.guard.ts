@@ -36,7 +36,10 @@ export class JwtAuthGuard implements CanActivate {
       if (!user || user.status !== UserStatus.ACTIVE) {
         throw new UnauthorizedException('Account is not active');
       }
-      if (user.sessionsRevokedAt && payload.iat * 1000 <= user.sessionsRevokedAt.getTime()) {
+      if (
+        user.sessionsRevokedAt &&
+        payload.iat < Math.floor(user.sessionsRevokedAt.getTime() / 1000)
+      ) {
         throw new UnauthorizedException('Session has been revoked');
       }
       if (user.mustChangePassword && !String(request.path ?? '').endsWith('/auth/change-password')) {

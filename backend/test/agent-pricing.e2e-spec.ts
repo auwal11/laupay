@@ -91,6 +91,7 @@ describe('Agent pricing & confirm-cash security (e2e)', () => {
     return prisma.order.create({
       data: {
         userId: customerUser.id,
+        agentId: agentUserId,
         type: 'AIRTIME',
         status: 'CREATED',
         network,
