@@ -384,7 +384,7 @@ export class AdminOpsService {
   async creditWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
     this.requireIdempotencyKey(idempotencyKey);
-    this.rejectSelfFinancialAction(userId, actor.adminId);
+    this.rejectSelfFinancialAction(userId, actor);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
     const mode = await this.settings.effectiveFulfillmentMode();
@@ -427,7 +427,7 @@ export class AdminOpsService {
   async debitWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
     this.requireIdempotencyKey(idempotencyKey);
-    this.rejectSelfFinancialAction(userId, actor.adminId);
+    this.rejectSelfFinancialAction(userId, actor);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
     const entry = await this.ledger.debit({
@@ -574,8 +574,10 @@ export class AdminOpsService {
     }
   }
 
-  private rejectSelfFinancialAction(userId: string, adminId: string) {
-    if (userId === adminId) throw new ForbiddenException('An administrator cannot adjust their own wallet');
+  private rejectSelfFinancialAction(userId: string, actor: AdminActor) {
+    if (userId === actor.adminId && !this.config.superAdminIds.has(actor.adminId)) {
+      throw new ForbiddenException('Only a configured super administrator can adjust their own wallet');
+    }
   }
 
   async reverseEntry(entryId: string, reason: string, actor: AdminActor) {
@@ -585,7 +587,7 @@ export class AdminOpsService {
       include: { walletAccount: true },
     });
     if (!original) throw new NotFoundException('Ledger entry not found');
-    if (original.walletAccount.ownerId === actor.adminId) {
+    if (original.walletAccount.ownerId === actor.adminId && !this.config.superAdminIds.has(actor.adminId)) {
       throw new ForbiddenException('An administrator cannot reverse their own wallet entry');
     }
     if (original.reason === LedgerReason.REVERSAL) {
