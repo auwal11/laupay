@@ -187,7 +187,22 @@ export function AdminUserDetailPage() {
           Every action requires a written reason and is written to the immutable audit log.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {user.status === "FROZEN" ? (
+          {user.status === "CLOSED" ? (
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() =>
+                setPending({
+                  title: "Reopen account",
+                  description: "This customer will regain access. Existing ledger history remains unchanged.",
+                  confirmLabel: "Reopen account",
+                  run: (reason) => adminService.setUserStatus(id, "reopen", reason),
+                })
+              }
+            >
+              Reopen account
+            </Button>
+          ) : user.status === "FROZEN" ? (
             <Button
               variant="secondary"
               disabled={busy}

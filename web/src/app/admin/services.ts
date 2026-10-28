@@ -64,7 +64,7 @@ export const adminService = {
     return adminRequest<AdminUserDetail>(`/admin/users/${id}`);
   },
 
-  setUserStatus(id: string, action: "freeze" | "unfreeze" | "close", reason: string) {
+  setUserStatus(id: string, action: "freeze" | "unfreeze" | "close" | "reopen", reason: string) {
     return adminRequest(`/admin/users/${id}/${action}`, { method: "POST", body: { reason } });
   },
 

@@ -168,6 +168,17 @@ export class AdminController {
     return this.ops.closeUser(id, this.actor(user, req), dto.reason);
   }
 
+  @Post('users/:id/reopen')
+  @RequirePermissions('users.manage')
+  reopenUser(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: FreezeUserDto,
+    @Req() req: Request,
+  ) {
+    return this.ops.reopenUser(id, this.actor(user, req), dto.reason);
+  }
+
   @Post('users/:id/reset-pin')
   @RequirePermissions('users.manage')
   resetPin(

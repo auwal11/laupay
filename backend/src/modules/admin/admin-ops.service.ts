@@ -178,6 +178,19 @@ export class AdminOpsService {
     return this.setUserStatus(id, UserStatus.CLOSED, actor, reason, 'user.close');
   }
 
+  async reopenUser(id: string, actor: AdminActor, reason: string) {
+    this.requireReason(reason);
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.status !== UserStatus.CLOSED) {
+      throw new BadRequestException('Only a closed account can be reopened');
+    }
+    if (user.role !== UserRole.CUSTOMER && user.role !== UserRole.AGENT) {
+      throw new ForbiddenException('Only customer or agent accounts can be reopened');
+    }
+    return this.setUserStatus(id, UserStatus.ACTIVE, actor, reason, 'user.reopen');
+  }
+
   private async setUserStatus(id: string, status: UserStatus, actor: AdminActor, reason: string, action: string) {
     this.requireReason(reason);
     const user = await this.prisma.user.findUnique({ where: { id } });
