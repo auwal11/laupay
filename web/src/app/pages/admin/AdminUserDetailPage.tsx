@@ -145,6 +145,10 @@ export function AdminUserDetailPage() {
   if (state.status === "error") return <ErrorState error={state.error} onRetry={state.reload} />;
 
   const user = state.data;
+  // Keep the action reliable even if an older API/database adapter returns
+  // whitespace or a differently-cased enum string.
+  const normalizedStatus = String(user.status ?? "").trim().toUpperCase();
+  const isClosed = normalizedStatus === "CLOSED";
 
   return (
     <div className="flex flex-col gap-6">
@@ -187,7 +191,7 @@ export function AdminUserDetailPage() {
           Every action requires a written reason and is written to the immutable audit log.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {user.status === "CLOSED" ? (
+          {isClosed ? (
             <Button
               variant="secondary"
               disabled={busy}
@@ -295,23 +299,25 @@ export function AdminUserDetailPage() {
               Verify phone
             </Button>
           )}
-          <Button
-            variant="danger"
-            disabled={busy}
-            onClick={() =>
-              setPending({
-                title: "Close account",
-                description:
-                  "Permanently closes this account. Ledger history is retained and cannot be deleted.",
-                confirmLabel: "Close account",
-                danger: true,
-                requireToken: "CLOSE",
-                run: (reason) => adminService.setUserStatus(id, "close", reason),
-              })
-            }
-          >
-            Close account
-          </Button>
+          {!isClosed && (
+            <Button
+              variant="danger"
+              disabled={busy}
+              onClick={() =>
+                setPending({
+                  title: "Close account",
+                  description:
+                    "Permanently closes this account. Ledger history is retained and cannot be deleted.",
+                  confirmLabel: "Close account",
+                  danger: true,
+                  requireToken: "CLOSE",
+                  run: (reason) => adminService.setUserStatus(id, "close", reason),
+                })
+              }
+            >
+              Close account
+            </Button>
+          )}
         </div>
       </Card>
 
