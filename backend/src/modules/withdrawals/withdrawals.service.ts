@@ -81,6 +81,10 @@ export class WithdrawalsService {
     const amount = new Prisma.Decimal(dto.amount);
     const wallet = await this.prisma.walletAccount.findUnique({ where: { ownerId: userId } });
     if (!wallet) throw new NotFoundException('Wallet not found');
+    const withdrawable = await this.withdrawableBalance(wallet.id);
+    if (withdrawable.lt(amount)) {
+      throw new BadRequestException('Test credit is not withdrawable. Only funds from real deposits or approved earnings can be withdrawn.');
+    }
     const reference = `WD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`;
     const withdrawal = await this.prisma.withdrawal.create({ data: { userId, reference, idempotencyKey: dto.idempotencyKey, amount, fee: 0, bankName: bank.name, bankCode: bank.code, accountName: dto.accountName.trim(), accountNumber: dto.accountNumber, accountVerified: false, status: WithdrawalStatus.PENDING } });
     try {
@@ -95,6 +99,34 @@ export class WithdrawalsService {
     await this.notifications.create({ userId, category: 'wallet', title: 'Withdrawal request received', body: `${naira(amount.toString())} is held pending review.`, metadata: { withdrawalId: withdrawal.id, reference, status: 'PENDING' } }).catch(() => undefined);
     await this.audit(userId, withdrawal.id, { kind: 'withdrawal_request', reference, amount: amount.toString() });
     return this.toView(await this.prisma.withdrawal.findUniqueOrThrow({ where: { id: withdrawal.id } }));
+  }
+
+  /**
+   * Test allocations are product-testing funds, never cash. They are spent
+   * first, so only the remainder of non-test credits can back a withdrawal.
+   * This also blocks withdrawn balances created before auto-credit was removed.
+   */
+  private async withdrawableBalance(walletAccountId: string): Promise<Prisma.Decimal> {
+    const rows = await this.prisma.ledgerEntry.findMany({
+      where: { walletAccountId },
+      select: { direction: true, amount: true, source: true },
+    });
+    let testCredits = new Prisma.Decimal(0);
+    let otherCredits = new Prisma.Decimal(0);
+    let debits = new Prisma.Decimal(0);
+
+    for (const row of rows) {
+      if (row.direction === 'CREDIT') {
+        if (row.source === 'test_allocation') testCredits = testCredits.plus(row.amount);
+        else otherCredits = otherCredits.plus(row.amount);
+      } else {
+        debits = debits.plus(row.amount);
+      }
+    }
+
+    const realConsumed = Prisma.Decimal.max(debits.minus(testCredits), new Prisma.Decimal(0));
+    const remaining = otherCredits.minus(realConsumed);
+    return remaining.gt(0) ? remaining : new Prisma.Decimal(0);
   }
 
   async listForUser(userId: string) { return (await this.prisma.withdrawal.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 })).map((row) => this.toView(row)); }

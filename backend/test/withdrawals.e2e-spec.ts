@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module';
 import { MockMailProvider } from '../src/common/mail/mock-mail.provider';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CreditsService } from '../src/modules/credits/credits.service';
+import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { WithdrawalsService } from '../src/modules/withdrawals/withdrawals.service';
 
 process.env.WITHDRAWAL_BANKS_JSON = JSON.stringify([{ code: '058', name: 'GTBank' }]);
@@ -60,7 +61,13 @@ describe('Withdrawals (e2e)', () => {
       .set('Authorization', `Bearer ${session.accessToken}`)
       .send({ pin: '1234' })
       .expect(201);
-    await moduleRef.get(CreditsService).grantTestCredit(session.userId, 5000, {
+    const wallet = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: session.userId } });
+    await moduleRef.get(LedgerService).credit({
+      walletAccountId: wallet.id,
+      amount: '5000',
+      reason: 'ADMIN_ADJUSTMENT' as never,
+      source: 'e2e_funding',
+      mode: 'test',
       idempotencyKey: `test-withdrawal-funding:${session.userId}`,
     });
   });
@@ -152,5 +159,24 @@ describe('Withdrawals (e2e)', () => {
     const approved = await withdrawals.approve('admin-test', res.body.id, 'Verified payout');
     expect(approved.status).toBe('APPROVED');
     expect(await balance()).toBe(before - 300);
+  });
+  it('refuses to withdraw test credits', async () => {
+    const other = await registerVerified(app.getHttpServer(), prisma, `wd-test-credit-${Date.now()}@test.local`);
+    await request(app.getHttpServer())
+      .post('/api/security/pin')
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .send({ pin: '1234' })
+      .expect(201);
+    await app.get(CreditsService).grantTestCredit(other.userId, 1000, {
+      idempotencyKey: `test-withdrawal-credit-only:${other.userId}`,
+    });
+    const before = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: other.userId } });
+    await request(app.getHttpServer())
+      .post('/api/withdrawals')
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .send({ ...base, amount: 500, idempotencyKey: `wd-test-credit-${Date.now()}` })
+      .expect(400);
+    const after = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: other.userId } });
+    expect(after.balance.toString()).toBe(before.balance.toString());
   });
 });

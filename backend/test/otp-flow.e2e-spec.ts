@@ -112,6 +112,20 @@ describe('Registration → Email OTP → Login (e2e)', () => {
     expect(Number(res.body.balance)).toBe(0);
   });
 
+  it('rejects disposable email domains before creating an account', async () => {
+    await request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({
+        email: `probe-${Date.now()}@xzcoot.com`,
+        password: 'Password123!',
+        fullName: 'Disposable Probe',
+        phone: phone('3'),
+        termsAccepted: true,
+        termsVersion: 'e2e',
+      })
+      .expect(400);
+  });
+
   it('rejects a malformed (non-6-digit) code at the DTO layer', async () => {
     await request(app.getHttpServer())
       .post('/api/auth/verify-otp')

@@ -22,6 +22,7 @@ import { MAIL_PROVIDER, MailProvider } from '../../common/mail/mail-provider.int
 import { ProfileStorageService } from '../../common/storage/profile-storage.service';
 import { normalizeFullName } from '../../common/utils/name.util';
 import { ADMIN_ROLES, permissionsForRole } from '../../common/permissions';
+import { assertEmailAllowed, normalizeEmail } from '../../common/security/email-policy';
 
 export interface AuthTokens {
   accessToken: string;
@@ -48,8 +49,9 @@ export class AuthService {
    * then issues tokens (requirements 3 + 4). No code, no tokens.
    */
   async verifyEmail(dto: VerifyOtpDto, ip?: string) {
-    await this.otp.assertVerifyAllowed(dto.email, ip ?? 'unknown');
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const email = normalizeEmail(dto.email);
+    await this.otp.assertVerifyAllowed(email, ip ?? 'unknown');
+    const user = await this.prisma.user.findUnique({ where: { email } });
     // Same message whether the email exists or the code is wrong.
     if (!user) throw new UnauthorizedException('Invalid or expired verification code');
 
@@ -92,7 +94,8 @@ export class AuthService {
   async register(dto: RegisterDto, ipAddress?: string) {
     await this.otp.assertRegisterAllowed(ipAddress ?? 'unknown');
     if (dto.termsAccepted !== true) throw new ForbiddenException('Terms acceptance is required');
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const email = assertEmailAllowed(dto.email);
+    const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
       throw new ConflictException('An account with this email already exists');
     }
@@ -127,7 +130,7 @@ export class AuthService {
         async (tx) => {
           const created = await tx.user.create({
             data: {
-              email: dto.email,
+              email,
               phone: dto.phone,
               passwordHash,
               fullName: normalizeFullName(dto.fullName),
@@ -188,22 +191,23 @@ export class AuthService {
 
   async login(dto: LoginDto, ipAddress?: string) {
     const ip = ipAddress ?? 'unknown';
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const email = normalizeEmail(dto.email);
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
-      const failure = await this.loginThrottle.recordFailure(dto.email, ip, 'customer');
-      await this.recordFailedLogin(dto.email);
+      const failure = await this.loginThrottle.recordFailure(email, ip, 'customer');
+      await this.recordFailedLogin(email);
       if (failure.blocked) throw this.tooManyLogins();
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const passwordOk = await this.passwordHasher.verify(user.passwordHash, dto.password);
     if (!passwordOk) {
-      const failure = await this.loginThrottle.recordFailure(dto.email, ip, 'customer');
-      await this.recordFailedLogin(dto.email, user.id);
+      const failure = await this.loginThrottle.recordFailure(email, ip, 'customer');
+      await this.recordFailedLogin(email, user.id);
       if (failure.blocked) throw this.tooManyLogins();
       throw new UnauthorizedException('Invalid email or password');
     }
-    await this.loginThrottle.recordSuccess(dto.email, 'customer');
+    await this.loginThrottle.recordSuccess(email, 'customer');
 
     // Requirement 3/4: an unverified account may never receive tokens.
     // The message is intentionally identical to the wrong-password case so
@@ -231,22 +235,23 @@ export class AuthService {
    */
   async adminLogin(dto: LoginDto, ipAddress?: string): Promise<AuthTokens & { role: UserRole; permissions: string[]; mustChangePassword: boolean }> {
     const ip = ipAddress ?? 'unknown';
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const email = normalizeEmail(dto.email);
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
-      const failure = await this.loginThrottle.recordFailure(dto.email, ip, 'admin');
-      await this.recordFailedLogin(dto.email);
+      const failure = await this.loginThrottle.recordFailure(email, ip, 'admin');
+      await this.recordFailedLogin(email);
       if (failure.blocked) throw this.tooManyLogins();
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const passwordOk = await this.passwordHasher.verify(user.passwordHash, dto.password);
     if (!passwordOk) {
-      const failure = await this.loginThrottle.recordFailure(dto.email, ip, 'admin');
-      await this.recordFailedLogin(dto.email, user.id);
+      const failure = await this.loginThrottle.recordFailure(email, ip, 'admin');
+      await this.recordFailedLogin(email, user.id);
       if (failure.blocked) throw this.tooManyLogins();
       throw new UnauthorizedException('Invalid email or password');
     }
-    await this.loginThrottle.recordSuccess(dto.email, 'admin');
+    await this.loginThrottle.recordSuccess(email, 'admin');
 
     if (!ADMIN_ROLES.includes(user.role)) {
       await this.prisma.auditLog.create({
@@ -286,7 +291,8 @@ export class AuthService {
     return { ...tokens, role: user.role, permissions: permissionsForRole(user.role), mustChangePassword: Boolean((user as User & { mustChangePassword?: boolean }).mustChangePassword) };
   }
 
-  async forgotPassword(email: string, ipAddress?: string) {
+  async forgotPassword(rawEmail: string, ipAddress?: string) {
+    const email = normalizeEmail(rawEmail);
     await this.otp.assertPasswordResetAllowed(email, ipAddress ?? 'unknown');
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (user) {

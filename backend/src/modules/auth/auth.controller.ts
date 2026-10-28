@@ -9,6 +9,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
+import { normalizeEmail } from '../../common/security/email-policy';
 
 @Controller('auth')
 export class AuthController {
@@ -44,8 +45,9 @@ export class AuthController {
   @Throttle({ default: { limit: 3, ttl: 300_000 } })
   @Post('resend-otp')
   async resendOtp(@Body() dto: ResendOtpDto, @Req() req: Request) {
-    await this.otpService.assertResendAllowed(dto.email, req.ip ?? 'unknown');
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const email = normalizeEmail(dto.email);
+    await this.otpService.assertResendAllowed(email, req.ip ?? 'unknown');
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (user && user.status === 'PENDING_VERIFICATION') {
       await this.otpService.issue(user.id);
     }
