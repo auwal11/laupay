@@ -62,6 +62,7 @@ import { ReconciliationService } from '../reconciliation/reconciliation.service'
 import { SettingsService } from '../settings/settings.service';
 import { RiskService } from '../risk/risk.service';
 import { WithdrawalsService } from '../withdrawals/withdrawals.service';
+import { AppConfigService } from '../../config/app-config.service';
 import { permissionsForRole } from '../../common/permissions';
 
 /**
@@ -80,6 +81,7 @@ export class AdminController {
     private readonly settings: SettingsService,
     private readonly risk: RiskService,
     private readonly withdrawals: WithdrawalsService,
+    private readonly config: AppConfigService,
   ) {}
 
   private actor(user: AuthenticatedUser, req: Request): AdminActor {
@@ -97,6 +99,8 @@ export class AdminController {
       userId: user.userId,
       role: user.role,
       permissions: permissionsForRole(user.role),
+      isSuperAdmin: this.config.superAdminIds.has(user.userId),
+      superAdminConfigured: this.config.superAdminIds.size > 0,
     };
   }
 
