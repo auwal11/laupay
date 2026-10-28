@@ -21,7 +21,6 @@ import { Inject } from '@nestjs/common';
 import { MAIL_PROVIDER, MailProvider } from '../../common/mail/mail-provider.interface';
 import { ProfileStorageService } from '../../common/storage/profile-storage.service';
 import { normalizeFullName } from '../../common/utils/name.util';
-import { CreditsService } from '../credits/credits.service';
 import { ADMIN_ROLES, permissionsForRole } from '../../common/permissions';
 
 export interface AuthTokens {
@@ -42,7 +41,6 @@ export class AuthService {
     private readonly loginThrottle: LoginThrottleService,
     @Inject(MAIL_PROVIDER) private readonly mail: MailProvider,
     private readonly profileStorage: ProfileStorageService,
-    private readonly credits: CreditsService,
   ) {}
 
   /**
@@ -88,22 +86,7 @@ export class AuthService {
       this.logger.warn(`Welcome email skipped for ${activated.id}: ${String(err)}`);
     }
 
-    await this.tryAutoTestCredit(activated.id);
-
     return this.issueTokens(activated.id, activated.role);
-  }
-
-  /**
-   * Applies the one-shot automatic test credit once the account is ACTIVE and
-   * a transaction PIN exists (see CreditsService). No-op unless enabled in
-   * admin settings; failures are swallowed so they can never block auth.
-   */
-  private async tryAutoTestCredit(userId: string): Promise<void> {
-    try {
-      await this.credits.maybeApplyAutoTestCredit(userId);
-    } catch (err) {
-      this.logger.warn(`Auto test credit skipped for ${userId}: ${String(err)}`);
-    }
   }
 
   async register(dto: RegisterDto, ipAddress?: string) {

@@ -203,12 +203,6 @@ export const adminService = {
     return adminRequest<AdminSettings>("/admin/settings");
   },
 
-  updateSettings(
-    body: { autoTestCreditEnabled?: boolean; autoTestCreditAmount?: number },
-  ): Promise<ApiResult<AdminSettings>> {
-    return adminRequest<AdminSettings>("/admin/settings", { method: "PATCH", body });
-  },
-
   updateSettingsV2(settings: Record<string, string>, reason: string): Promise<ApiResult<AdminSettings>> {
     return adminRequest<AdminSettings>("/admin/settings/update", {
       method: "POST",

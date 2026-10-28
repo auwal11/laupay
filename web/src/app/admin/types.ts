@@ -166,7 +166,6 @@ export interface AdminOverview {
 export interface AdminSettings {
   fulfillmentMode: string;
   providers: Record<string, string | boolean>;
-  autoTestCredit: { enabled: boolean; amount: number };
   mailProvider: string;
   adminWebOrigin: string;
   settings?: Record<string, string>;

@@ -28,7 +28,6 @@ function makeService(status: UserStatus) {
     {} as never,
     {} as never,
     {} as never,
-    {} as never,
   );
   return { service, otp, jwt, prisma };
 }
@@ -90,7 +89,6 @@ describe('AuthService password reset verification boundary', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
     );
 
     await expect(service.resetPassword('reset-token', 'NewPassword123!')).resolves.toEqual({ reset: true });
@@ -136,7 +134,6 @@ describe('AuthService refresh-token rotation', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
     );
 
     await expect(service.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
@@ -168,7 +165,6 @@ describe('AuthService refresh-token rotation', () => {
       prisma as never,
       jwt as never,
       { jwtAccessSecret: 'test-secret', jwtAccessExpiresIn: '15m', jwtRefreshExpiresInDays: 30 } as never,
-      {} as never,
       {} as never,
       {} as never,
       {} as never,

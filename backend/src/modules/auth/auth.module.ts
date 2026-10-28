@@ -10,7 +10,6 @@ import { BrevoMailProvider } from '../../common/mail/brevo-mail.provider';
 import { MockMailProvider } from '../../common/mail/mock-mail.provider';
 import { AppConfigService } from '../../config/app-config.service';
 import { ProfileStorageService } from '../../common/storage/profile-storage.service';
-import { CreditsModule } from '../credits/credits.module';
 
 /**
  * MAIL_PROVIDER follows the same selection pattern as payment/VTU providers
@@ -26,7 +25,7 @@ const mailProviderFactory = {
 };
 
 @Module({
-  imports: [JwtModule.register({}), CreditsModule],
+  imports: [JwtModule.register({})],
   controllers: [AuthController],
   providers: [AuthService, OtpService, PasswordHasher, ProfileStorageService, LoginThrottleService, mailProviderFactory],
   exports: [PasswordHasher, AuthService, MAIL_PROVIDER],

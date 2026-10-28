@@ -48,9 +48,6 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   risk_require_second_approval: 'false',
   blacklist_phones: '[]',
 
-  // Test credit
-  auto_test_credit_enabled: 'false',
-  auto_test_credit_amount: '5000',
 };
 
 const FULFILLMENT_MODES = ['simulated', 'provider_test', 'live'];
@@ -110,7 +107,7 @@ export class SettingsService {
   /** Clamp/validate values so a typo cannot disable a limit or set nonsense. */
   private normalize(key: string, value: string): string {
     const v = String(value ?? '').trim();
-    if (['maintenance_mode', 'service_airtime_enabled', 'service_data_enabled', 'service_wallet_funding_enabled', 'risk_require_second_approval', 'auto_test_credit_enabled', 'admin_2fa_required'].includes(key)) {
+    if (['maintenance_mode', 'service_airtime_enabled', 'service_data_enabled', 'service_wallet_funding_enabled', 'risk_require_second_approval', 'admin_2fa_required'].includes(key)) {
       return v.toLowerCase() === 'true' ? 'true' : 'false';
     }
     if (key === 'provider_fulfillment_mode') {
@@ -119,7 +116,7 @@ export class SettingsService {
     if (key === 'provider_payment_provider') {
       return PAYMENT_PROVIDERS.includes(v) ? v : '';
     }
-    if (['order_timeout_minutes', 'risk_max_orders_per_day', 'risk_max_amount_per_day', 'risk_max_failed_tx_per_hour', 'otp_max_attempts', 'otp_cooldown_seconds', 'auto_test_credit_amount'].includes(key)) {
+    if (['order_timeout_minutes', 'risk_max_orders_per_day', 'risk_max_amount_per_day', 'risk_max_failed_tx_per_hour', 'otp_max_attempts', 'otp_cooldown_seconds'].includes(key)) {
       const n = Number(v);
       return Number.isFinite(n) && n >= 0 ? String(n) : (SETTING_DEFAULTS[key] ?? '0');
     }

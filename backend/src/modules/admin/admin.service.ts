@@ -698,27 +698,19 @@ export class AdminService {
   // Settings
   // -----------------------------------------------------------------
   async getSettings() {
-    const auto = await this.credits.getAutoTestCreditSettings();
     return {
       fulfillmentMode: this.config.fulfillmentMode,
       providers: this.providerStatus(),
-      autoTestCredit: { enabled: auto.enabled, amount: auto.amount },
       mailProvider: this.config.mailProvider,
       adminWebOrigin: this.config.adminWebOrigin,
     };
   }
 
   async updateSettings(
-    dto: { autoTestCreditEnabled?: boolean; autoTestCreditAmount?: number },
+    dto: object,
     adminId: string,
     ipAddress?: string,
   ) {
-    if (dto.autoTestCreditEnabled !== undefined) {
-      await this.credits.setSetting('auto_test_credit_enabled', String(dto.autoTestCreditEnabled), adminId);
-    }
-    if (dto.autoTestCreditAmount !== undefined) {
-      await this.credits.setSetting('auto_test_credit_amount', String(dto.autoTestCreditAmount), adminId);
-    }
     await this.prisma.auditLog.create({
       data: {
         actorId: adminId,

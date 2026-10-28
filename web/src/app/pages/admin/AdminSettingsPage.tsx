@@ -29,7 +29,6 @@ const EDITABLE = [
   { key: "risk_max_orders_per_day", label: "Max orders per day", type: "number" },
   { key: "risk_max_amount_per_day", label: "Max daily amount (NGN)", type: "number" },
   { key: "risk_max_failed_tx_per_hour", label: "Max failed tx per hour", type: "number" },
-  { key: "auto_test_credit_amount", label: "Auto test credit (NGN)", type: "number" },
 ] as const;
 
 const SWITCHES = [
@@ -79,7 +78,6 @@ export function AdminSettingsPage() {
     const payload: Record<string, string> = {};
     for (const field of EDITABLE) payload[field.key] = form[field.key] ?? "";
     payload.risk_require_second_approval = form.risk_require_second_approval ?? "false";
-    payload.auto_test_credit_enabled = form.auto_test_credit_enabled ?? "false";
     const result = await adminService.updateSettingsV2(payload, reason.trim());
     setBusy(false);
     if (!result.ok) {
@@ -265,16 +263,6 @@ export function AdminSettingsPage() {
               }
             />
             Require second approval for risky actions
-          </label>
-          <label className="flex items-center gap-2 text-sm text-laupay-ink">
-            <input
-              type="checkbox"
-              checked={form.auto_test_credit_enabled === "true"}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, auto_test_credit_enabled: String(e.target.checked) }))
-              }
-            />
-            Automatic test credit for new accounts
           </label>
           <div className="sm:col-span-2">
             <Input

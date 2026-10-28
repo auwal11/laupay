@@ -59,14 +59,6 @@ export class CreditTestFundsDto {
 }
 
 export class UpdateSettingsDto {
-  @IsOptional()
-  @IsBoolean()
-  autoTestCreditEnabled?: boolean;
-
-  @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @IsPositive()
-  autoTestCreditAmount?: number;
 }
 
 export class UserListQueryDto {

@@ -51,13 +51,6 @@ export class CreditsService {
     });
   }
 
-  async getAutoTestCreditSettings() {
-    const enabled = (await this.getSetting('auto_test_credit_enabled', 'false')) === 'true';
-    const rawAmount = await this.getSetting('auto_test_credit_amount', '5000');
-    const amount = Number(rawAmount) > 0 ? Number(rawAmount) : 5000;
-    return { enabled, amount };
-  }
-
   // ---------------------------------------------------------------
   // Admin-initiated grant
   // ---------------------------------------------------------------
@@ -115,43 +108,4 @@ export class CreditsService {
     return entry;
   }
 
-  // ---------------------------------------------------------------
-  // Automatic grant — once, after email verified AND PIN set
-  // ---------------------------------------------------------------
-  async maybeApplyAutoTestCredit(userId: string): Promise<{ granted: boolean; amount?: number }> {
-    const { enabled, amount } = await this.getAutoTestCreditSettings();
-    if (!enabled) return { granted: false };
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { security: true },
-    });
-    if (!user || user.status !== 'ACTIVE' || !user.security?.pinHash || user.testCreditGrantedAt) {
-      return { granted: false };
-    }
-
-    // Atomic one-shot claim — only one concurrent caller can win.
-    const claimed = await this.prisma.user.updateMany({
-      where: { id: userId, testCreditGrantedAt: null },
-      data: { testCreditGrantedAt: new Date() },
-    });
-    if (claimed.count === 0) return { granted: false };
-
-    try {
-      await this.grantTestCredit(userId, amount, {
-        source: 'test_allocation',
-        mode: 'test',
-        idempotencyKey: `ledger:auto-test-credit:${userId}`,
-      });
-      return { granted: true, amount };
-    } catch (err) {
-      this.logger.error(`Auto test credit failed for ${userId}: ${String(err)}`);
-      // Release the claim so a later attempt can retry.
-      await this.prisma.user.updateMany({
-        where: { id: userId, testCreditGrantedAt: { not: null } },
-        data: { testCreditGrantedAt: null },
-      });
-      return { granted: false };
-    }
-  }
 }
