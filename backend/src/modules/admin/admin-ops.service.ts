@@ -469,6 +469,104 @@ export class AdminOpsService {
     return this.debitWallet(userId, amount, reason, note, actor, idempotencyKey);
   }
 
+  /**
+   * Remove only remaining test-credit funds from customer/agent wallets.
+   * This never edits a balance directly or deletes history: every removal is
+   * an idempotent, audited reversal debit in the immutable ledger.
+   */
+  async clearAllTestBalances(reason: string, actor: AdminActor, idempotencyKey: string) {
+    this.requireReason(reason);
+    this.requireIdempotencyKey(idempotencyKey);
+
+    const wallets = await this.prisma.walletAccount.findMany({
+      where: {
+        ownerType: { in: ['USER', 'AGENT'] },
+        status: WalletStatus.ACTIVE,
+        user: { role: { in: [UserRole.CUSTOMER, UserRole.AGENT] } },
+      },
+      include: {
+        user: { select: { id: true, fullName: true } },
+        ledgerEntries: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+      },
+    });
+
+    let walletsAffected = 0;
+    let usersAffected = 0;
+    let totalRemoved = new Prisma.Decimal(0);
+    const entries: Array<{ walletId: string; userId: string; amount: string; entryId: string; alreadyApplied: boolean }> = [];
+
+    for (const wallet of wallets) {
+      let testBucket = new Prisma.Decimal(0);
+      for (const entry of wallet.ledgerEntries) {
+        const isTestCredit =
+          entry.direction === LedgerDirection.CREDIT &&
+          (entry.source === 'test_allocation' || entry.source === 'admin_test_credit' ||
+            (entry.mode === 'test' && entry.reason === LedgerReason.ADMIN_ADJUSTMENT));
+        if (isTestCredit) {
+          testBucket = testBucket.add(entry.amount);
+        } else if (entry.direction === LedgerDirection.DEBIT && testBucket.greaterThan(0)) {
+          const consumed = testBucket.lessThan(entry.amount) ? testBucket : entry.amount;
+          testBucket = testBucket.sub(consumed);
+        }
+      }
+
+      const availableToRemove = testBucket.lessThan(wallet.balance) ? testBucket : wallet.balance;
+      if (availableToRemove.lessThanOrEqualTo(0) || !wallet.user) continue;
+
+      const entry = await this.ledger.debit({
+        walletAccountId: wallet.id,
+        amount: availableToRemove.toString(),
+        reason: LedgerReason.REVERSAL,
+        narrative: 'Removal of remaining test credit — Ibrahim Lau Provision Shop',
+        source: 'test_balance_clear',
+        mode: 'test',
+        adminId: actor.adminId,
+        referenceType: 'TestBalanceClear',
+        referenceId: idempotencyKey,
+        idempotencyKey: `ledger:test-balance-clear:${idempotencyKey}:${wallet.id}`,
+      });
+
+      walletsAffected += 1;
+      usersAffected += 1;
+      totalRemoved = totalRemoved.add(entry.amount);
+      entries.push({ walletId: wallet.id, userId: wallet.user.id, amount: entry.amount, entryId: entry.entryId, alreadyApplied: entry.wasAlreadyApplied });
+
+      await this.notifications.create({
+        userId: wallet.user.id,
+        category: 'wallet',
+        title: 'Test balance removed',
+        body: `₦${Number(entry.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })} test balance was removed from your wallet by Ibrahim Lau Provision Shop.`,
+        metadata: { entryId: entry.entryId, kind: 'test_balance_clear' },
+      }).catch(() => undefined);
+
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: actor.adminId,
+          action: AuditAction.WALLET_ADJUSTMENT,
+          entityType: 'WalletAccount',
+          entityId: wallet.id,
+          reason,
+          before: { balance: wallet.balance.toString(), testBalance: availableToRemove.toString() },
+          after: { balance: entry.balanceAfter, reversalEntryId: entry.entryId },
+          metadata: { action: 'wallet.clear_test_balance', userId: wallet.user.id, idempotencyKey },
+          ipAddress: actor.ipAddress,
+          userAgent: actor.userAgent,
+        },
+      });
+    }
+
+    await this.writeAudit(actor, {
+      action: AuditAction.WALLET_ADJUSTMENT,
+      entityType: 'TestBalanceClear',
+      entityId: idempotencyKey,
+      reason,
+      after: { walletsAffected, usersAffected, totalRemoved: totalRemoved.toString() },
+      metadata: { action: 'wallet.clear_test_balances', idempotencyKey },
+    });
+
+    return { operationId: idempotencyKey, walletsAffected, usersAffected, totalRemoved: totalRemoved.toString(), entries };
+  }
+
   private requireIdempotencyKey(value: string) {
     if (!value || value.trim().length < 16 || value.length > 128) {
       throw new BadRequestException('A unique idempotency key is required for wallet adjustments');

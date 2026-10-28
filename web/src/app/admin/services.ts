@@ -110,6 +110,16 @@ export const adminService = {
     );
   },
 
+  clearTestBalances(body: { reason: string; idempotencyKey: string }) {
+    return adminRequest<{
+      operationId: string;
+      walletsAffected: number;
+      usersAffected: number;
+      totalRemoved: string;
+      entries: Array<{ walletId: string; userId: string; amount: string; entryId: string; alreadyApplied: boolean }>;
+    }>("/admin/wallets/clear-test-balances", { method: "POST", body });
+  },
+
   reverseEntry(id: string, reason: string) {
     return adminRequest(`/admin/ledger/${id}/reverse`, { method: "POST", body: { reason } });
   },

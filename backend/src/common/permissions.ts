@@ -13,6 +13,7 @@ export const ALL_PERMISSIONS = [
   'users.manage',
   'wallets.read',
   'wallets.adjust',
+  'wallets.clear_test_balances',
   'withdrawals.read',
   'withdrawals.manage',
   'withdrawals.refund',

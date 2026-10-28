@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { adminService } from "@app/admin/services";
+import { useAdminAuth } from "@app/admin/AdminAuthContext";
 import {
   LoadingRows,
   ModeBadge,
@@ -21,6 +22,7 @@ import { Input } from "@app/components/ui/Input";
 import { formatNaira, formatDateTime } from "@app/lib/format";
 
 export function AdminOverviewPage() {
+  const { hasPermission } = useAdminAuth();
   const state = useAsync(() => adminService.overview(), []);
   const settingsState = useAsync(() => adminService.settings(), []);
 
@@ -51,6 +53,7 @@ export function AdminOverviewPage() {
       />
 
       <FundUserCard />
+      {hasPermission("wallets.clear_test_balances") && <ClearTestBalancesCard />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -316,6 +319,63 @@ function FundUserCard() {
           {error}
         </p>
       )}
+    </Card>
+  );
+}
+
+function ClearTestBalancesCard() {
+  const [pending, setPending] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function clear(reason: string) {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const result = await adminService.clearTestBalances({
+      reason,
+      idempotencyKey: crypto.randomUUID(),
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setPending(false);
+    setNotice(
+      result.data.usersAffected === 0
+        ? "No remaining customer or agent test balances were found."
+        : `Removed ${formatNaira(result.data.totalRemoved)} from ${result.data.usersAffected} user${result.data.usersAffected === 1 ? "" : "s"}. Ledger history was preserved.`,
+    );
+  }
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/60">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-laupay-ink">Clear remaining test balances</h2>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-laupay-ink-muted">
+            Removes available test-credit funds from all customer and agent wallets in one audited operation. Real payment credits and ledger history are not deleted.
+          </p>
+        </div>
+        <Button variant="danger" onClick={() => { setError(null); setPending(true); }}>
+          Clear test balances
+        </Button>
+      </div>
+      {notice && <p role="status" className="mt-3 rounded-md bg-green-50 px-3 py-2 text-xs font-medium text-laupay-success">{notice}</p>}
+      {error && <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-laupay-danger">{error}</p>}
+      <ReasonDialog
+        open={pending}
+        title="Clear all remaining test balances?"
+        description="This will debit the currently available test-credit portion from every customer and agent wallet. It cannot be undone automatically. Type a clear reason; the action is recorded in the audit trail."
+        confirmLabel="Clear all test balances"
+        requireToken="CLEAR TEST BALANCES"
+        danger
+        busy={busy}
+        onCancel={() => setPending(false)}
+        onConfirm={(reason) => void clear(reason)}
+      />
     </Card>
   );
 }

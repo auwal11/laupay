@@ -21,6 +21,7 @@ import {
   AuditListQueryDto,
   CreditTestFundsDto,
   WalletDebitBalanceDto,
+  ClearTestBalancesDto,
   OrderListQueryDto,
   TransactionListQueryDto,
   UpdateSettingsDto,
@@ -266,6 +267,18 @@ export class AdminController {
     @Req() req: Request,
   ) {
     return this.ops.debitWalletBalance(dto.userId, dto.reason, dto.note, this.actor(user, req), dto.idempotencyKey);
+  }
+
+  /** Removes currently available test-credit funds via audited ledger entries. */
+  @Post('wallets/clear-test-balances')
+  @RequirePermissions('wallets.clear_test_balances')
+  @Throttle({ default: { limit: 2, ttl: 60_000 } })
+  clearTestBalances(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ClearTestBalancesDto,
+    @Req() req: Request,
+  ) {
+    return this.ops.clearAllTestBalances(dto.reason, this.actor(user, req), dto.idempotencyKey);
   }
 
   @Post('ledger/:id/reverse')

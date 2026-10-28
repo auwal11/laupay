@@ -174,6 +174,14 @@ export class WalletCreditDto extends ReasonDto {
 
 export class WalletDebitDto extends WalletCreditDto {}
 
+export class ClearTestBalancesDto extends ReasonDto {
+  /** One key per confirmed bulk operation; retries are safe and idempotent. */
+  @IsString()
+  @MinLength(16)
+  @MaxLength(128)
+  idempotencyKey!: string;
+}
+
 export class WalletDebitBalanceDto extends ReasonDto {
   @IsUUID()
   userId!: string;
