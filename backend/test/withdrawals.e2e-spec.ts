@@ -179,4 +179,27 @@ describe('Withdrawals (e2e)', () => {
     const after = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: other.userId } });
     expect(after.balance.toString()).toBe(before.balance.toString());
   });
+
+  it('refuses to withdraw manually granted admin test credits', async () => {
+    const other = await registerVerified(app.getHttpServer(), prisma, `wd-admin-test-credit-${Date.now()}@test.local`);
+    await request(app.getHttpServer())
+      .post('/api/security/pin')
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .send({ pin: '1234' })
+      .expect(201);
+    await app.get(CreditsService).grantTestCredit(other.userId, 1000, {
+      source: 'admin_test_credit',
+      mode: 'test',
+      idempotencyKey: `admin-test-credit-withdrawal:${other.userId}`,
+    });
+
+    const before = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: other.userId } });
+    await request(app.getHttpServer())
+      .post('/api/withdrawals')
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .send({ ...base, amount: 500, idempotencyKey: `wd-admin-test-credit-${Date.now()}` })
+      .expect(400);
+    const after = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: other.userId } });
+    expect(after.balance.toString()).toBe(before.balance.toString());
+  });
 });

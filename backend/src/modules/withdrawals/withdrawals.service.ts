@@ -109,7 +109,7 @@ export class WithdrawalsService {
   private async withdrawableBalance(walletAccountId: string): Promise<Prisma.Decimal> {
     const rows = await this.prisma.ledgerEntry.findMany({
       where: { walletAccountId },
-      select: { direction: true, amount: true, source: true },
+      select: { direction: true, amount: true, source: true, mode: true, reason: true },
     });
     let testCredits = new Prisma.Decimal(0);
     let otherCredits = new Prisma.Decimal(0);
@@ -117,7 +117,11 @@ export class WithdrawalsService {
 
     for (const row of rows) {
       if (row.direction === 'CREDIT') {
-        if (row.source === 'test_allocation') testCredits = testCredits.plus(row.amount);
+        const isTestCredit =
+          row.source === 'test_allocation' ||
+          row.source === 'admin_test_credit' ||
+          (row.mode === 'test' && row.reason === 'ADMIN_ADJUSTMENT');
+        if (isTestCredit) testCredits = testCredits.plus(row.amount);
         else otherCredits = otherCredits.plus(row.amount);
       } else {
         debits = debits.plus(row.amount);

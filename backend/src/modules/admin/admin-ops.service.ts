@@ -14,6 +14,7 @@ import {
   Prisma,
   UserRole,
   UserStatus,
+  WalletStatus,
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
