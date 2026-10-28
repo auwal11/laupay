@@ -59,6 +59,54 @@ describe('AuthService OTP activation boundary', () => {
   });
 });
 
+describe('AuthService password reset verification boundary', () => {
+  it('does not activate an unverified account after password reset', async () => {
+    const userUpdate = jest.fn().mockReturnValue({ operation: 'user.update' });
+    const tokenUpdate = jest.fn().mockReturnValue({ operation: 'token.update' });
+    const refreshUpdate = jest.fn().mockReturnValue({ operation: 'refresh.update' });
+    const auditCreate = jest.fn().mockReturnValue({ operation: 'audit.create' });
+    const transaction = jest.fn().mockResolvedValue([]);
+    const prisma = {
+      passwordResetToken: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'reset-1',
+          userId: 'user-1',
+          usedAt: null,
+          expiresAt: new Date(Date.now() + 60_000),
+        }),
+        update: tokenUpdate,
+      },
+      user: { update: userUpdate },
+      refreshToken: { updateMany: refreshUpdate },
+      auditLog: { create: auditCreate },
+      $transaction: transaction,
+    };
+    const service = new AuthService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      { hash: jest.fn().mockResolvedValue('new-password-hash') } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.resetPassword('reset-token', 'NewPassword123!')).resolves.toEqual({ reset: true });
+    expect(userUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'user-1' },
+      data: expect.not.objectContaining({ status: 'ACTIVE' }),
+    }));
+    expect(transaction).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ operation: 'user.update' }),
+      expect.objectContaining({ operation: 'token.update' }),
+      expect.objectContaining({ operation: 'refresh.update' }),
+      expect.objectContaining({ operation: 'audit.create' }),
+    ]));
+  });
+});
+
 describe('AuthService refresh-token rotation', () => {
   it('rejects a refresh replay that loses the atomic single-use claim', async () => {
     const refreshToken = 'refresh-token';
