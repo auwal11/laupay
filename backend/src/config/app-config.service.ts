@@ -176,7 +176,10 @@ export class AppConfigService {
    * possible before the production user ID is known.
    */
   readonly superAdminEmails = new Set(
-    (process.env.SUPER_ADMIN_EMAILS ?? '')
+    // The product owner's account is a deliberately server-side bootstrap
+    // identity. Deployments may add/remove identities with SUPER_ADMIN_EMAILS;
+    // clients can never nominate themselves as a super administrator.
+    (process.env.SUPER_ADMIN_EMAILS ?? 'auwalbashar12@gmail.com')
       .split(',')
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
