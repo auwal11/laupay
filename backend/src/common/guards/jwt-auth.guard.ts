@@ -31,8 +31,8 @@ export class JwtAuthGuard implements CanActivate {
       // role change.
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, role: true, status: true, sessionsRevokedAt: true, mustChangePassword: true } as any,
-      }) as ({ id: string; role: any; status: UserStatus; sessionsRevokedAt: Date | null; mustChangePassword?: boolean } | null);
+        select: { id: true, email: true, role: true, status: true, sessionsRevokedAt: true, mustChangePassword: true } as any,
+      }) as ({ id: string; email: string; role: any; status: UserStatus; sessionsRevokedAt: Date | null; mustChangePassword?: boolean } | null);
       if (!user || user.status !== UserStatus.ACTIVE) {
         throw new UnauthorizedException('Account is not active');
       }
@@ -46,7 +46,7 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('Password change required');
       }
 
-      request.user = { userId: user.id, role: user.role };
+      request.user = { userId: user.id, email: user.email, role: user.role };
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');

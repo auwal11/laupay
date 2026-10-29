@@ -27,6 +27,7 @@ import { AppConfigService } from '../../config/app-config.service';
 
 export interface AdminActor {
   adminId: string;
+  adminEmail?: string;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -575,9 +576,14 @@ export class AdminOpsService {
   }
 
   private rejectSelfFinancialAction(userId: string, actor: AdminActor) {
-    if (userId === actor.adminId && !this.config.superAdminIds.has(actor.adminId)) {
+    if (userId === actor.adminId && !this.isConfiguredSuperAdmin(actor)) {
       throw new ForbiddenException('Only a configured super administrator can adjust their own wallet');
     }
+  }
+
+  private isConfiguredSuperAdmin(actor: AdminActor): boolean {
+    return this.config.superAdminIds.has(actor.adminId) ||
+      (!!actor.adminEmail && this.config.superAdminEmails.has(actor.adminEmail.trim().toLowerCase()));
   }
 
   async reverseEntry(entryId: string, reason: string, actor: AdminActor) {

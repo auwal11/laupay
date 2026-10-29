@@ -87,6 +87,7 @@ export class AdminController {
   private actor(user: AuthenticatedUser, req: Request): AdminActor {
     return {
       adminId: user.userId,
+      adminEmail: user.email,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     };
@@ -99,8 +100,8 @@ export class AdminController {
       userId: user.userId,
       role: user.role,
       permissions: permissionsForRole(user.role),
-      isSuperAdmin: this.config.superAdminIds.has(user.userId),
-      superAdminConfigured: this.config.superAdminIds.size > 0,
+      isSuperAdmin: this.config.superAdminIds.has(user.userId) || this.config.superAdminEmails.has(user.email.toLowerCase()),
+      superAdminConfigured: this.config.superAdminIds.size > 0 || this.config.superAdminEmails.size > 0,
     };
   }
 

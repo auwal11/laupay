@@ -9,7 +9,13 @@ function context(request: Record<string, unknown>) {
 
 function makeGuard(user: Record<string, unknown> | null, payload: { sub: string; role: UserRole; iat: number } = { sub: 'user-1', role: UserRole.CUSTOMER, iat: 100 }) {
   const jwt = { verifyAsync: jest.fn().mockResolvedValue(payload) };
-  const prisma = { user: { findUnique: jest.fn().mockResolvedValue(user) } };
+  const prisma = {
+    user: {
+      findUnique: jest.fn().mockResolvedValue(
+        user ? { email: 'user@example.com', ...user } : user,
+      ),
+    },
+  };
   const guard = new JwtAuthGuard(jwt as never, { jwtAccessSecret: 'test-secret' } as never, prisma as never);
   return { guard, jwt, prisma };
 }
@@ -29,6 +35,6 @@ describe('JwtAuthGuard account/session enforcement', () => {
     const request: Record<string, unknown> = {};
     const { guard } = makeGuard({ id: 'user-1', role: UserRole.CUSTOMER, status: UserStatus.ACTIVE, sessionsRevokedAt: null }, { sub: 'user-1', role: UserRole.ADMIN, iat: 100 });
     await expect(guard.canActivate(context(request))).resolves.toBe(true);
-    expect(request.user).toEqual({ userId: 'user-1', role: UserRole.CUSTOMER });
+    expect(request.user).toEqual({ userId: 'user-1', email: 'user@example.com', role: UserRole.CUSTOMER });
   });
 });

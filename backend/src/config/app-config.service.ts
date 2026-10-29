@@ -169,6 +169,18 @@ export class AppConfigService {
       .map((id) => id.trim())
       .filter(Boolean),
   );
+  /**
+   * Optional email-based bootstrap for the immutable super-admin allowlist.
+   * Values are normalized once at boot and are never accepted from requests.
+   * IDs remain the preferred stable identifier; emails make initial setup
+   * possible before the production user ID is known.
+   */
+  readonly superAdminEmails = new Set(
+    (process.env.SUPER_ADMIN_EMAILS ?? '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
 
   /** Base URL of THIS API, used to build the OTP link emailed to users. */
   readonly publicApiBaseUrl = optional('PUBLIC_API_BASE_URL', 'http://localhost:3000');
