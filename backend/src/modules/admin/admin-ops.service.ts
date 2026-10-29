@@ -385,7 +385,7 @@ export class AdminOpsService {
   async creditWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
     this.requireIdempotencyKey(idempotencyKey);
-    this.rejectSelfFinancialAction(userId, actor);
+    await this.rejectSelfFinancialAction(userId, actor);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
     const mode = await this.settings.effectiveFulfillmentMode();
@@ -428,7 +428,7 @@ export class AdminOpsService {
   async debitWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
     this.requireIdempotencyKey(idempotencyKey);
-    this.rejectSelfFinancialAction(userId, actor);
+    await this.rejectSelfFinancialAction(userId, actor);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
     const entry = await this.ledger.debit({
@@ -575,8 +575,21 @@ export class AdminOpsService {
     }
   }
 
-  private rejectSelfFinancialAction(userId: string, actor: AdminActor) {
-    if (userId === actor.adminId && !this.isConfiguredSuperAdmin(actor)) {
+  private async rejectSelfFinancialAction(userId: string, actor: AdminActor) {
+    if (userId !== actor.adminId) return;
+
+    // Read the current email from the database as a defense against an old
+    // token/request context that does not carry the email used for the
+    // configured super-admin allowlist. The client can never supply this.
+    const currentActor = await this.prisma.user.findUnique({
+      where: { id: actor.adminId },
+      select: { email: true },
+    });
+    const actorWithCurrentEmail = currentActor
+      ? { ...actor, adminEmail: currentActor.email }
+      : actor;
+
+    if (!this.isConfiguredSuperAdmin(actorWithCurrentEmail)) {
       throw new ForbiddenException('Only a configured super administrator can adjust their own wallet');
     }
   }
