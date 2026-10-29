@@ -16,14 +16,13 @@ export class VtuService {
 
   /** Provider label recorded on the VTU transaction, derived from the mode. */
   private providerName(mode: string): VtuProviderName {
-    switch (mode) {
-      case 'live':
-        return VtuProviderName.VTPASS_LIVE;
-      case 'provider_test':
-        return VtuProviderName.VTPASS_SANDBOX;
-      default:
-        return VtuProviderName.MOCK;
-    }
+    // Cast keeps this source compatible with an older generated Prisma client
+    // during rolling deploys; `prisma generate` on the new schema contains the
+    // two enum values and the migration adds them before writes occur.
+    if (this.config.vtuProvider === 'vtuagent') return 'VTUAGENT' as VtuProviderName;
+    if (this.config.vtuProvider === 'cheapdatahub') return 'CHEAPDATAHUB' as VtuProviderName;
+    if (this.config.vtuProvider === 'vtpass') return mode === 'live' ? VtuProviderName.VTPASS_LIVE : VtuProviderName.VTPASS_SANDBOX;
+    return VtuProviderName.MOCK;
   }
 
   /**
@@ -40,6 +39,9 @@ export class VtuService {
     if (existing) return existing;
 
     const mode = await this.settings.effectiveFulfillmentMode();
+    if (['vtuagent', 'cheapdatahub'].includes(this.config.vtuProvider) && mode !== 'live') {
+      throw new Error(`Real VTU provider ${this.config.vtuProvider} requires live fulfillment mode`);
+    }
     const txn = await this.prisma.vtuTransaction.create({
       data: {
         orderId,
@@ -50,6 +52,7 @@ export class VtuService {
     });
 
     if (mode === 'simulated') {
+      if (this.config.isProduction) throw new Error('Simulated fulfillment is disabled in production');
       return this.prisma.vtuTransaction.update({
         where: { id: txn.id },
         data: {
@@ -60,9 +63,9 @@ export class VtuService {
       });
     }
 
-    const result = this.config.vtpassTestOutcome === 'success' && mode === 'provider_test'
+    const result = this.config.vtuProvider === 'vtpass' && this.config.vtpassTestOutcome === 'success' && mode === 'provider_test'
       ? { status: 'SUCCESS' as const, providerReference: `provider-test-success-${orderId}`, raw: { providerTest: true, outcome: 'success' } }
-      : this.config.vtpassTestOutcome === 'failed' && mode === 'provider_test'
+      : this.config.vtuProvider === 'vtpass' && this.config.vtpassTestOutcome === 'failed' && mode === 'provider_test'
         ? { status: 'FAILED' as const, providerReference: `provider-test-failed-${orderId}`, raw: { providerTest: true, outcome: 'failed' } }
         : await this.provider.purchaseAirtime({ network, phoneNumber, amount, idempotencyKey });
     return this.prisma.vtuTransaction.update({
@@ -81,6 +84,9 @@ export class VtuService {
     if (existing) return existing;
 
     const mode = await this.settings.effectiveFulfillmentMode();
+    if (['vtuagent', 'cheapdatahub'].includes(this.config.vtuProvider) && mode !== 'live') {
+      throw new Error(`Real VTU provider ${this.config.vtuProvider} requires live fulfillment mode`);
+    }
     const txn = await this.prisma.vtuTransaction.create({
       data: {
         orderId,
@@ -91,6 +97,7 @@ export class VtuService {
     });
 
     if (mode === 'simulated') {
+      if (this.config.isProduction) throw new Error('Simulated fulfillment is disabled in production');
       return this.prisma.vtuTransaction.update({
         where: { id: txn.id },
         data: {
@@ -101,9 +108,9 @@ export class VtuService {
       });
     }
 
-    const result = this.config.vtpassTestOutcome === 'success' && mode === 'provider_test'
+    const result = this.config.vtuProvider === 'vtpass' && this.config.vtpassTestOutcome === 'success' && mode === 'provider_test'
       ? { status: 'SUCCESS' as const, providerReference: `provider-test-success-${orderId}`, raw: { providerTest: true, outcome: 'success' } }
-      : this.config.vtpassTestOutcome === 'failed' && mode === 'provider_test'
+      : this.config.vtuProvider === 'vtpass' && this.config.vtpassTestOutcome === 'failed' && mode === 'provider_test'
         ? { status: 'FAILED' as const, providerReference: `provider-test-failed-${orderId}`, raw: { providerTest: true, outcome: 'failed' } }
         : await this.provider.purchaseData({ network, phoneNumber, planCode, idempotencyKey });
     return this.prisma.vtuTransaction.update({

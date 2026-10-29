@@ -47,7 +47,9 @@ export class AppConfigService {
   })();
 
   readonly paymentProvider = optional('PAYMENT_PROVIDER', 'mock');
-  readonly vtuProvider = optional('VTU_PROVIDER', 'mock');
+  // Mock VTU is only a test double. Production must explicitly select one of
+  // the supported real providers below.
+  readonly vtuProvider = optional('VTU_PROVIDER', this.isProduction ? 'vtuagent' : 'mock');
 
   // === Staging/TEST-only provider credentials ============================
   // Never rendered into a response and never sent to the client bundle —
@@ -82,7 +84,43 @@ export class AppConfigService {
     return !!(this.monnifyApiKey && this.monnifySecretKey && this.monnifyContractCode);
   }
 
-  readonly vtpassEnabled = this.vtuProvider === 'vtpass';
+  readonly vtuAgentEnabled = this.vtuProvider === 'vtuagent';
+  readonly cheapDataHubEnabled = this.vtuProvider === 'cheapdatahub';
+  readonly vtpassEnabled = this.vtuProvider === 'vtpass'; // legacy rows/config only; not allowed in production
+  readonly vtuAgentApiKey = this.requiredIf(this.vtuAgentEnabled, 'VTUAGENT_API_KEY');
+  readonly vtuAgentBaseUrl = optional('VTUAGENT_BASE_URL', 'https://api.vtuagent.com/v1').replace(/\/$/, '');
+  readonly cheapDataHubApiKey = this.requiredIf(this.cheapDataHubEnabled, 'CHEAPDATAHUB_API_KEY');
+  readonly cheapDataHubBaseUrl = optional('CHEAPDATAHUB_BASE_URL', 'https://www.cheapdatahub.ng/api/v1/resellers').replace(/\/$/, '');
+  readonly cheapDataHubPlansJson = optional('CHEAPDATAHUB_PLANS_JSON', '[]');
+  readonly cheapDataHubNetworkIdsJson = optional('CHEAPDATAHUB_NETWORK_IDS_JSON', '{}');
+  readonly vtuProviderTimeoutMs = Math.min(Math.max(Number(optional('VTU_PROVIDER_TIMEOUT_MS', '15000')), 3000), 30000);
+
+  get cheapDataHubPlans(): Array<{ network: string; bundleId: number; label: string; price: number; validityDays?: number }> {
+    try {
+      const parsed = JSON.parse(this.cheapDataHubPlansJson) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((item): item is { network: string; bundleId: number; label: string; price: number; validityDays?: number } => {
+        if (!item || typeof item !== 'object') return false;
+        const value = item as Record<string, unknown>;
+        return typeof value.network === 'string' && Number.isInteger(value.bundleId) && Number(value.bundleId) > 0 &&
+          typeof value.label === 'string' && Number.isFinite(value.price) && Number(value.price) > 0;
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  get cheapDataHubNetworkIds(): Record<string, number> {
+    try {
+      const parsed = JSON.parse(this.cheapDataHubNetworkIdsJson) as unknown;
+      if (!parsed || typeof parsed !== 'object') return {};
+      return Object.fromEntries(Object.entries(parsed as Record<string, unknown>)
+        .filter(([key, value]) => /^[A-Z0-9]+$/.test(key) && Number.isInteger(value) && Number(value) > 0)
+        .map(([key, value]) => [key, Number(value)]));
+    } catch {
+      return {};
+    }
+  }
   readonly vtpassApiKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_API_KEY');
   readonly vtpassSecretKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_SECRET_KEY');
   readonly vtpassBaseUrl = optional('VTPASS_BASE_URL', 'https://sandbox.vtpass.com');
@@ -169,7 +207,13 @@ export class AppConfigService {
       if (this.vtuProvider === 'mock') {
         throw new Error(
           '[config] Refusing to start: VTU_PROVIDER=mock in production. ' +
-            'Real fulfillment must go through vtpass.',
+            'Real fulfillment must use VTU_PROVIDER=vtuagent or cheapdatahub.',
+          );
+      }
+      if (!['vtuagent', 'cheapdatahub'].includes(this.vtuProvider)) {
+        throw new Error(
+          `[config] Refusing to start: unsupported VTU_PROVIDER=${this.vtuProvider}. ` +
+            'Use vtuagent or cheapdatahub.',
         );
       }
       if (this.fulfillmentMode === 'simulated') {
@@ -178,7 +222,19 @@ export class AppConfigService {
             'Use provider_test or live.',
         );
       }
+      if (this.fulfillmentMode !== 'live') {
+        throw new Error(
+          `[config] Refusing to start: real VTU provider ${this.vtuProvider} requires FULFILLMENT_MODE=live. ` +
+            'Neither VTUAgent nor CheapDataHub exposes a public sandbox in the configured API contract.',
+        );
+      }
       return;
+    }
+
+    if (['vtuagent', 'cheapdatahub'].includes(this.vtuProvider) && this.fulfillmentMode !== 'live') {
+      throw new Error(
+        `[config] ${this.vtuProvider} has no public sandbox configured; use FULFILLMENT_MODE=live only with a funded provider account.`,
+      );
     }
 
     // Non-production: a LIVE key alongside staging config is always a mistake.

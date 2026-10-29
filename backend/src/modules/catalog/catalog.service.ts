@@ -1,9 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { VTU_PROVIDER, VTUProvider } from '../vtu/providers/vtu-provider.interface';
+import { AppConfigService } from '../../config/app-config.service';
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(VTU_PROVIDER) private readonly provider: VTUProvider,
+    private readonly config: AppConfigService,
+  ) {}
 
   async listNetworks() {
     const networks = await this.prisma.network.findMany({ orderBy: { code: 'asc' } });
@@ -18,9 +24,41 @@ export class CatalogService {
     ];
   }
 
-  listDataPlans(networkCode: string) {
+  async listDataPlans(networkCode: string) {
+    const network = await this.prisma.network.upsert({
+      where: { code: networkCode.toUpperCase() },
+      update: {},
+      create: { code: networkCode.toUpperCase(), name: networkCode },
+    });
+    const providerPlans = await this.provider.listDataPlans(network.code);
+    if (providerPlans.length === 0) return [];
+
+    await Promise.all(providerPlans.map((plan) => {
+      const id = `${this.config.vtuProvider}:${network.code}:${plan.externalCode}`;
+      return this.prisma.dataPlan.upsert({
+        where: { id },
+        create: {
+          id,
+          networkId: network.id,
+          externalCode: plan.externalCode,
+          label: plan.label,
+          priceNaira: plan.costNaira,
+          costNaira: plan.costNaira,
+          validityDays: plan.validityDays,
+          isActive: true,
+        },
+        update: {
+          label: plan.label,
+          priceNaira: plan.costNaira,
+          costNaira: plan.costNaira,
+          validityDays: plan.validityDays,
+          isActive: true,
+        },
+      });
+    }));
+
     return this.prisma.dataPlan.findMany({
-      where: { isActive: true, network: { code: networkCode } },
+      where: { isActive: true, networkId: network.id, id: { startsWith: `${this.config.vtuProvider}:` } },
       orderBy: { priceNaira: 'asc' },
     });
   }

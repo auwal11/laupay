@@ -119,6 +119,8 @@ enum VtuProviderName {
   MOCK
   VTPASS_SANDBOX
   VTPASS_LIVE
+  VTUAGENT
+  CHEAPDATAHUB
 }
 
 enum VtuTransactionStatus {

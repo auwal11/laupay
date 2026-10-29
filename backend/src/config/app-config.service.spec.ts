@@ -22,6 +22,11 @@ describe('AppConfigService.assertStagingSafety', () => {
     'VTPASS_API_KEY',
     'VTPASS_SECRET_KEY',
     'VTPASS_BASE_URL',
+    'VTUAGENT_API_KEY',
+    'VTUAGENT_BASE_URL',
+    'CHEAPDATAHUB_API_KEY',
+    'CHEAPDATAHUB_BASE_URL',
+    'VTU_PROVIDER_TIMEOUT_MS',
   ];
 
   let saved: Record<string, string | undefined> = {};
@@ -49,6 +54,7 @@ describe('AppConfigService.assertStagingSafety', () => {
   it('refuses mock payment provider in production', () => {
     process.env.NODE_ENV = 'production';
     process.env.PAYMENT_PROVIDER = 'mock';
+    process.env.VTU_PROVIDER = 'mock';
     process.env.JWT_ACCESS_SECRET = 'x';
     expect(() => config().assertStagingSafety()).toThrow(/PAYMENT_PROVIDER=mock/);
   });
@@ -59,9 +65,8 @@ describe('AppConfigService.assertStagingSafety', () => {
     process.env.PAYMENT_PROVIDER = 'paystack';
     process.env.PAYSTACK_SECRET_KEY = 'sk_test_x';
     process.env.PAYSTACK_WEBHOOK_SECRET = 'wh';
-    process.env.VTU_PROVIDER = 'vtpass';
-    process.env.VTPASS_API_KEY = 'a';
-    process.env.VTPASS_SECRET_KEY = 's';
+    process.env.VTU_PROVIDER = 'vtuagent';
+    process.env.VTUAGENT_API_KEY = 'a';
     process.env.FULFILLMENT_MODE = 'simulated';
     expect(() => config().assertStagingSafety()).toThrow(/FULFILLMENT_MODE=simulated/);
   });
@@ -72,10 +77,9 @@ describe('AppConfigService.assertStagingSafety', () => {
     process.env.PAYMENT_PROVIDER = 'paystack';
     process.env.PAYSTACK_SECRET_KEY = 'sk_test_x';
     process.env.PAYSTACK_WEBHOOK_SECRET = 'wh';
-    process.env.VTU_PROVIDER = 'vtpass';
-    process.env.VTPASS_API_KEY = 'a';
-    process.env.VTPASS_SECRET_KEY = 's';
-    process.env.FULFILLMENT_MODE = 'provider_test';
+    process.env.VTU_PROVIDER = 'vtuagent';
+    process.env.VTUAGENT_API_KEY = 'a';
+    process.env.FULFILLMENT_MODE = 'live';
     expect(() => config().assertStagingSafety()).not.toThrow();
   });
 
@@ -107,13 +111,11 @@ describe('AppConfigService.assertStagingSafety', () => {
     expect(() => config().assertStagingSafety()).not.toThrow();
   });
 
-  it('refuses a non-sandbox VTpass host while testing VTpass', () => {
+  it('refuses a real provider in non-live mode because it has no public sandbox', () => {
     process.env.NODE_ENV = 'staging';
-    process.env.VTU_PROVIDER = 'vtpass';
-    process.env.VTPASS_API_KEY = 'a';
-    process.env.VTPASS_SECRET_KEY = 's';
+    process.env.VTU_PROVIDER = 'cheapdatahub';
+    process.env.CHEAPDATAHUB_API_KEY = 'a';
     process.env.FULFILLMENT_MODE = 'provider_test';
-    process.env.VTPASS_BASE_URL = 'https://vtpass.com';
-    expect(() => config().assertStagingSafety()).toThrow(/VTPASS_BASE_URL/);
+    expect(() => config().assertStagingSafety()).toThrow(/no public sandbox/);
   });
 });

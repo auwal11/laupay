@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, timingSafeEqual } from 'crypto';
 import { Prisma } from '@prisma/client';
 import {
   BadRequestException,
@@ -48,6 +48,14 @@ interface VtpassCallback {
     requestId?: string;
     content?: { transactions?: { transactionId?: string; status?: string } };
   };
+}
+
+interface VtuAgentCallback {
+  event?: string;
+  reference?: string;
+  status?: string;
+  hash?: string;
+  timestamp?: string;
 }
 
 /**
@@ -294,6 +302,32 @@ export class WebhooksController {
 
     // VTpass documents no signing header/secret. Never trust its status field;
     // reconcileVtuTransaction re-queries the provider before changing state.
+    void this.ordersService.reconcileVtuTransaction(txn.id).catch(() => undefined);
+    return { response: 'success' };
+  }
+
+  /**
+   * VTUAgent callback. Its documented authenticity proof is SHA-256 of
+   * "{API key}:{request_ref}" in the body hash (not an HTTP signature header).
+   * The callback status is never trusted for wallet/order state; reconciliation
+   * re-queries VTUAgent before applying the outcome.
+   */
+  @Post('vtuagent')
+  async handleVtuAgentWebhook(@Body() body: VtuAgentCallback) {
+    if (!this.config.vtuAgentEnabled || !this.config.vtuAgentApiKey || !body.reference || !body.hash || !/^[a-f0-9]{64}$/.test(body.hash)) {
+      throw new BadRequestException('Invalid VTUAgent callback payload');
+    }
+    const expected = createHash('sha256')
+      .update(`${this.config.vtuAgentApiKey}:${body.reference}`)
+      .digest('hex');
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    const actualBuffer = Buffer.from(body.hash, 'utf8');
+    if (expectedBuffer.length !== actualBuffer.length || !timingSafeEqual(expectedBuffer, actualBuffer)) {
+      throw new BadRequestException('Invalid VTUAgent callback signature');
+    }
+
+    const txn = await this.prisma.vtuTransaction.findUnique({ where: { providerReference: body.reference } });
+    if (!txn) throw new BadRequestException('Unknown VTUAgent transaction reference');
     void this.ordersService.reconcileVtuTransaction(txn.id).catch(() => undefined);
     return { response: 'success' };
   }
