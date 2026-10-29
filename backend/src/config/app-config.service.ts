@@ -139,7 +139,17 @@ export class AppConfigService {
    *   live          - real fulfillment (requires live keys)
    * Defaults to `simulated` so nothing real can be purchased by accident.
    */
-  readonly fulfillmentMode = optional('FULFILLMENT_MODE', 'simulated');
+  readonly fulfillmentMode = (() => {
+    const configured = optional('FULFILLMENT_MODE', 'simulated');
+    // Older Railway deployments used the real VTpass sandbox while the
+    // variable was still named `simulated`. Normalize that legacy value to a
+    // real provider mode so auth/support endpoints do not crash during the
+    // migration. No fake fulfillment is enabled by this compatibility path.
+    if (this.isProduction && this.vtuProvider === 'vtpass' && configured === 'simulated') {
+      return 'provider_test';
+    }
+    return configured;
+  })();
   get isSimulatedFulfillment(): boolean {
     return this.fulfillmentMode === 'simulated';
   }
@@ -226,7 +236,7 @@ export class AppConfigService {
             'Use provider_test or live.',
         );
       }
-      if (this.fulfillmentMode !== 'live') {
+      if (['vtuagent', 'cheapdatahub'].includes(this.vtuProvider) && this.fulfillmentMode !== 'live') {
         throw new Error(
           `[config] Refusing to start: real VTU provider ${this.vtuProvider} requires FULFILLMENT_MODE=live. ` +
             'Neither VTUAgent nor CheapDataHub exposes a public sandbox in the configured API contract.',

@@ -83,6 +83,22 @@ describe('AppConfigService.assertStagingSafety', () => {
     expect(() => config().assertStagingSafety()).not.toThrow();
   });
 
+  it('normalizes the legacy VTpass simulated setting to real provider_test mode', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_ACCESS_SECRET = 'x';
+    process.env.PAYMENT_PROVIDER = 'paystack';
+    process.env.PAYSTACK_SECRET_KEY = 'sk_test_x';
+    process.env.PAYSTACK_WEBHOOK_SECRET = 'wh';
+    process.env.VTU_PROVIDER = 'vtpass';
+    process.env.VTPASS_API_KEY = 'a';
+    process.env.VTPASS_SECRET_KEY = 's';
+    process.env.VTPASS_BASE_URL = 'https://sandbox.vtpass.com';
+    process.env.FULFILLMENT_MODE = 'simulated';
+    const instance = config();
+    expect(instance.fulfillmentMode).toBe('provider_test');
+    expect(() => instance.assertStagingSafety()).not.toThrow();
+  });
+
   it('refuses a LIVE Paystack key outside production', () => {
     process.env.NODE_ENV = 'staging';
     process.env.PAYMENT_PROVIDER = 'paystack';
