@@ -817,7 +817,7 @@ onClick={() => { pauseForInteraction(); setActiveService(item.key); setDemoStage
             <div className="mt-4 flex flex-col gap-3 text-sm text-white/65">
               <a href="mailto:support.laupay@gmail.com" className="flex items-start gap-2.5 transition-colors hover:text-white"><Mail size={16} className="mt-0.5 shrink-0 text-[#F4B33F]" aria-hidden="true" /><span>support.laupay@gmail.com</span></a>
               <a href="tel:+2347045648248" className="flex items-start gap-2.5 transition-colors hover:text-white"><Phone size={16} className="mt-0.5 shrink-0 text-[#F4B33F]" aria-hidden="true" /><span>0704 564 8248</span></a>
-              <div className="flex items-start gap-2.5"><MapPin size={16} className="mt-0.5 shrink-0 text-[#F4B33F]" aria-hidden="true" /><span>33 Palace Way, Jalingo</span></div>
+              <div className="flex items-start gap-2.5"><MapPin size={16} className="mt-0.5 shrink-0 text-[#F4B33F]" aria-hidden="true" /><span>NO. 33 PALACE WAY, OPPOSITE PALACE MOSQUE, JALINGO</span></div>
             </div>
           </div>
           <p className="text-[10px] font-semibold text-white/30 md:col-span-3">
