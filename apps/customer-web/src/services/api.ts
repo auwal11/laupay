@@ -11,7 +11,8 @@ import type { ApiError, ApiResult } from "@/types/common";
  * a real security decision the integrating team should make on purpose.
  */
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const DEFAULT_API_BASE_URL = "https://laupay-production.up.railway.app";
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, "");
 
 let accessToken: string | null = sessionStorage.getItem("laupay_access_token");
 

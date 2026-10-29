@@ -11,7 +11,11 @@ import type { ApiError, ApiResult } from "@app/types/common";
  * a real security decision the integrating team should make on purpose.
  */
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+// Vercel must provide VITE_API_BASE_URL, but keep the deployed backend as a
+// safe fallback so a missing build-time variable never turns API calls into
+// same-origin requests that return the SPA HTML instead of JSON.
+const DEFAULT_API_BASE_URL = "https://laupay-production.up.railway.app/api";
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, "");
 
 // Persisted so a page reload keeps the session; the refresh token lives
 // separately (see services/auth.ts) and the backend remains authoritative.
