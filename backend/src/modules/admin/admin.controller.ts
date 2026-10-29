@@ -132,7 +132,7 @@ export class AdminController {
     @Body() dto: CreateStaffAccountDto,
     @Req() req: Request,
   ) {
-    return this.admin.createStaffAccount(dto.email, dto.fullName, dto.role, dto.reason, user.userId, req.ip);
+    return this.admin.createStaffAccount(dto.email, dto.fullName, dto.role, dto.reason, user.userId, req.ip, user.email);
   }
 
   @Get('users/:id')

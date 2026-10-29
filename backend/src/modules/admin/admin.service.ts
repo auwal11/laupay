@@ -59,8 +59,16 @@ export class AdminService {
     reason: string,
     actorId: string,
     ipAddress?: string,
+    actorEmail?: string,
   ) {
-    if (!this.config.superAdminIds.has(actorId)) {
+    const currentActor = await this.prisma.user.findUnique({
+      where: { id: actorId },
+      select: { email: true },
+    });
+    const normalizedActorEmail = (currentActor?.email ?? actorEmail ?? '').trim().toLowerCase();
+    const isConfiguredSuperAdmin = this.config.superAdminIds.has(actorId) ||
+      this.config.superAdminEmails.has(normalizedActorEmail);
+    if (!isConfiguredSuperAdmin) {
       throw new ForbiddenException('Only a configured super administrator can create staff accounts');
     }
     if (!reason?.trim() || reason.trim().length < 5) {
