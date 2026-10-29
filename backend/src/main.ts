@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as bodyParser from 'body-parser';
 import type { Request, Response, NextFunction } from 'express';
+import compression from 'compression';
 import helmet from 'helmet';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
@@ -41,6 +42,10 @@ async function bootstrap() {
   }));
 
   app.use(helmet());
+  // Compress JSON responses for slow mobile connections. The default filter
+  // skips already-compressed content, and the threshold avoids spending CPU
+  // on tiny responses such as health checks and simple acknowledgements.
+  app.use(compression({ threshold: '1kb' }));
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
   app.enableCors({
     origin: (origin, callback) => {
