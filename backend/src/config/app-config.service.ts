@@ -210,10 +210,14 @@ export class AppConfigService {
             'Real fulfillment must use VTU_PROVIDER=vtuagent or cheapdatahub.',
           );
       }
-      if (!['vtuagent', 'cheapdatahub'].includes(this.vtuProvider)) {
+      // Keep an existing VTpass deployment bootable during migration. VTpass
+      // is a real provider (not a mock); new deployments should use
+      // vtuagent/cheapdatahub, but a config rollout must not take auth down
+      // before Railway variables have been changed.
+      if (!['vtuagent', 'cheapdatahub', 'vtpass'].includes(this.vtuProvider)) {
         throw new Error(
           `[config] Refusing to start: unsupported VTU_PROVIDER=${this.vtuProvider}. ` +
-            'Use vtuagent or cheapdatahub.',
+            'Use vtuagent, cheapdatahub, or the legacy real vtpass provider while migrating.',
         );
       }
       if (this.fulfillmentMode === 'simulated') {
