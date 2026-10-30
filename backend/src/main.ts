@@ -3,7 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as bodyParser from 'body-parser';
 import type { Request, Response, NextFunction } from 'express';
-import compression from 'compression';
+import compression = require('compression');
 import helmet from 'helmet';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
