@@ -13,6 +13,9 @@ import { AppConfigService } from './config/app-config.service';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   app.disable('x-powered-by');
+  // Render/Railway terminate TLS at one trusted proxy hop. Without this,
+  // rate limiting keys on the proxy IP instead of the real client.
+  app.set('trust proxy', 1);
   const config = app.get(AppConfigService);
   // Refuse to boot with a dangerous provider/credential combination (mock in
   // production, or a live key in staging) before accepting any traffic.
