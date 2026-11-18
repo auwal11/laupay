@@ -6,7 +6,7 @@ import type { ApiError, ApiResult } from "@app/types/common";
  * browser never share (or clobber) each other's token. No secrets live here —
  * the access token is kept in memory + sessionStorage only.
  */
-const DEFAULT_API_BASE_URL = "https://laupay-production.up.railway.app/api";
+const DEFAULT_API_BASE_URL = "https://laupay.onrender.com/api";
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, "");
 const TOKEN_KEY = "laupay_admin_access_token";
 
