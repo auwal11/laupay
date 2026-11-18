@@ -15,7 +15,9 @@ import type { ApiError, ApiResult } from "@app/types/common";
 // safe fallback so a missing build-time variable never turns API calls into
 // same-origin requests that return the SPA HTML instead of JSON.
 const DEFAULT_API_BASE_URL = "https://laupay.onrender.com/api";
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, "");
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const activeApiBaseUrl = configuredApiBaseUrl && configuredApiBaseUrl !== "https://laupay-production.up.railway.app/api" ? configuredApiBaseUrl : DEFAULT_API_BASE_URL;
+const BASE_URL = activeApiBaseUrl.replace(/\/$/, "");
 
 // Persisted so a page reload keeps the session; the refresh token lives
 // separately (see services/auth.ts) and the backend remains authoritative.

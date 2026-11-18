@@ -7,7 +7,9 @@ import type { ApiError, ApiResult } from "@app/types/common";
  * the access token is kept in memory + sessionStorage only.
  */
 const DEFAULT_API_BASE_URL = "https://laupay.onrender.com/api";
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, "");
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const activeApiBaseUrl = configuredApiBaseUrl && configuredApiBaseUrl !== "https://laupay-production.up.railway.app/api" ? configuredApiBaseUrl : DEFAULT_API_BASE_URL;
+const BASE_URL = activeApiBaseUrl.replace(/\/$/, "");
 const TOKEN_KEY = "laupay_admin_access_token";
 
 let adminToken: string | null =

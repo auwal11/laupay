@@ -1,4 +1,5 @@
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://laupay.onrender.com/api").replace(/\/$/, "");
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const API_BASE = (configuredApiBaseUrl && configuredApiBaseUrl !== "https://laupay-production.up.railway.app/api" ? configuredApiBaseUrl : "https://laupay.onrender.com/api").replace(/\/$/, "");
 const API_ORIGIN = API_BASE.replace(/\/api$/, "");
 
 /**
