@@ -1,8 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { LedgerDirection, LedgerReason, WalletStatus } from '@prisma/client';
+import { LedgerDirection, LedgerReason, Prisma, WalletStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LedgerService } from './ledger.service';
-import { InsufficientBalanceError, WalletNotActiveError } from './ledger.errors';
+import {
+  InsufficientBalanceError,
+  InsufficientWithdrawableBalanceError,
+  WalletNotActiveError,
+} from './ledger.errors';
 
 /**
  * These tests exercise LedgerService against a mocked PrismaService so they
@@ -32,6 +36,8 @@ describe('LedgerService', () => {
     return {
       $queryRaw: jest.fn().mockResolvedValue([wallet]),
       ledgerEntry: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation(({ data }: any) => {
           const entry = { id: `entry-${created.length + 1}`, ...data };
           created.push(entry);
@@ -105,6 +111,77 @@ describe('LedgerService', () => {
         idempotencyKey: 'debit-2',
       }),
     ).rejects.toBeInstanceOf(InsufficientBalanceError);
+  });
+
+  it('checks real-credit capacity under the wallet lock and does not offset an existing hold with test credits', async () => {
+    const wallet = { id: WALLET_ID, balance: bignum(1000), status: WalletStatus.ACTIVE, version: 1 };
+    const tx = makeTxMock(wallet);
+    tx.ledgerEntry.findMany.mockResolvedValue([
+      {
+        direction: LedgerDirection.CREDIT,
+        amount: new Prisma.Decimal('1000'),
+        source: 'test_allocation',
+        mode: 'test',
+        reason: LedgerReason.ADMIN_ADJUSTMENT,
+      },
+      {
+        direction: LedgerDirection.CREDIT,
+        amount: new Prisma.Decimal('1000'),
+        source: 'e2e_funding',
+        mode: 'test',
+        reason: LedgerReason.WALLET_FUNDING,
+      },
+      {
+        direction: LedgerDirection.DEBIT,
+        amount: new Prisma.Decimal('1000'),
+        source: 'withdrawal_request',
+        mode: 'test',
+        reason: LedgerReason.WITHDRAWAL,
+      },
+    ]);
+    prisma.$transaction.mockImplementation((fn: any) => fn(tx));
+
+    await expect(
+      service.debitWithdrawal({
+        walletAccountId: WALLET_ID,
+        amount: '500',
+        reason: LedgerReason.WITHDRAWAL,
+        idempotencyKey: 'withdrawal-insufficient-real-capacity',
+      }),
+    ).rejects.toBeInstanceOf(InsufficientWithdrawableBalanceError);
+
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.ledgerEntry.findMany).toHaveBeenCalled();
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.ledgerEntry.findMany.mock.invocationCallOrder[0],
+    );
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
+    expect(tx.walletAccount.update).not.toHaveBeenCalled();
+  });
+
+  it('returns an already-applied withdrawal idempotently before checking remaining capacity', async () => {
+    const wallet = { id: WALLET_ID, balance: bignum(0), status: WalletStatus.ACTIVE, version: 1 };
+    const tx = makeTxMock(wallet);
+    tx.ledgerEntry.findUnique.mockResolvedValue({
+      id: 'withdrawal-entry-original',
+      walletAccountId: WALLET_ID,
+      direction: LedgerDirection.DEBIT,
+      amount: new Prisma.Decimal('1000'),
+      balanceAfter: new Prisma.Decimal('0'),
+    });
+    prisma.$transaction.mockImplementation((fn: any) => fn(tx));
+
+    const result = await service.debitWithdrawal({
+      walletAccountId: WALLET_ID,
+      amount: '1000',
+      reason: LedgerReason.WITHDRAWAL,
+      idempotencyKey: 'withdrawal-idempotent-replay',
+    });
+
+    expect(result.wasAlreadyApplied).toBe(true);
+    expect(result.entryId).toBe('withdrawal-entry-original');
+    expect(tx.ledgerEntry.findMany).not.toHaveBeenCalled();
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
   });
 
   it('rejects any mutation on a non-ACTIVE wallet', async () => {

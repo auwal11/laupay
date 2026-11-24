@@ -5,6 +5,13 @@ export class InsufficientBalanceError extends Error {
   }
 }
 
+export class InsufficientWithdrawableBalanceError extends Error {
+  constructor(walletAccountId: string) {
+    super(`Insufficient real-credit capacity for withdrawal on wallet ${walletAccountId}`);
+    this.name = 'InsufficientWithdrawableBalanceError';
+  }
+}
+
 export class WalletNotActiveError extends Error {
   constructor(walletAccountId: string, status: string) {
     super(`Wallet ${walletAccountId} is not active (status: ${status})`);

@@ -3,9 +3,11 @@ import { LedgerDirection, LedgerReason, Prisma, WalletStatus } from '@prisma/cli
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   InsufficientBalanceError,
+  InsufficientWithdrawableBalanceError,
   InvalidAmountError,
   WalletNotActiveError,
 } from './ledger.errors';
+import { calculateWithdrawableBalance } from './withdrawal-provenance';
 
 export interface LedgerEntryRequest {
   walletAccountId: string;
@@ -71,6 +73,19 @@ export class LedgerService {
   }
 
   /**
+   * Debits an eligible withdrawal hold only when real-credit capacity remains.
+   * The provenance check shares the wallet row lock and transaction with the
+   * ledger mutation, so concurrent withdrawal requests cannot reuse capacity.
+   */
+  async debitWithdrawal(req: LedgerEntryRequest): Promise<LedgerEntryResult> {
+    return this.applyEntry({
+      ...req,
+      direction: LedgerDirection.DEBIT,
+      enforceWithdrawableBalance: true,
+    });
+  }
+
+  /**
    * Reverses a previous ledger entry by inserting a new, opposite-direction
    * entry. The original entry is never modified or deleted — see
    * docs/architecture/wallet-ledger-model.md §6.
@@ -96,7 +111,10 @@ export class LedgerService {
   }
 
   private async applyEntry(
-    req: LedgerEntryRequest & { direction: LedgerDirection },
+    req: LedgerEntryRequest & {
+      direction: LedgerDirection;
+      enforceWithdrawableBalance?: boolean;
+    },
   ): Promise<LedgerEntryResult> {
     const amount = new Prisma.Decimal(req.amount);
     if (amount.lessThanOrEqualTo(0)) {
@@ -122,6 +140,31 @@ export class LedgerService {
         }
         if (wallet.status !== WalletStatus.ACTIVE) {
           throw new WalletNotActiveError(wallet.id, wallet.status);
+        }
+
+        if (req.enforceWithdrawableBalance) {
+          const existing = await tx.ledgerEntry.findUnique({
+            where: { idempotencyKey: req.idempotencyKey },
+          });
+          if (existing) {
+            return {
+              entryId: existing.id,
+              walletAccountId: existing.walletAccountId,
+              direction: existing.direction,
+              amount: existing.amount.toString(),
+              balanceAfter: existing.balanceAfter.toString(),
+              wasAlreadyApplied: true,
+            };
+          }
+
+          const entries = await tx.ledgerEntry.findMany({
+            where: { walletAccountId: wallet.id },
+            select: { direction: true, amount: true, source: true, mode: true, reason: true },
+          });
+          const withdrawable = calculateWithdrawableBalance(entries);
+          if (withdrawable.lessThan(amount)) {
+            throw new InsufficientWithdrawableBalanceError(wallet.id);
+          }
         }
 
         const balanceAfter =

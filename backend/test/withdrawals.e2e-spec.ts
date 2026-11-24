@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as request from 'supertest';
+import request = require('supertest');
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { MockMailProvider } from '../src/common/mail/mock-mail.provider';
@@ -65,7 +65,7 @@ describe('Withdrawals (e2e)', () => {
     await moduleRef.get(LedgerService).credit({
       walletAccountId: wallet.id,
       amount: '5000',
-      reason: 'ADMIN_ADJUSTMENT' as never,
+      reason: 'WALLET_FUNDING' as never,
       source: 'e2e_funding',
       mode: 'test',
       idempotencyKey: `test-withdrawal-funding:${session.userId}`,
@@ -201,5 +201,77 @@ describe('Withdrawals (e2e)', () => {
       .expect(400);
     const after = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: other.userId } });
     expect(after.balance.toString()).toBe(before.balance.toString());
+  });
+
+  it('does not reuse test-credit offset after a real-credit withdrawal hold', async () => {
+    const other = await registerVerified(app.getHttpServer(), prisma, `wd-mixed-credit-${Date.now()}@test.local`);
+    await request(app.getHttpServer())
+      .post('/api/security/pin')
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .send({ pin: '1234' })
+      .expect(201);
+    const wallet = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: other.userId } });
+    await app.get(LedgerService).credit({
+      walletAccountId: wallet.id,
+      amount: '1000',
+      reason: 'WALLET_FUNDING' as never,
+      source: 'e2e_funding',
+      mode: 'test',
+      idempotencyKey: `mixed-real-credit:${other.userId}`,
+    });
+    await app.get(CreditsService).grantTestCredit(other.userId, 1000, {
+      idempotencyKey: `mixed-test-credit:${other.userId}`,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/withdrawals')
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .send({ ...base, amount: 1000, idempotencyKey: `mixed-first-hold:${other.userId}` })
+      .expect(201);
+
+    const beforeSecondRequest = await prisma.walletAccount.findUniqueOrThrow({ where: { id: wallet.id } });
+    await request(app.getHttpServer())
+      .post('/api/withdrawals')
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .send({ ...base, amount: 500, idempotencyKey: `mixed-second-hold:${other.userId}` })
+      .expect(400);
+    const afterSecondRequest = await prisma.walletAccount.findUniqueOrThrow({ where: { id: wallet.id } });
+    expect(afterSecondRequest.balance.toString()).toBe(beforeSecondRequest.balance.toString());
+  });
+
+  it('serializes concurrent withdrawal holds against the same real-credit capacity', async () => {
+    const other = await registerVerified(app.getHttpServer(), prisma, `wd-concurrent-${Date.now()}@test.local`);
+    await request(app.getHttpServer())
+      .post('/api/security/pin')
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .send({ pin: '1234' })
+      .expect(201);
+    const wallet = await prisma.walletAccount.findUniqueOrThrow({ where: { ownerId: other.userId } });
+    await app.get(LedgerService).credit({
+      walletAccountId: wallet.id,
+      amount: '1000',
+      reason: 'WALLET_FUNDING' as never,
+      source: 'e2e_funding',
+      mode: 'test',
+      idempotencyKey: `concurrent-real-credit:${other.userId}`,
+    });
+    await app.get(CreditsService).grantTestCredit(other.userId, 1000, {
+      idempotencyKey: `concurrent-test-credit:${other.userId}`,
+    });
+
+    const results = await Promise.all([
+      request(app.getHttpServer())
+        .post('/api/withdrawals')
+        .set('Authorization', `Bearer ${other.accessToken}`)
+        .send({ ...base, amount: 1000, idempotencyKey: `concurrent-hold-a:${other.userId}` }),
+      request(app.getHttpServer())
+        .post('/api/withdrawals')
+        .set('Authorization', `Bearer ${other.accessToken}`)
+        .send({ ...base, amount: 1000, idempotencyKey: `concurrent-hold-b:${other.userId}` }),
+    ]);
+
+    expect(results.map((result) => result.status).sort()).toEqual([201, 400]);
+    const after = await prisma.walletAccount.findUniqueOrThrow({ where: { id: wallet.id } });
+    expect(after.balance.toString()).toBe('1000');
   });
 });

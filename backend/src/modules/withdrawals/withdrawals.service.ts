@@ -4,7 +4,8 @@ import { randomBytes } from 'crypto';
 import { AppConfigService } from '../../config/app-config.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
-import { InsufficientBalanceError } from '../ledger/ledger.errors';
+import { InsufficientBalanceError, InsufficientWithdrawableBalanceError } from '../ledger/ledger.errors';
+import { calculateWithdrawableBalance } from '../ledger/withdrawal-provenance';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SecurityService } from '../security/security.service';
 import { RequestWithdrawalDto } from './dto/withdrawals.dto';
@@ -88,11 +89,14 @@ export class WithdrawalsService {
     const reference = `WD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`;
     const withdrawal = await this.prisma.withdrawal.create({ data: { userId, reference, idempotencyKey: dto.idempotencyKey, amount, fee: 0, bankName: bank.name, bankCode: bank.code, accountName: dto.accountName.trim(), accountNumber: dto.accountNumber, accountVerified: false, status: WithdrawalStatus.PENDING } });
     try {
-      const entry = await this.ledger.debit({ walletAccountId: wallet.id, amount: amount.toString(), reason: LedgerReason.WITHDRAWAL, narrative: `Withdrawal hold • ${reference}`, source: 'withdrawal_request', mode: this.config.fulfillmentMode, referenceType: 'Withdrawal', referenceId: withdrawal.id, idempotencyKey: `withdrawal:${withdrawal.id}` });
+      const entry = await this.ledger.debitWithdrawal({ walletAccountId: wallet.id, amount: amount.toString(), reason: LedgerReason.WITHDRAWAL, narrative: `Withdrawal hold • ${reference}`, source: 'withdrawal_request', mode: this.config.fulfillmentMode, referenceType: 'Withdrawal', referenceId: withdrawal.id, idempotencyKey: `withdrawal:${withdrawal.id}` });
       await this.prisma.withdrawal.update({ where: { id: withdrawal.id }, data: { ledgerEntryId: entry.entryId } });
       await this.event(withdrawal.id, null, WithdrawalStatus.PENDING, 'REQUESTED', userId, 'Withdrawal request submitted');
     } catch (error) {
       await this.prisma.withdrawal.update({ where: { id: withdrawal.id }, data: { status: WithdrawalStatus.REJECTED, failureReason: 'Insufficient available balance' } });
+      if (error instanceof InsufficientWithdrawableBalanceError) {
+        throw new BadRequestException('Test credit is not withdrawable. Only funds from real deposits or approved earnings can be withdrawn.');
+      }
       if (error instanceof InsufficientBalanceError) throw new BadRequestException('Insufficient balance for this withdrawal');
       throw error;
     }
@@ -111,26 +115,7 @@ export class WithdrawalsService {
       where: { walletAccountId },
       select: { direction: true, amount: true, source: true, mode: true, reason: true },
     });
-    let testCredits = new Prisma.Decimal(0);
-    let otherCredits = new Prisma.Decimal(0);
-    let debits = new Prisma.Decimal(0);
-
-    for (const row of rows) {
-      if (row.direction === 'CREDIT') {
-        const isTestCredit =
-          row.source === 'test_allocation' ||
-          row.source === 'admin_test_credit' ||
-          (row.mode === 'test' && row.reason === 'ADMIN_ADJUSTMENT');
-        if (isTestCredit) testCredits = testCredits.plus(row.amount);
-        else otherCredits = otherCredits.plus(row.amount);
-      } else {
-        debits = debits.plus(row.amount);
-      }
-    }
-
-    const realConsumed = Prisma.Decimal.max(debits.minus(testCredits), new Prisma.Decimal(0));
-    const remaining = otherCredits.minus(realConsumed);
-    return remaining.gt(0) ? remaining : new Prisma.Decimal(0);
+    return calculateWithdrawableBalance(rows);
   }
 
   async listForUser(userId: string) { return (await this.prisma.withdrawal.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 })).map((row) => this.toView(row)); }
