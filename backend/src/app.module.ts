@@ -24,6 +24,7 @@ import { BeneficiariesModule } from './modules/beneficiaries/beneficiaries.modul
 import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
 import { RiskModule } from './modules/risk/risk.module';
 import { SupportModule } from './modules/support/support.module';
+import { ProoftrailModule } from './modules/prooftrail/prooftrail.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 @Module({
@@ -54,6 +55,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     DisputesModule,
     BeneficiariesModule,
     WithdrawalsModule,
+    ProoftrailModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

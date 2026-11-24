@@ -8,5 +8,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
   imports: [JwtModule.register({}), NotificationsModule],
   controllers: [DisputesController],
   providers: [DisputesService],
+  exports: [DisputesService],
 })
 export class DisputesModule {}

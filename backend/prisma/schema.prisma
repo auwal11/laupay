@@ -538,10 +538,38 @@ model TransactionDispute {
   updatedAt       DateTime      @updatedAt
 
   messages DisputeMessage[]
+  prooftrailMapping ProoftrailCaseMapping?
 
   @@unique([userId, ledgerEntryId])
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+model ProoftrailCaseMapping {
+  id                    String             @id @default(uuid())
+  disputeId             String             @unique
+  dispute               TransactionDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  prooftrailCaseId      String             @unique
+  externalTransactionId String             @unique
+  prooftrailStatus      String
+  lastSyncedAt          DateTime?
+  evidenceCount         Int                @default(0)
+  findingsCount         Int                @default(0)
+  reportAvailable       Boolean            @default(false)
+  reportSha256          String?
+  reportVersion         Int?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([prooftrailStatus, updatedAt])
+}
+
+model ProoftrailWebhookEvent {
+  id         String   @id @default(uuid())
+  eventId    String   @unique
+  event      String?
+  payload    Json
+  receivedAt DateTime @default(now())
 }
 
 // ============================================================

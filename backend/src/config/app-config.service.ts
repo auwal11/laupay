@@ -213,6 +213,14 @@ export class AppConfigService {
     }
   }
 
+  /** ProofTrail is opt-in so existing LauPay deployments remain bootable. */
+  readonly prooftrailEnabled = optional('PROOFTRAIL_ENABLED', 'false').toLowerCase() === 'true';
+  readonly prooftrailBaseUrl = optional('PROOFTRAIL_BASE_URL', 'http://localhost:3001').replace(/\/$/, '');
+  readonly prooftrailApiKey = this.requiredIf(this.prooftrailEnabled, 'PROOFTRAIL_API_KEY');
+  readonly prooftrailApiSecret = this.requiredIf(this.prooftrailEnabled, 'PROOFTRAIL_API_SECRET');
+  readonly prooftrailWebhookSecret = this.requiredIf(this.prooftrailEnabled, 'PROOFTRAIL_WEBHOOK_SECRET');
+  readonly prooftrailTimeoutMs = Math.min(Math.max(Number(optional('PROOFTRAIL_TIMEOUT_MS', '10000')), 3000), 30000);
+
   /**
    * Guard evaluated at boot (see main.ts).
    *
