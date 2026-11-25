@@ -69,6 +69,14 @@ export class UserListQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize?: number;
 }
 
+export class StaffListQueryDto {
+  @IsOptional() @IsString() @MaxLength(200) search?: string;
+  @IsOptional() @IsIn(['ADMIN', 'SUPPORT', 'FINANCE', 'VIEWER']) role?: string;
+  @IsOptional() @IsIn(['ACTIVE', 'SUSPENDED', 'FROZEN', 'CLOSED', 'PENDING_VERIFICATION']) status?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize?: number;
+}
+
 export class TransactionListQueryDto {
   @IsOptional() @IsIn(['CREDIT', 'DEBIT']) direction?: string;
   @IsOptional() @IsString() source?: string;

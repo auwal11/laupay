@@ -9,6 +9,7 @@ import type {
   AdminOrderDetail,
   AdminOverview,
   AdminReport,
+  AdminStaffRow,
   AdminSettings,
   AdminTransaction,
   AdminUserDetail,
@@ -36,7 +37,7 @@ export const adminService = {
     });
   },
 
-  me(): Promise<ApiResult<{ userId: string; role: string; permissions: string[] }>> {
+  me(): Promise<ApiResult<{ userId: string; role: string; permissions: string[]; isSuperAdmin: boolean }>> {
     return adminRequest("/admin/me");
   },
 
@@ -51,6 +52,17 @@ export const adminService = {
 
   createStaff(body: { email: string; fullName: string; role: "SUPPORT" | "FINANCE" | "VIEWER"; reason: string }) {
     return adminRequest<{ user: { id: string; email: string; fullName: string; role: string; status: string }; temporaryPassword: string; warning: string }>("/admin/staff", { method: "POST", body });
+  },
+
+  staff(params: ListParams = {}): Promise<ApiResult<Paged<AdminStaffRow>>> {
+    return adminRequest<Paged<AdminStaffRow>>(`/admin/staff${buildQuery(params)}`);
+  },
+
+  revokeStaffAccess(id: string, reason: string): Promise<ApiResult<{ id: string; status: string }>> {
+    return adminRequest<{ id: string; status: string }>(`/admin/staff/${id}/revoke`, {
+      method: "POST",
+      body: { reason },
+    });
   },
 
   changePassword(currentPassword: string, newPassword: string) {

@@ -15,6 +15,7 @@ import {
   LifeBuoy,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@app/lib/cn";
 import { useAdminAuth } from "./AdminAuthContext";
@@ -23,6 +24,7 @@ import { FlowMark } from "@/components/laupay/FlowMark";
 const NAV = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/admin/users", label: "Users", icon: Users, end: false },
+  { to: "/admin/staff", label: "Staff access", icon: ShieldCheck, end: false, superAdminOnly: true },
   { to: "/admin/transactions", label: "Transactions", icon: Receipt, end: false },
   { to: "/admin/wallets", label: "Wallets", icon: Wallet, end: false },
   { to: "/admin/orders", label: "Orders", icon: ShoppingCart, end: false },
@@ -39,6 +41,7 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const visibleNav = NAV.filter((item) => !("superAdminOnly" in item) || session?.isSuperAdmin);
 
   const onLogout = () => {
     logout();
@@ -56,7 +59,7 @@ export function AdminLayout() {
           </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:overflow-visible md:pb-0">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
+          {visibleNav.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}

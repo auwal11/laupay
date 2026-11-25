@@ -53,24 +53,30 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       setStatus("anonymous");
       return;
     }
-    // A newly provisioned staff member is intentionally restricted to the
-    // password-change screen. Keep that screen usable after a refresh; the
-    // change-password request still validates the token and current password
-    // on the backend.
-    if (stored.mustChangePassword) {
-      setSession(stored);
-      setStatus("authenticated");
-      return;
-    }
-    adminService.overview().then((result) => {
+    // Hydrate trusted role/permission state from the backend for every session.
+    // `mustChangePassword` remains on the stored session, so the route guard
+    // still restricts newly provisioned accounts to the password-change page.
+    adminService.me().then((result) => {
       if (cancelled) return;
       if (result.ok) {
-        setSession(stored);
+        const refreshed: AdminSession = {
+          ...stored,
+          userId: result.data.userId,
+          role: result.data.role as AdminSession["role"],
+          permissions: result.data.permissions,
+          isSuperAdmin: result.data.isSuperAdmin,
+        };
+        sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(refreshed));
+        setSession(refreshed);
         setStatus("authenticated");
-      } else {
-        setAdminToken(null);
-        if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(ADMIN_SESSION_KEY);
+      } else if (!hasAdminToken()) {
+        sessionStorage.removeItem(ADMIN_SESSION_KEY);
         setStatus("anonymous");
+      } else {
+        const restricted: AdminSession = { ...stored, isSuperAdmin: false, permissions: [] };
+        sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(restricted));
+        setSession(restricted);
+        setStatus("authenticated");
       }
     });
     return () => {
@@ -82,11 +88,14 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const result = await adminService.login(email, password);
     if (!result.ok) return { error: result.error, mustChangePassword: false };
     setAdminToken(result.data.accessToken);
+    const capabilities = await adminService.me();
     const next: AdminSession = {
       email,
-      role: result.data.role,
-      permissions: result.data.permissions ?? [],
+      role: capabilities.ok ? capabilities.data.role as AdminSession["role"] : result.data.role,
+      permissions: capabilities.ok ? capabilities.data.permissions : result.data.permissions ?? [],
       mustChangePassword: result.data.mustChangePassword,
+      isSuperAdmin: capabilities.ok ? capabilities.data.isSuperAdmin : false,
+      userId: capabilities.ok ? capabilities.data.userId : undefined,
     };
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(next));

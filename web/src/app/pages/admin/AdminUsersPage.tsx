@@ -22,7 +22,7 @@ import { Input } from "@app/components/ui/Input";
 import { formatNaira } from "@app/lib/format";
 
 export function AdminUsersPage() {
-  const { hasPermission } = useAdminAuth();
+  const { session } = useAdminAuth();
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
@@ -118,7 +118,7 @@ export function AdminUsersPage() {
     <div>
       <PageHeader title="Users" description="Every registered account and its wallet." />
 
-      {hasPermission("admins.manage") && (
+      {session?.isSuperAdmin && (
         <Card className="mb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>

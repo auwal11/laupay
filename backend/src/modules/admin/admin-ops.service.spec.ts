@@ -94,7 +94,7 @@ describe('AdminOpsService Super Admin protections', () => {
       $transaction: jest.fn().mockImplementation((ops) => Promise.all(ops)),
     };
     const service = new AdminOpsService(
-      prisma as never, {} as never, { create: jest.fn() } as never, {} as never,
+      prisma as never, {} as never, { create: jest.fn().mockResolvedValue(undefined) } as never, {} as never,
       {} as never, {} as never, config as never,
     );
     return { service, prisma };
@@ -157,5 +157,64 @@ describe('AdminOpsService Super Admin protections', () => {
     )).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
     expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks an ordinary admin from revoking staff access before reading the target', async () => {
+    const ordinaryAdmin = { id: 'ordinary-id', email: 'ordinary@example.test', role: UserRole.ADMIN };
+    const { service, prisma } = makeService(ordinaryAdmin);
+    await expect(service.revokeStaffAccess(
+      ordinaryAdmin.id, { adminId: 'admin-id', adminEmail: 'admin@example.test' }, 'staff access removal',
+    )).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('allows the Super Admin to revoke a support account and invalidate its sessions', async () => {
+    const support = { id: 'support-id', email: 'support@example.test', role: UserRole.SUPPORT, status: 'ACTIVE' };
+    const { service, prisma } = makeService(support);
+    await service.revokeStaffAccess(
+      support.id, { adminId: 'root-id', adminEmail: configuredEmail }, 'staff access removal',
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: support.id },
+      data: expect.objectContaining({ status: 'FROZEN', sessionsRevokedAt: expect.any(Date) }),
+    }));
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: support.id, revokedAt: null },
+    }));
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        actorId: 'root-id',
+        entityType: 'User',
+        entityId: support.id,
+        reason: 'staff access removal',
+        metadata: { action: 'staff.revoke' },
+      }),
+    }));
+  });
+
+  it('never allows the configured Super Admin to be revoked', async () => {
+    const superAdmin = { id: 'root-id', email: configuredEmail, role: UserRole.ADMIN, status: 'ACTIVE' };
+    const { service, prisma } = makeService(superAdmin);
+    await expect(service.revokeStaffAccess(
+      superAdmin.id, { adminId: 'root-id', adminEmail: configuredEmail }, 'staff access removal',
+    )).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not revoke customer or closed accounts through the staff endpoint', async () => {
+    const actor = { adminId: 'root-id', adminEmail: configuredEmail };
+    const customer = { id: 'customer-id', email: 'customer@example.test', role: UserRole.CUSTOMER, status: 'ACTIVE' };
+    const { service: customerService, prisma: customerPrisma } = makeService(customer);
+    await expect(customerService.revokeStaffAccess(customer.id, actor, 'staff access removal'))
+      .rejects.toThrow('Only admin or support staff accounts can be revoked here');
+    expect(customerPrisma.user.update).not.toHaveBeenCalled();
+
+    const closed = { id: 'closed-id', email: 'closed@example.test', role: UserRole.SUPPORT, status: 'CLOSED' };
+    const { service: closedService, prisma: closedPrisma } = makeService(closed);
+    await expect(closedService.revokeStaffAccess(closed.id, actor, 'staff access removal'))
+      .rejects.toThrow('A closed staff account cannot be revoked from this screen');
+    expect(closedPrisma.user.update).not.toHaveBeenCalled();
   });
 });

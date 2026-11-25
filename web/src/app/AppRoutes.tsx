@@ -38,6 +38,7 @@ const WithdrawPage = lazyNamed(() => import('@app/pages/customer/WithdrawPage'),
 const AdminLoginPage = lazyNamed(() => import('@app/pages/admin/AdminLoginPage'), 'AdminLoginPage');
 const AdminOverviewPage = lazyNamed(() => import('@app/pages/admin/AdminOverviewPage'), 'AdminOverviewPage');
 const AdminUsersPage = lazyNamed(() => import('@app/pages/admin/AdminUsersPage'), 'AdminUsersPage');
+const AdminStaffPage = lazyNamed(() => import('@app/pages/admin/AdminStaffPage'), 'AdminStaffPage');
 const AdminUserDetailPage = lazyNamed(() => import('@app/pages/admin/AdminUserDetailPage'), 'AdminUserDetailPage');
 const AdminTransactionsPage = lazyNamed(() => import('@app/pages/admin/AdminTransactionsPage'), 'AdminTransactionsPage');
 const AdminTransactionDetailPage = lazyNamed(() => import('@app/pages/admin/AdminTransactionDetailPage'), 'AdminTransactionDetailPage');
@@ -120,6 +121,7 @@ export const appRoutes = (
       <Route index element={page(AdminOverviewPage)} />
       <Route path="change-password" element={page(AdminChangePasswordPage)} />
       <Route path="users" element={page(AdminUsersPage)} />
+      <Route path="staff" element={page(AdminStaffPage)} />
       <Route path="users/:id" element={page(AdminUserDetailPage)} />
       <Route path="transactions" element={page(AdminTransactionsPage)} />
       <Route path="transactions/:id" element={page(AdminTransactionDetailPage)} />

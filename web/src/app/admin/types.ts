@@ -5,6 +5,8 @@ export interface AdminSession {
   role: AdminRole;
   permissions?: string[];
   mustChangePassword?: boolean;
+  isSuperAdmin?: boolean;
+  userId?: string;
 }
 
 export interface AdminLoginResponse {
@@ -57,6 +59,17 @@ export interface AdminUserRow {
   createdAt: string;
   walletAccount: AdminUserWallet | null;
   hasPin: boolean;
+}
+
+export interface AdminStaffRow {
+  id: string;
+  email: string;
+  fullName: string;
+  role: AdminRole;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  isSuperAdmin: boolean;
 }
 
 export interface AdminTransaction {

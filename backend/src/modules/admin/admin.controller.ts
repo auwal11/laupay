@@ -51,6 +51,7 @@ import {
   RejectWithdrawalDto,
   WithdrawalActionDto,
   CreateStaffAccountDto,
+  StaffListQueryDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -134,6 +135,23 @@ export class AdminController {
     @Req() req: Request,
   ) {
     return this.admin.createStaffAccount(dto.email, dto.fullName, dto.role, dto.reason, user.userId, req.ip, user.email);
+  }
+
+  @Get('staff')
+  @RequirePermissions('admins.manage')
+  listStaff(@CurrentUser() user: AuthenticatedUser, @Query() q: StaffListQueryDto) {
+    return this.admin.listStaffAccounts(user.userId, user.email, q);
+  }
+
+  @Post('staff/:id/revoke')
+  @RequirePermissions('admins.manage')
+  revokeStaff(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: FreezeUserDto,
+    @Req() req: Request,
+  ) {
+    return this.ops.revokeStaffAccess(id, this.actor(user, req), dto.reason);
   }
 
   @Get('users/:id')

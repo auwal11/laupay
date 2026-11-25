@@ -348,6 +348,49 @@ export class AdminService {
     };
   }
 
+  async listStaffAccounts(
+    actorId: string,
+    actorEmail: string,
+    q: { search?: string; role?: string; status?: string; page?: number; pageSize?: number },
+  ) {
+    if (!this.config.isConfiguredSuperAdmin(actorId, actorEmail)) {
+      throw new ForbiddenException('Only a configured Super Admin can view staff access');
+    }
+
+    const staffRoles = [UserRole.ADMIN, UserRole.SUPPORT, UserRole.FINANCE, UserRole.VIEWER];
+    const where: Prisma.UserWhereInput = { role: { in: staffRoles } };
+    if (q.role) where.role = q.role as UserRole;
+    if (q.status) where.status = q.status as UserStatus;
+    if (q.search) {
+      where.OR = [
+        { email: { contains: q.search, mode: 'insensitive' } },
+        { fullName: { contains: q.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const { skip, take } = paginate(q.page, q.pageSize);
+    const [total, rows] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+        select: { id: true, email: true, fullName: true, role: true, status: true, createdAt: true, updatedAt: true },
+      }),
+    ]);
+
+    return {
+      total,
+      page: q.page ?? 1,
+      pageSize: take,
+      items: rows.map((user) => ({
+        ...user,
+        isSuperAdmin: this.config.isConfiguredSuperAdmin(user.id, user.email),
+      })),
+    };
+  }
+
   async getUser(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },

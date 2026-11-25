@@ -203,6 +203,13 @@ export class AdminOpsService {
     return this.setUserStatus(id, UserStatus.FROZEN, actor, reason, 'user.freeze');
   }
 
+  async revokeStaffAccess(id: string, actor: AdminActor, reason: string) {
+    if (!this.isConfiguredSuperAdmin(actor)) {
+      throw new ForbiddenException('Only a configured Super Admin can revoke staff access');
+    }
+    return this.setUserStatus(id, UserStatus.FROZEN, actor, reason, 'staff.revoke', true);
+  }
+
   async unfreezeUser(id: string, actor: AdminActor, reason: string) {
     return this.setUserStatus(id, UserStatus.ACTIVE, actor, reason, 'user.unfreeze');
   }
@@ -224,11 +231,24 @@ export class AdminOpsService {
     return this.setUserStatus(id, UserStatus.ACTIVE, actor, reason, 'user.reopen');
   }
 
-  private async setUserStatus(id: string, status: UserStatus, actor: AdminActor, reason: string, action: string) {
+  private async setUserStatus(
+    id: string,
+    status: UserStatus,
+    actor: AdminActor,
+    reason: string,
+    action: string,
+    staffOnly = false,
+  ) {
     this.requireReason(reason);
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
     const targetIsStaff = ([UserRole.ADMIN, UserRole.SUPPORT, UserRole.FINANCE, UserRole.VIEWER] as UserRole[]).includes(user.role as UserRole);
+    if (staffOnly && !targetIsStaff) {
+      throw new BadRequestException('Only admin or support staff accounts can be revoked here');
+    }
+    if (staffOnly && user.status === UserStatus.CLOSED) {
+      throw new BadRequestException('A closed staff account cannot be revoked from this screen');
+    }
     if (this.config.isConfiguredSuperAdmin(user.id, user.email)) {
       throw new ForbiddenException('A configured super administrator account cannot be frozen or closed');
     }
@@ -260,9 +280,13 @@ export class AdminOpsService {
       .create({
         userId: id,
         category: 'account',
-        title: status === UserStatus.ACTIVE ? 'Account reactivated' : status === UserStatus.CLOSED ? 'Account closed' : 'Account frozen',
+        title: action === 'staff.revoke'
+          ? 'Staff access revoked'
+          : status === UserStatus.ACTIVE ? 'Account reactivated' : status === UserStatus.CLOSED ? 'Account closed' : 'Account frozen',
         body:
-          status === UserStatus.ACTIVE
+          action === 'staff.revoke'
+            ? 'Your LAUPAY staff access has been revoked. Contact your Super Admin if you believe this is a mistake.'
+            : status === UserStatus.ACTIVE
             ? 'Your LAUPAY account has been reactivated. You can transact again.'
             : status === UserStatus.CLOSED
               ? 'Your LAUPAY account has been closed. Contact support if you have questions.'
