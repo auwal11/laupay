@@ -7,6 +7,7 @@ import { useAuth } from "@app/context/AuthContext";
 import { firstNameFrom } from "@app/lib/name";
 import { assetUrl } from "@app/lib/assets";
 import type { PurchaseNotice } from "@app/types/orders";
+import { TransactionList } from "@app/components/wallet/TransactionList";
 
 const QUICK_ACTIONS: { to: string; icon: LucideIcon; label: string; ready: boolean }[] = [
   { to: "/app/airtime", icon: Smartphone, label: "Airtime", ready: true },
@@ -74,6 +75,19 @@ export function DashboardPage() {
           ))}
         </div>
       </div>
+
+      <section className="customer-dashboard-activity" aria-labelledby="recent-activity-title">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-laupay-ink-muted">Your account</p>
+            <h2 id="recent-activity-title" className="mt-1 font-display text-lg font-semibold text-laupay-ink">Recent activity</h2>
+          </div>
+          <Link to="/app/transactions" className="rounded-lg px-3 py-2 text-xs font-bold text-laupay-indigo transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laupay-amber">
+            View all
+          </Link>
+        </div>
+        <TransactionList limit={4} />
+      </section>
 
     </div>
   );

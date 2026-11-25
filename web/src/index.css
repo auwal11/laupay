@@ -289,3 +289,150 @@ button { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .customer-glass-panel { transition: none !important; }
 }
+
+/* LAUPAY Glass V4 — authenticated dashboards only. Marketing pages retain
+   their existing palette; app data, routes and permissions remain untouched. */
+:root {
+  --glass-navy: #0b1220;
+  --glass-navy-raised: #111b2d;
+  --glass-surface: rgba(255, 255, 255, .075);
+  --glass-border: rgba(255, 255, 255, .14);
+  --glass-text: #f5f7ff;
+  --glass-muted: #b7c0d3;
+  --glass-teal: #58d6b3;
+}
+
+.customer-shell,
+.admin-shell {
+  color: var(--glass-text);
+  background:
+    radial-gradient(ellipse at 78% 4%, rgba(49, 92, 137, .24), transparent 36rem),
+    radial-gradient(ellipse at 14% 92%, rgba(32, 121, 111, .14), transparent 32rem),
+    linear-gradient(145deg, #0b1220 0%, #0e1727 55%, #0a1220 100%);
+}
+.customer-shell::before { background: #3d7aa0; opacity: .18; }
+.customer-shell::after { background: #30b998; opacity: .12; }
+.admin-shell::before { background: #3d7aa0; opacity: .18; }
+.admin-shell::after { background: #30b998; opacity: .12; }
+
+.customer-header,
+.admin-header {
+  color: var(--glass-text);
+  background: rgba(11, 18, 32, .74);
+  border-color: var(--glass-border);
+  box-shadow: 0 1px 0 rgba(255,255,255,.045);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+.customer-header .text-laupay-indigo,
+.admin-header .text-laupay-indigo { color: var(--glass-teal); }
+.customer-shell .customer-glass-panel,
+.admin-shell .admin-card {
+  color: var(--glass-text);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255,255,255,.105), rgba(255,255,255,.045));
+  box-shadow: 0 12px 34px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.09);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.customer-shell .customer-glass-panel:hover,
+.admin-shell .admin-card:hover {
+  border-color: rgba(88,214,179,.32);
+  box-shadow: 0 16px 38px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.12);
+}
+.customer-shell .customer-dashboard-activity .customer-glass-panel,
+.customer-shell .customer-dashboard-activity > div > .rounded-xl {
+  border-color: var(--glass-border);
+  background: var(--glass-surface);
+  color: var(--glass-text);
+}
+.customer-shell .customer-balance {
+  border: 1px solid rgba(255,255,255,.2);
+  background: linear-gradient(125deg, rgba(23,48,77,.94), rgba(15,69,72,.88) 58%, rgba(19,35,60,.96));
+  box-shadow: 0 20px 45px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.16);
+}
+.customer-shell .customer-balance button.bg-white {
+  color: #0b1220;
+  background: #f4b33f;
+}
+.customer-shell .customer-balance button.bg-white:hover { background: #ffd98a; }
+.customer-shell .customer-glass-panel:hover,
+.customer-shell a.customer-glass-panel:hover { transform: translateY(-2px); }
+
+.admin-sidebar {
+  background: rgba(10, 17, 30, .9);
+  border-color: var(--glass-border);
+  box-shadow: 12px 0 36px rgba(0,0,0,.25);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+.admin-sidebar .admin-nav-item[aria-current="page"]::before { background: var(--glass-teal); }
+.admin-sidebar nav a { color: rgba(238,243,255,.68); }
+.admin-sidebar nav a:hover,
+.admin-sidebar nav a[aria-current="page"] { color: #fff; background: rgba(255,255,255,.085); }
+.admin-main, .customer-shell main { min-width: 0; }
+.customer-shell .text-laupay-ink,
+.admin-shell .text-laupay-ink { color: var(--glass-text); }
+.customer-shell .text-laupay-ink-muted,
+.admin-shell .text-laupay-ink-muted { color: var(--glass-muted); }
+.customer-shell .text-laupay-indigo,
+.admin-shell .text-laupay-indigo { color: #8cebd1; }
+.customer-shell .border-laupay-border,
+.admin-shell .border-laupay-border,
+.admin-shell .divide-laupay-border > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,.12); }
+.customer-shell .bg-white,
+.admin-shell .bg-white { background-color: rgba(255,255,255,.075); }
+.customer-shell .bg-laupay-surface-muted,
+.admin-shell .bg-laupay-surface-muted { background-color: rgba(255,255,255,.07); }
+.customer-shell .hover\:bg-laupay-surface-muted:hover,
+.admin-shell .hover\:bg-laupay-surface-muted:hover { background-color: rgba(255,255,255,.11); }
+.customer-shell input,
+.customer-shell select,
+.customer-shell textarea,
+.admin-shell input,
+.admin-shell select,
+.admin-shell textarea {
+  color: var(--glass-text);
+  border-color: rgba(255,255,255,.18);
+  background-color: rgba(9,16,28,.62);
+}
+.customer-shell input::placeholder,
+.admin-shell input::placeholder { color: #9ba8bc; }
+.customer-shell option,
+.admin-shell option,
+.customer-shell optgroup,
+.admin-shell optgroup { color: #172033; background: #f7f9fc; }
+.customer-shell .customer-dashboard h2,
+.customer-shell .customer-dashboard h1,
+.admin-shell h1,
+.admin-shell h2,
+.admin-shell h3 { color: var(--glass-text); }
+.customer-shell .customer-dashboard-activity .text-laupay-success { color: #69e0a7; }
+.customer-shell .customer-dashboard-activity .text-laupay-danger { color: #ff969b; }
+.admin-shell .bg-green-50 { background: rgba(44,180,112,.16); }
+.admin-shell .bg-red-50 { background: rgba(231,80,90,.16); }
+.admin-shell .bg-amber-50 { background: rgba(235,175,55,.17); }
+.admin-shell .bg-indigo-50 { background: rgba(107,132,235,.18); }
+.admin-shell .bg-amber-50\/60 { background: rgba(235,175,55,.10); }
+.admin-shell table { color: var(--glass-text); }
+.admin-shell tr:hover { background-color: rgba(255,255,255,.035); }
+.customer-shell .customer-dashboard-activity a,
+.admin-shell a:not(.admin-sidebar a) { text-underline-offset: 3px; }
+.customer-shell .customer-dashboard-activity a:hover,
+.admin-shell a:not(.admin-sidebar a):hover { color: var(--glass-teal); }
+
+@supports not ((backdrop-filter: blur(1px))) {
+  .customer-header, .admin-header { background: #101a2b; }
+  .customer-shell .customer-glass-panel, .admin-shell .admin-card { background: #152238; }
+}
+@media (max-width: 640px) {
+  .customer-shell .customer-glass-panel,
+  .admin-shell .admin-card { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .customer-shell main { padding-inline: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .customer-shell .customer-glass-panel, .admin-shell .admin-card { transition: none !important; }
+  .customer-shell .customer-glass-panel:hover, .admin-shell .admin-card:hover { transform: none; }
+}
