@@ -1,4 +1,6 @@
 import { AdminOpsService, toCsv } from './admin-ops.service';
+import { ForbiddenException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 
 describe('admin CSV exports', () => {
   it('neutralizes spreadsheet formula injection in user-controlled cells', () => {
@@ -71,5 +73,89 @@ describe('AdminOpsService.userDetail response allowlist', () => {
       failedPinAttempts: 0,
       sessions: [],
     }));
+  });
+});
+
+describe('AdminOpsService Super Admin protections', () => {
+  const configuredEmail = 'root@example.test';
+  const config = {
+    isConfiguredSuperAdmin: (id?: string, email?: string) =>
+      id === 'root-id' || email?.trim().toLowerCase() === configuredEmail,
+  };
+
+  function makeService(user: Record<string, unknown>) {
+    const prisma = {
+      user: {
+        findUnique: jest.fn().mockResolvedValue(user),
+        update: jest.fn().mockResolvedValue(user),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      $transaction: jest.fn().mockImplementation((ops) => Promise.all(ops)),
+    };
+    const service = new AdminOpsService(
+      prisma as never, {} as never, { create: jest.fn() } as never, {} as never,
+      {} as never, {} as never, config as never,
+    );
+    return { service, prisma };
+  }
+
+  it('blocks a regular admin from changing staff roles', async () => {
+    const { service } = makeService({ id: 'staff-id', email: 'staff@example.test', role: UserRole.ADMIN });
+    await expect(service.setRole(
+      'staff-id', UserRole.SUPPORT, { adminId: 'admin-id', adminEmail: 'admin@example.test' }, 'role update',
+    )).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('allows a Super Admin to demote an ordinary admin', async () => {
+    const ordinaryAdmin = { id: 'ordinary-id', email: 'ordinary@example.test', role: UserRole.ADMIN };
+    const { service, prisma } = makeService(ordinaryAdmin);
+    await service.setRole(
+      ordinaryAdmin.id, UserRole.SUPPORT,
+      { adminId: 'root-id', adminEmail: configuredEmail }, 'revoke admin access',
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: ordinaryAdmin.id },
+      data: expect.objectContaining({ role: UserRole.SUPPORT }),
+    }));
+  });
+
+  it('never permits changing a Super Admin role, including by another Super Admin', async () => {
+    const superAdmin = { id: 'root-id', email: configuredEmail, role: UserRole.ADMIN };
+    const { service, prisma } = makeService(superAdmin);
+    await expect(service.setRole(
+      superAdmin.id, UserRole.SUPPORT,
+      { adminId: 'root-id', adminEmail: configuredEmail }, 'demotion attempt',
+    )).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('cannot freeze a Super Admin identified by normalized allowlisted email', async () => {
+    const superAdmin = { id: 'other-id', email: ' ROOT@EXAMPLE.TEST ', role: UserRole.ADMIN };
+    const { service, prisma } = makeService(superAdmin);
+    await expect(service.freezeUser(
+      superAdmin.id, { adminId: 'root-id' }, 'attempted freeze',
+    )).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('cannot force-logout a Super Admin', async () => {
+    const superAdmin = { id: 'root-id', email: configuredEmail, role: UserRole.ADMIN };
+    const { service, prisma } = makeService(superAdmin);
+    await expect(service.forceLogout(
+      superAdmin.id, { adminId: 'root-id' }, 'attempted logout',
+    )).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks an ordinary admin from force-logging out another staff account', async () => {
+    const ordinaryAdmin = { id: 'ordinary-id', email: 'ordinary@example.test', role: UserRole.ADMIN };
+    const { service, prisma } = makeService(ordinaryAdmin);
+    await expect(service.forceLogout(
+      ordinaryAdmin.id, { adminId: 'admin-id', adminEmail: 'admin@example.test' }, 'logout attempt',
+    )).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });

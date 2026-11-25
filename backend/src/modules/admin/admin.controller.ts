@@ -63,7 +63,7 @@ import { SettingsService } from '../settings/settings.service';
 import { RiskService } from '../risk/risk.service';
 import { WithdrawalsService } from '../withdrawals/withdrawals.service';
 import { AppConfigService } from '../../config/app-config.service';
-import { permissionsForRole } from '../../common/permissions';
+import { ALL_PERMISSIONS, permissionsForRole } from '../../common/permissions';
 
 /**
  * Admin console API. Every route requires a verified admin token; sensitive
@@ -96,11 +96,12 @@ export class AdminController {
   // ---- Session / capabilities ----
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
+    const isSuperAdmin = this.config.isConfiguredSuperAdmin(user.userId, user.email);
     return {
       userId: user.userId,
       role: user.role,
-      permissions: permissionsForRole(user.role),
-      isSuperAdmin: this.config.superAdminIds.has(user.userId) || this.config.superAdminEmails.has(user.email.toLowerCase()),
+      permissions: isSuperAdmin ? [...ALL_PERMISSIONS] : permissionsForRole(user.role),
+      isSuperAdmin,
       superAdminConfigured: this.config.superAdminIds.size > 0 || this.config.superAdminEmails.size > 0,
     };
   }

@@ -229,7 +229,10 @@ export class AdminOpsService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
     const targetIsStaff = ([UserRole.ADMIN, UserRole.SUPPORT, UserRole.FINANCE, UserRole.VIEWER] as UserRole[]).includes(user.role as UserRole);
-    if (targetIsStaff && !this.config.superAdminIds.has(actor.adminId)) {
+    if (this.config.isConfiguredSuperAdmin(user.id, user.email)) {
+      throw new ForbiddenException('A configured super administrator account cannot be frozen or closed');
+    }
+    if (targetIsStaff && !this.isConfiguredSuperAdmin(actor)) {
       throw new ForbiddenException('Only a configured super administrator can change staff account status');
     }
     if (user.role !== UserRole.CUSTOMER && user.role !== UserRole.AGENT && status === UserStatus.CLOSED) {
@@ -316,6 +319,14 @@ export class AdminOpsService {
 
   async forceLogout(id: string, actor: AdminActor, reason: string) {
     this.requireReason(reason);
+    const target = await this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true, role: true } });
+    if (!target) throw new NotFoundException('User not found');
+    if (this.config.isConfiguredSuperAdmin(target.id, target.email)) {
+      throw new ForbiddenException('A configured super administrator cannot be force-logged out');
+    }
+    if (ADMIN_ROLES.includes(target.role) && !this.isConfiguredSuperAdmin(actor)) {
+      throw new ForbiddenException('Only a configured super administrator can force-logout staff accounts');
+    }
     const revokedAt = new Date();
     const [result] = await this.prisma.$transaction([
       this.prisma.refreshToken.updateMany({
@@ -379,13 +390,13 @@ export class AdminOpsService {
     if (role === UserRole.CUSTOMER || role === UserRole.AGENT) {
       throw new BadRequestException('Use customer/agent onboarding flows to change non-admin roles');
     }
-    if (role === UserRole.ADMIN && !this.config.superAdminIds.has(actor.adminId)) {
-      throw new ForbiddenException('Only a configured super administrator can grant the ADMIN role');
+    if (!this.isConfiguredSuperAdmin(actor)) {
+      throw new ForbiddenException('Only a configured super administrator can change staff roles');
     }
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
-    if (this.config.superAdminIds.has(id) && !this.config.superAdminIds.has(actor.adminId)) {
-      throw new ForbiddenException('Only a configured super administrator can change another super administrator');
+    if (this.config.isConfiguredSuperAdmin(user.id, user.email)) {
+      throw new ForbiddenException('A configured super administrator role cannot be changed');
     }
     if (id === actor.adminId && role !== user.role) {
       throw new ForbiddenException('An administrator cannot change their own role');
@@ -626,8 +637,7 @@ export class AdminOpsService {
   }
 
   private isConfiguredSuperAdmin(actor: AdminActor): boolean {
-    return this.config.superAdminIds.has(actor.adminId) ||
-      (!!actor.adminEmail && this.config.superAdminEmails.has(actor.adminEmail.trim().toLowerCase()));
+    return this.config.isConfiguredSuperAdmin(actor.adminId, actor.adminEmail);
   }
 
   async reverseEntry(entryId: string, reason: string, actor: AdminActor) {

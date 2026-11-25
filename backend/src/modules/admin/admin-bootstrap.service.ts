@@ -1,14 +1,15 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { AuditAction, UserRole, UserStatus, WalletOwnerType } from '@prisma/client';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { PasswordHasher } from '../auth/password-hasher.service';
 
 /**
  * Ensures a first ADMIN account exists on a fresh deployment where we have
- * no shell/DB access. Idempotent and no-op unless ADMIN_EMAIL + ADMIN_PASSWORD
- * are both set. Never creates anything when they are unset, so it is safe to
- * leave the code in place permanently. See docs/security/security-model.md §2.
+ * no shell/DB access. An allowlisted Super Admin can be bootstrapped without
+ * putting a usable password in deployment configuration; the generated random
+ * credential is discarded and the owner must use the password-reset email.
  */
 @Injectable()
 export class AdminBootstrapService implements OnApplicationBootstrap {
@@ -22,10 +23,13 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     const rawEmail = this.config.adminBootstrapEmail;
-    const password = this.config.adminBootstrapPassword;
-    if (!rawEmail || !password) return;
+    if (!rawEmail) return;
 
     const email = rawEmail.toLowerCase().trim();
+    const configuredPassword = this.config.adminBootstrapPassword;
+    const generateResetOnlyPassword = !configuredPassword &&
+      this.config.isConfiguredSuperAdmin(undefined, email);
+    if (!configuredPassword && !generateResetOnlyPassword) return;
 
     try {
       const existing = await this.prisma.user.findUnique({ where: { email } });
@@ -42,7 +46,8 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
         return;
       }
 
-      const passwordHash = await this.passwordHasher.hash(password);
+      const initialPassword = configuredPassword || randomBytes(48).toString('base64url');
+      const passwordHash = await this.passwordHasher.hash(initialPassword);
       await this.prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
@@ -51,6 +56,7 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
             fullName: this.config.adminBootstrapName,
             role: UserRole.ADMIN,
             status: UserStatus.ACTIVE,
+            mustChangePassword: generateResetOnlyPassword,
           },
         });
         await tx.walletAccount.create({

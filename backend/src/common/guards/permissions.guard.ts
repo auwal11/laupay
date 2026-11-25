@@ -2,7 +2,8 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
-import { Permission, permissionsForRole } from '../permissions';
+import { AppConfigService } from '../../config/app-config.service';
+import { ALL_PERMISSIONS, Permission, permissionsForRole } from '../permissions';
 
 /**
  * Must run after JwtAuthGuard. Enforces the @RequirePermissions(...) set for
@@ -15,6 +16,7 @@ export class PermissionsGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
+    private readonly config: AppConfigService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -28,7 +30,9 @@ export class PermissionsGuard implements CanActivate {
     const user = request.user;
     if (!user?.userId) throw new ForbiddenException('Admin identity required');
 
-    const rolePerms = permissionsForRole(user.role);
+    const rolePerms = this.config.isConfiguredSuperAdmin(user.userId, user.email)
+      ? [...ALL_PERMISSIONS]
+      : permissionsForRole(user.role);
     let granted: Permission[] = [];
     if (!rolePerms.includes('admins.manage')) {
       const overrides = await this.prisma.adminPermissionGrant.findMany({

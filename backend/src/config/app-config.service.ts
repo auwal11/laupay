@@ -155,9 +155,9 @@ export class AppConfigService {
   }
 
   /**
-   * Optional one-time admin bootstrap. When both are set, the app ensures an
-   * ADMIN user with this email/password exists at boot (idempotent). Used to
-   * create the first admin on a fresh deployment without shell/DB access.
+   * Optional one-time admin bootstrap. When ADMIN_PASSWORD is omitted, an
+   * allowlisted SUPER_ADMIN_EMAILS identity can still be created with an
+   * undisclosed random credential and must complete password reset by email.
    */
   readonly adminBootstrapEmail = optional('ADMIN_EMAIL', '');
   readonly adminBootstrapPassword = optional('ADMIN_PASSWORD', '');
@@ -176,14 +176,19 @@ export class AppConfigService {
    * possible before the production user ID is known.
    */
   readonly superAdminEmails = new Set(
-    // The product owner's account is a deliberately server-side bootstrap
-    // identity. Deployments may add/remove identities with SUPER_ADMIN_EMAILS;
-    // clients can never nominate themselves as a super administrator.
-    (process.env.SUPER_ADMIN_EMAILS ?? 'auwalbashar12@gmail.com')
+    (process.env.SUPER_ADMIN_EMAILS ?? '')
       .split(',')
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
   );
+
+  isConfiguredSuperAdmin(userId?: string, email?: string): boolean {
+    const normalizedEmail = email?.trim().toLowerCase();
+    return Boolean(
+      (userId && this.superAdminIds.has(userId)) ||
+      (normalizedEmail && this.superAdminEmails.has(normalizedEmail)),
+    );
+  }
 
   /** Base URL of THIS API, used to build the OTP link emailed to users. */
   readonly publicApiBaseUrl = optional('PUBLIC_API_BASE_URL', 'http://localhost:3000');
