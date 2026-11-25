@@ -13,6 +13,31 @@ describe('WebhooksController provider callbacks', () => {
     monnifySecretKey: '',
   } as any;
 
+  it('returns Paystack challenge text with a plain-text content type', () => {
+    const controller = new WebhooksController(config, {} as any, {} as any, {} as any, {} as any);
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      type: jest.fn().mockReturnThis(),
+      send: jest.fn().mockReturnValue('sent'),
+    };
+    const markup = '<b>challenge</b>';
+
+    expect(controller.challenge({ query: { challenge: markup } } as any, res as any)).toBe('sent');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.type).toHaveBeenCalledWith('text/plain');
+    expect(res.send).toHaveBeenCalledWith(markup);
+  });
+
+  it('retains the missing-challenge 400 behavior', () => {
+    const controller = new WebhooksController(config, {} as any, {} as any, {} as any, {} as any);
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn().mockReturnValue('sent') };
+
+    controller.challenge({ query: {} } as any, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.send).toHaveBeenCalledWith({ message: 'Missing challenge' });
+  });
+
   it('accepts a documented Paystack payload signed over the exact raw bytes', async () => {
     const body = Buffer.from('{"event":"charge.success","data":{"id":123,"reference":"LAU_123","status":"success"}}');
     const payment = { id: 'payment-1', providerReference: 'LAU_123' };

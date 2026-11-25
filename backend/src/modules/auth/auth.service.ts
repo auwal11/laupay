@@ -309,14 +309,27 @@ export class AuthService {
     if (!record || record.usedAt || record.expiresAt < new Date()) throw new UnauthorizedException('Invalid or expired reset link');
     const passwordHash = await this.passwordHasher.hash(password);
     const sessionsRevokedAt = new Date();
-    await this.prisma.$transaction([
+    await this.prisma.$transaction(async (tx) => {
+      const claimedAt = new Date();
+      const claimed = await tx.passwordResetToken.updateMany({
+        where: { id: record.id, usedAt: null, expiresAt: { gt: claimedAt } },
+        data: { usedAt: claimedAt },
+      });
+      if (claimed.count !== 1) throw new UnauthorizedException('Invalid or expired reset link');
+
       // A password-reset link changes credentials only. It is not an email
       // registration verification proof, so it must never activate a pending
-      // account or bypass the mandatory registration OTP.
-      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash, sessionsRevokedAt, mustChangePassword: false } as any }),
-      this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: sessionsRevokedAt } }),
-      this.prisma.refreshToken.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: sessionsRevokedAt } }),
-      this.prisma.auditLog.create({
+      // account or bypass the mandatory registration OTP. The conditional
+      // claim above makes the bearer token single-use under concurrent submits.
+      await tx.user.update({
+        where: { id: record.userId },
+        data: { passwordHash, sessionsRevokedAt, mustChangePassword: false } as any,
+      });
+      await tx.refreshToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: sessionsRevokedAt },
+      });
+      await tx.auditLog.create({
         data: {
           actorId: record.userId,
           action: AuditAction.UPDATE,
@@ -324,8 +337,8 @@ export class AuthService {
           entityId: record.userId,
           metadata: { event: 'password.reset' },
         },
-      }),
-    ]);
+      });
+    }, PrismaService.txOptions());
     return { reset: true };
   }
 

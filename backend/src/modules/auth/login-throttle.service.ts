@@ -1,4 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 
 const WINDOW_MS = 15 * 60_000;
@@ -7,7 +9,7 @@ const IP_MAX = process.env.NODE_ENV === 'test' ? 100_000 : 100;
 
 /**
  * Database-backed login lockout. The in-memory ThrottlerGuard is not enough
- * behind Railway's proxy / multiple replicas because each request can land on
+ * behind a proxy / multiple replicas because each request can land on
  * a fresh counter. Counting in Postgres makes the limit shared and durable.
  *
  * Per account: 5 failures in 15 minutes -> 429 until the window ends.
@@ -40,29 +42,38 @@ export class LoginThrottleService {
     return `login:${surface}:ip:${ip || 'unknown'}`;
   }
 
-  /** Returns true when this key was already over the limit before this failure. */
+  /** Atomically advances a key's window and returns its persisted block state. */
   private async bump(key: string, max: number, category: string): Promise<boolean> {
     const now = new Date();
-    const row = await this.prisma.otpRateLimit.findUnique({ where: { key } });
-    if (!row || now.getTime() - row.windowStartedAt.getTime() >= WINDOW_MS) {
-      await this.prisma.otpRateLimit.upsert({
-        where: { key },
-        create: { key, category, count: 1, windowStartedAt: now, lastAttemptAt: now },
-        update: { category, count: 1, windowStartedAt: now, lastAttemptAt: now, blockedUntil: null },
-      });
-      return false;
-    }
-    if (row.blockedUntil && row.blockedUntil > now) return true;
-    const next = row.count + 1;
-    await this.prisma.otpRateLimit.update({
-      where: { key },
-      data: {
-        count: next,
-        lastAttemptAt: now,
-        ...(next >= max ? { blockedUntil: new Date(row.windowStartedAt.getTime() + WINDOW_MS) } : {}),
-      },
-    });
-    return next > max;
+    const expiredBefore = new Date(now.getTime() - WINDOW_MS);
+    const rows = await this.prisma.$queryRaw<Array<{ count: number; blockedUntil: Date | null }>>(Prisma.sql`
+      INSERT INTO "OtpRateLimit" AS rate_limit
+        ("id", "key", "category", "count", "windowStartedAt", "lastAttemptAt", "blockedUntil", "createdAt", "updatedAt")
+      VALUES
+        (${randomUUID()}, ${key}, ${category}, 1, ${now}, ${now}, NULL, ${now}, ${now})
+      ON CONFLICT ("key") DO UPDATE SET
+        "category" = EXCLUDED."category",
+        "count" = CASE
+          WHEN rate_limit."windowStartedAt" <= ${expiredBefore} THEN 1
+          WHEN rate_limit."blockedUntil" > ${now} THEN LEAST(rate_limit."count" + 1, ${max + 1})
+          ELSE rate_limit."count" + 1
+        END,
+        "windowStartedAt" = CASE
+          WHEN rate_limit."windowStartedAt" <= ${expiredBefore} THEN ${now}
+          ELSE rate_limit."windowStartedAt"
+        END,
+        "lastAttemptAt" = ${now},
+        "blockedUntil" = CASE
+          WHEN rate_limit."windowStartedAt" <= ${expiredBefore} THEN NULL
+          WHEN rate_limit."blockedUntil" > ${now} THEN rate_limit."blockedUntil"
+          WHEN rate_limit."count" + 1 >= ${max} THEN rate_limit."windowStartedAt" + (${WINDOW_MS} * INTERVAL '1 millisecond')
+          ELSE NULL
+        END,
+        "updatedAt" = ${now}
+      RETURNING "count", "blockedUntil"
+    `);
+    const row = rows[0];
+    return !!row && row.count > max && !!row.blockedUntil && row.blockedUntil > now;
   }
 
   private tooMany() {

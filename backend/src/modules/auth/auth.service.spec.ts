@@ -61,10 +61,15 @@ describe('AuthService OTP activation boundary', () => {
 describe('AuthService password reset verification boundary', () => {
   it('does not activate an unverified account after password reset', async () => {
     const userUpdate = jest.fn().mockReturnValue({ operation: 'user.update' });
-    const tokenUpdate = jest.fn().mockReturnValue({ operation: 'token.update' });
+    const tokenClaim = jest.fn().mockResolvedValue({ count: 1 });
     const refreshUpdate = jest.fn().mockReturnValue({ operation: 'refresh.update' });
     const auditCreate = jest.fn().mockReturnValue({ operation: 'audit.create' });
-    const transaction = jest.fn().mockResolvedValue([]);
+    const transaction = jest.fn((callback: (tx: unknown) => Promise<unknown>) => callback({
+      passwordResetToken: { updateMany: tokenClaim },
+      user: { update: userUpdate },
+      refreshToken: { updateMany: refreshUpdate },
+      auditLog: { create: auditCreate },
+    }));
     const prisma = {
       passwordResetToken: {
         findUnique: jest.fn().mockResolvedValue({
@@ -73,11 +78,7 @@ describe('AuthService password reset verification boundary', () => {
           usedAt: null,
           expiresAt: new Date(Date.now() + 60_000),
         }),
-        update: tokenUpdate,
       },
-      user: { update: userUpdate },
-      refreshToken: { updateMany: refreshUpdate },
-      auditLog: { create: auditCreate },
       $transaction: transaction,
     };
     const service = new AuthService(
@@ -92,16 +93,49 @@ describe('AuthService password reset verification boundary', () => {
     );
 
     await expect(service.resetPassword('reset-token', 'NewPassword123!')).resolves.toEqual({ reset: true });
+    expect(tokenClaim).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'reset-1', usedAt: null, expiresAt: { gt: expect.any(Date) } }),
+    }));
     expect(userUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'user-1' },
       data: expect.not.objectContaining({ status: 'ACTIVE' }),
     }));
-    expect(transaction).toHaveBeenCalledWith(expect.arrayContaining([
-      expect.objectContaining({ operation: 'user.update' }),
-      expect.objectContaining({ operation: 'token.update' }),
-      expect.objectContaining({ operation: 'refresh.update' }),
-      expect.objectContaining({ operation: 'audit.create' }),
-    ]));
+    expect(transaction).toHaveBeenCalledWith(expect.any(Function), expect.objectContaining({ timeout: expect.any(Number), maxWait: expect.any(Number) }));
+  });
+
+  it('does not mutate credentials, sessions, or audit records when another reset request claimed the token', async () => {
+    const userUpdate = jest.fn();
+    const refreshUpdate = jest.fn();
+    const auditCreate = jest.fn();
+    const transaction = jest.fn((callback: (tx: unknown) => Promise<unknown>) => callback({
+      passwordResetToken: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      user: { update: userUpdate },
+      refreshToken: { updateMany: refreshUpdate },
+      auditLog: { create: auditCreate },
+    }));
+    const prisma = {
+      passwordResetToken: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'reset-1', userId: 'user-1', usedAt: null, expiresAt: new Date(Date.now() + 60_000),
+        }),
+      },
+      $transaction: transaction,
+    };
+    const service = new AuthService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      { hash: jest.fn().mockResolvedValue('new-password-hash') } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.resetPassword('reset-token', 'NewPassword123!')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(userUpdate).not.toHaveBeenCalled();
+    expect(refreshUpdate).not.toHaveBeenCalled();
+    expect(auditCreate).not.toHaveBeenCalled();
   });
 });
 

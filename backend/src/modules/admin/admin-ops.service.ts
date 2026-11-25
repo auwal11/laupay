@@ -125,10 +125,25 @@ export class AdminOpsService {
   async userDetail(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: {
-        walletAccount: true,
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        fullName: true,
+        profilePhotoUrl: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        emailVerifiedAt: true,
+        phoneVerifiedAt: true,
+        lastLoginAt: true,
+        frozenReason: true,
+        twoFactorEnabled: true,
+        mustChangePassword: true,
+        walletAccount: { select: { id: true, balance: true, currency: true, status: true, version: true } },
         security: { select: { pinSetAt: true, pinLockedUntil: true, failedPinAttempts: true, pinHash: true } },
-        agentProfile: true,
+        agentProfile: { select: { id: true, businessName: true, outletAddress: true, isVerified: true, createdAt: true, updatedAt: true } },
       },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -150,9 +165,25 @@ export class AdminOpsService {
       this.prisma.refreshToken.findMany({ where: { userId: id, revokedAt: null }, orderBy: { createdAt: 'desc' } }),
     ]);
 
-    const { security, ...rest } = user;
+    const security = user.security;
     return {
-      ...rest,
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      fullName: user.fullName,
+      profilePhotoUrl: user.profilePhotoUrl,
+      role: user.role,
+      status: user.status,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      emailVerifiedAt: user.emailVerifiedAt,
+      phoneVerifiedAt: user.phoneVerifiedAt,
+      lastLoginAt: user.lastLoginAt,
+      frozenReason: user.frozenReason,
+      twoFactorEnabled: user.twoFactorEnabled,
+      mustChangePassword: user.mustChangePassword,
+      walletAccount: user.walletAccount,
+      agentProfile: user.agentProfile,
       hasPin: !!security?.pinHash,
       pinSetAt: security?.pinSetAt ?? null,
       pinLockedUntil: security?.pinLockedUntil ?? null,

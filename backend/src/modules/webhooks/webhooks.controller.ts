@@ -115,7 +115,7 @@ export class WebhooksController {
   challenge(@Req() req: Request, @Res() res: Response) {
     const challenge = req.query.challenge;
     if (typeof challenge === 'string' && challenge.length > 0 && challenge.length <= 256) {
-      return res.status(200).send(challenge);
+      return res.status(200).type('text/plain').send(challenge);
     }
     return res.status(400).send({ message: 'Missing challenge' });
   }
