@@ -2,7 +2,10 @@ import * as SecureStore from 'expo-secure-store';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://laupay.onrender.com/api').replace(/\/+$/, '');
 const REFRESH_KEY = 'laupay_refresh_token';
-const REQUEST_TIMEOUT_MS = 18_000;
+// Render's free web service may need several seconds to wake before it can
+// reach the Supabase pooler. Keep the client from reporting a false network
+// failure while the production API is starting.
+const REQUEST_TIMEOUT_MS = 60_000;
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<boolean> | null = null;
