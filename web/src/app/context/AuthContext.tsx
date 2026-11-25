@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { auth } from "@app/services";
-import { setSessionInvalidHandler } from "@app/services/api";
+import { hasAccessToken, setSessionInvalidHandler } from "@app/services/api";
 import type { AuthUser, LoginPayload, OtpPayload, RegisterPayload } from "@app/types/auth";
 import type { ApiError } from "@app/types/common";
 import type { SessionStatus } from "@app/types/security";
@@ -40,6 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!hasAccessToken()) {
+      setStatus("anonymous");
+      setPinReady(null);
+      return () => {
+        cancelled = true;
+      };
+    }
     auth.me().then((result) => {
       if (cancelled) return;
       if (result.ok) {

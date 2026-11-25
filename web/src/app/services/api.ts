@@ -31,6 +31,10 @@ export function setAccessToken(token: string | null) {
   else sessionStorage.removeItem("laupay_access_token");
 }
 
+export function hasAccessToken(): boolean {
+  return Boolean(accessToken);
+}
+
 /**
  * AuthContext registers a handler here once, at app start. Any request that
  * comes back 401 calls it, so a revoked/expired session is never silently
