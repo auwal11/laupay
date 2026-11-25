@@ -43,6 +43,8 @@ jobs:
       DIRECT_URL: postgresql://laupay:laupay@localhost:5432/laupay?schema=public
       JWT_ACCESS_SECRET: ci-test-secret-not-used-in-production
       NODE_ENV: test
+      VTU_PROVIDER: mock
+      FULFILLMENT_MODE: provider_test
 
     steps:
       - uses: actions/checkout@v4
