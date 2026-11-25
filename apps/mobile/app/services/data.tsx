@@ -1,0 +1,1 @@
+import PurchaseFlow from '../../src/components/PurchaseFlow';export default function DataRoute(){return <PurchaseFlow kind="data"/>}

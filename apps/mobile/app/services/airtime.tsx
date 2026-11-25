@@ -1,0 +1,1 @@
+import PurchaseFlow from '../../src/components/PurchaseFlow';export default function AirtimeRoute(){return <PurchaseFlow kind="airtime"/>}

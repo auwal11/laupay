@@ -1,0 +1,15 @@
+import { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text } from 'react-native';
+import { router } from 'expo-router';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { AppButton, AppCard, FormField, InlineNotice, Screen } from '../src/components/ui';
+import { supportApi, SupportTicket } from '../src/api/services';
+import { useAuth } from '../src/features/auth/AuthProvider';
+import { colors, spacing } from '../src/theme';
+export default function Support(){
+ const {user}=useAuth();const query=useQuery({queryKey:['support-tickets'],queryFn:supportApi.list});
+ const [subject,setSubject]=useState(''),[description,setDescription]=useState(''),[category,setCategory]=useState('OTHER');
+ const create=useMutation({mutationFn:()=>supportApi.create({contactEmail:user!.email,contactName:user!.fullName,category,subject:subject.trim(),description:description.trim()}),onSuccess:()=>{setSubject('');setDescription('');Alert.alert('Ticket created','LAUPAY returned the support ticket.');void query.refetch()},onError:e=>Alert.alert('Ticket not created',e instanceof Error?e.message:'Try again.')});
+ return <Screen scroll><Text style={s.title}>Help & support</Text><Text style={s.body}>Create and view support requests handled by LAUPAY.</Text><Text style={s.label}>Category</Text>{['TRANSACTION','WALLET','WITHDRAWAL','AIRTIME','DATA','LOGIN','OTHER'].map(c=><AppButton key={c} title={c.replace('_',' ')} variant={category===c?'primary':'secondary'} onPress={()=>setCategory(c)}/>)}<FormField label="Subject" value={subject} onChangeText={setSubject} maxLength={160}/><FormField label="Describe the issue (10–5000 characters)" value={description} onChangeText={setDescription} multiline style={s.multiline}/><AppButton title="Create support ticket" loading={create.isPending} disabled={subject.trim().length<3||description.trim().length<10} onPress={()=>create.mutate()}/><Text style={s.label}>Your recent tickets</Text>{query.isError?<InlineNotice title="Tickets unavailable" body="Could not retrieve your support history." tone="error" action={<AppButton title="Retry" variant="secondary" onPress={()=>void query.refetch()}/>} />:null}{query.data?.map((ticket:SupportTicket)=><Pressable key={ticket.id} accessibilityRole="button" onPress={()=>router.push({pathname:'/support/[id]',params:{id:ticket.id}})}><AppCard><Text style={s.item}>{ticket.subject}</Text><Text style={s.body}>{ticket.ticketNumber||ticket.id}</Text><Text style={s.body}>{ticket.category} · {ticket.status}</Text><Text style={s.open}>Open conversation ›</Text></AppCard></Pressable>)}{!query.isPending&&!query.isError&&!query.data?.length?<Text style={s.body}>No support tickets found.</Text>:null}</Screen>
+}
+const s=StyleSheet.create({title:{fontSize:26,fontWeight:'900',color:colors.midnight},body:{fontSize:13,color:colors.muted,lineHeight:20},label:{fontSize:14,fontWeight:'900',color:colors.navy,marginTop:spacing.sm},item:{fontWeight:'900',color:colors.navy},open:{fontSize:12,color:colors.navy2,fontWeight:'800'},multiline:{minHeight:120,textAlignVertical:'top'}});

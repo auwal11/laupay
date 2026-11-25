@@ -24,7 +24,7 @@ designed so far. Read it before assuming anything works.
 ```
 laupay/
   apps/
-    mobile/        # Flutter app — not started (Phase 2+)
+    mobile/        # Native Android-first Expo/React Native + TypeScript app
     admin/          # Admin web dashboard — not started (Phase 3+)
     customer-web/    # Authenticated web app (customer + agent), Vite/React —
                       # see docs/decisions/0004-customer-web-integration-audit.md
@@ -66,6 +66,21 @@ notifications, a unified risk-decision flow) don't exist on the backend
 yet, and a few response shapes (auth, wallet balance) need reconciling
 first.
 
+## Quick Start (Android Mobile App)
+
+The native client lives in [`apps/mobile`](apps/mobile/README.md) and connects to the existing NestJS API. It uses the backend for balances, ledger history, catalog pricing, transaction authorization, payment settlement and status; it does not use mock financial data.
+
+```bash
+cd apps/mobile
+npm install
+cp .env.example .env.local  # optional; use a reachable non-production API for tests
+npm run typecheck
+npm run lint
+npx expo start
+```
+
+The mobile project supports Expo development. A native Android APK/AAB has not been built or verified in this repository session; see the mobile handoff for the current Android build-tooling requirement and limitations.
+
 ## Development Cost
 
 ₦0. All external integrations (payment, VTU) run against mock providers by
@@ -75,12 +90,7 @@ provider account or API key is required to build, run, or test the system.
 
 ## Current Phase
 
-**Phase 1 — Core foundation.** Architecture, database schema, and the
-backend's financial core (auth, wallet/ledger engine, orders, payments,
-VTU, webhooks, minimal admin) are built and tested. The Flutter app, the
-admin web dashboard, real provider integrations, and a scheduled
-reconciliation job are not yet started. Full detail in
-`docs/decisions/00-project-status.md`.
+**Backend:** existing NestJS/Prisma/PostgreSQL financial core remains the source of truth. **Mobile:** a new Expo/React Native client has been scaffolded and is under implementation; automated checks and a native Android artifact still need verification. Read [`apps/mobile/README.md`](apps/mobile/README.md) and the project-status/decision documents for the current scope; some older repository status documents may predate later backend work.
 
 GitHub access for pushing this repository will be provided separately, per
 the original project brief.
