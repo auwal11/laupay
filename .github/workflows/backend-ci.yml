@@ -36,6 +36,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://laupay:laupay@localhost:5432/laupay?schema=public
+      DIRECT_URL: postgresql://laupay:laupay@localhost:5432/laupay?schema=public
       JWT_ACCESS_SECRET: ci-test-secret-not-used-in-production
       NODE_ENV: test
 
