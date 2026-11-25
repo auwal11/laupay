@@ -3,13 +3,13 @@ import { AuditAction, UserRole, UserStatus, WalletOwnerType } from '@prisma/clie
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
+import { AuthService } from '../auth/auth.service';
 import { PasswordHasher } from '../auth/password-hasher.service';
 
 /**
- * Ensures a first ADMIN account exists on a fresh deployment where we have
- * no shell/DB access. An allowlisted Super Admin can be bootstrapped without
- * putting a usable password in deployment configuration; the generated random
- * credential is discarded and the owner must use the password-reset email.
+ * Bootstraps the configured initial admin separately from every allowlisted
+ * Super Admin identity. Newly-created Super Admins receive an emailed reset
+ * link; their random initial credential is never returned or logged.
  */
 @Injectable()
 export class AdminBootstrapService implements OnApplicationBootstrap {
@@ -19,35 +19,35 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
     private readonly passwordHasher: PasswordHasher,
+    private readonly auth: AuthService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    await this.bootstrapConfiguredAdmin();
+    await this.bootstrapAllowlistedSuperAdmins();
+  }
+
+  private async bootstrapConfiguredAdmin(): Promise<void> {
     const rawEmail = this.config.adminBootstrapEmail;
-    if (!rawEmail) return;
+    const password = this.config.adminBootstrapPassword;
+    if (!rawEmail || !password) return;
 
     const email = rawEmail.toLowerCase().trim();
-    const configuredPassword = this.config.adminBootstrapPassword;
-    const generateResetOnlyPassword = !configuredPassword &&
-      this.config.isConfiguredSuperAdmin(undefined, email);
-    if (!configuredPassword && !generateResetOnlyPassword) return;
-
     try {
       const existing = await this.prisma.user.findUnique({ where: { email } });
-
       if (existing) {
         if (existing.role !== UserRole.ADMIN || existing.status !== UserStatus.ACTIVE) {
           await this.prisma.user.update({
             where: { id: existing.id },
             data: { role: UserRole.ADMIN, status: UserStatus.ACTIVE },
           });
-          this.logger.log(`Admin bootstrap: promoted existing user ${email} to ADMIN/ACTIVE`);
+          this.logger.log('Admin bootstrap: promoted configured ADMIN account');
         }
         await this.ensureWallet(existing.id);
         return;
       }
 
-      const initialPassword = configuredPassword || randomBytes(48).toString('base64url');
-      const passwordHash = await this.passwordHasher.hash(initialPassword);
+      const passwordHash = await this.passwordHasher.hash(password);
       await this.prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
@@ -56,7 +56,6 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
             fullName: this.config.adminBootstrapName,
             role: UserRole.ADMIN,
             status: UserStatus.ACTIVE,
-            mustChangePassword: generateResetOnlyPassword,
           },
         });
         await tx.walletAccount.create({
@@ -72,11 +71,63 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
           },
         });
       });
-      this.logger.log(`Admin bootstrap: created ADMIN account ${email}`);
+      this.logger.log('Admin bootstrap: created configured ADMIN account');
     } catch (err) {
-      // Never crash the app because bootstrap failed — an operator can retry
-      // by redeploying once env vars are correct.
-      this.logger.error(`Admin bootstrap failed for ${email}: ${String(err)}`);
+      this.logger.error(`Configured admin bootstrap failed: ${String(err)}`);
+    }
+  }
+
+  private async bootstrapAllowlistedSuperAdmins(): Promise<void> {
+    for (const email of this.config.superAdminEmails) {
+      try {
+        const existing = await this.prisma.user.findUnique({ where: { email } });
+        if (existing) {
+          if (existing.role !== UserRole.ADMIN || existing.status !== UserStatus.ACTIVE) {
+            await this.prisma.user.update({
+              where: { id: existing.id },
+              data: { role: UserRole.ADMIN, status: UserStatus.ACTIVE },
+            });
+            this.logger.log('Super Admin bootstrap: restored allowlisted account access');
+          }
+          await this.ensureWallet(existing.id);
+          continue;
+        }
+
+        const unknownInitialPassword = randomBytes(48).toString('base64url');
+        const passwordHash = await this.passwordHasher.hash(unknownInitialPassword);
+        const created = await this.prisma.$transaction(async (tx) => {
+          const user = await tx.user.create({
+            data: {
+              email,
+              passwordHash,
+              fullName: 'LAUPAY Super Admin',
+              role: UserRole.ADMIN,
+              status: UserStatus.ACTIVE,
+              mustChangePassword: true,
+            },
+          });
+          await tx.walletAccount.create({
+            data: { ownerId: user.id, ownerType: WalletOwnerType.USER },
+          });
+          await tx.auditLog.create({
+            data: {
+              actorId: user.id,
+              action: AuditAction.CREATE,
+              entityType: 'User',
+              entityId: user.id,
+              metadata: { bootstrap: true, superAdmin: true },
+            },
+          });
+          return user;
+        });
+
+        // Reuse the normal single-use, expiring password reset flow. This sends
+        // the reset link to this allowlisted account, never ADMIN_EMAIL.
+        await this.auth.forgotPassword(email);
+        this.logger.log(`Super Admin bootstrap: created account and sent reset email for user ${created.id}`);
+      } catch (err) {
+        this.logger.error(`Super Admin bootstrap failed for configured allowlist entry: ${String(err)}`);
+      }
     }
   }
 

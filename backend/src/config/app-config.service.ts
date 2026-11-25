@@ -155,9 +155,9 @@ export class AppConfigService {
   }
 
   /**
-   * Optional one-time admin bootstrap. When ADMIN_PASSWORD is omitted, an
-   * allowlisted SUPER_ADMIN_EMAILS identity can still be created with an
-   * undisclosed random credential and must complete password reset by email.
+   * Optional bootstrap for the ordinary configured admin account. This is
+   * independent from SUPER_ADMIN_EMAILS; each allowlisted Super Admin identity
+   * is bootstrapped separately and receives a reset email only if newly created.
    */
   readonly adminBootstrapEmail = optional('ADMIN_EMAIL', '');
   readonly adminBootstrapPassword = optional('ADMIN_PASSWORD', '');
