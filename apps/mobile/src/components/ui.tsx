@@ -1,4 +1,4 @@
-import { PropsWithChildren, ReactNode } from 'react';
+import { PropsWithChildren, ReactNode, useState } from 'react';
 import { ActivityIndicator, Image, ImageSourcePropType, Pressable, PressableProps, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -13,6 +13,15 @@ export function Screen({ children, scroll = false, style }: PropsWithChildren<{ 
 
 export function AppMark({ size = 54 }: { size?: number }) {
   return <Image source={require('../../assets/images/laupay-mark.png') as ImageSourcePropType} style={{ width: size, height: size }} resizeMode="contain" accessibilityLabel="LAUPAY mark" />;
+}
+
+export function ProfileAvatar({ uri, initials, size = 40 }: { uri?: string | null; initials: string; size?: number }) {
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const failed = Boolean(uri && failedUri === uri);
+  const fallback = initials.trim().slice(0, 2).toUpperCase() || 'L';
+  return <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
+    {uri && !failed ? <Image source={{ uri }} onError={() => setFailedUri(uri)} style={{ width: size, height: size }} accessibilityLabel="Profile photo" /> : <Text style={[styles.avatarText, { fontSize: Math.max(11, size * 0.3) }]}>{fallback}</Text>}
+  </View>;
 }
 
 export function BrandLockup({ dark = false, subtitle }: { dark?: boolean; subtitle?: string }) {
@@ -30,8 +39,12 @@ export function AppCard({ children, style }: PropsWithChildren<{ style?: ViewSty
   return <View style={[styles.card, shadow.card, style]}>{children}</View>;
 }
 
-export function FormField({ label, error, style, ...props }: TextInputProps & { label: string; error?: string }) {
-  return <View style={[styles.fieldWrap, style]}><Text style={styles.label}>{label}</Text><TextInput placeholderTextColor="#94A3B8" style={[styles.input, error && styles.inputError]} autoCorrect={false} {...props} />{error ? <Text style={styles.errorText}>{error}</Text> : null}</View>;
+export function GlassCard({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
+  return <View style={[styles.glassCard, style]}>{children}</View>;
+}
+
+export function FormField({ label, error, dark = false, style, ...props }: TextInputProps & { label: string; error?: string; dark?: boolean }) {
+  return <View style={[styles.fieldWrap, style]}><Text style={[styles.label, dark && styles.labelDark]}>{label}</Text><TextInput placeholderTextColor={dark ? colors.glassMuted : '#94A3B8'} style={[styles.input, dark && styles.inputDark, error && styles.inputError]} autoCorrect={false} {...props} />{error ? <Text style={styles.errorText}>{error}</Text> : null}</View>;
 }
 
 export function SectionHeading({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
@@ -71,9 +84,14 @@ const styles = StyleSheet.create({
   buttonText_ghost: { color: colors.navy },
   buttonText_danger: { color: colors.white },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: '#E8EDF3' },
+  glassCard: { backgroundColor: colors.glassSurface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.glassBorder },
+  avatar: { backgroundColor: colors.midnight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.glassBorder },
+  avatarText: { color: colors.white, fontWeight: '900' },
   fieldWrap: { gap: spacing.xs },
   label: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  labelDark: { color: colors.glassMuted },
   input: { minHeight: 54, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.white, paddingHorizontal: spacing.lg, color: colors.text, fontSize: 16 },
+  inputDark: { borderColor: colors.glassBorder, backgroundColor: colors.glassSurface, color: colors.glassText },
   inputError: { borderColor: colors.error },
   errorText: { color: colors.error, fontSize: 12 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
