@@ -1,6 +1,6 @@
 # LAUPAY mobile validation record
 
-**Updated:** 26 November 2026. **Current commit:** `8fe8d7e` (`Match mobile dashboard colors to web shell`). Scope is the `apps/mobile/` source and its API-connected implementation. No backend migration, production setting, live provider or real-money operation was performed.
+**Updated:** 26 November 2026. **Current commit:** `19c02d6` (`Add custom mobile PIN keypad`). Scope is the `apps/mobile/` source and its API-connected implementation. No backend migration, production setting, live provider or real-money operation was performed.
 
 ## Fresh checks
 
@@ -10,7 +10,7 @@
 | `npm run lint` | PASS | Expo ESLint; no errors or warnings on the final run. |
 | `git diff --check` | PASS | No whitespace errors in the current tracked diff. |
 
-The latest verified changes include the dashboard Withdraw action and alignment of the mobile dashboard/header/tab bar with the web dark glass palette. Earlier milestones are recorded in Git history: `b0b4386`, `46c6def`, `1d300f2`, `dcce9c4`, `f139c26`, `706f33d` and `8fe8d7e`.
+The latest verified changes include the custom numeric PIN keypad in Withdraw/Airtime/Data, shared spinner-plus-text loading buttons, native receipt sharing, popular-bank-first ordering from backend-provided banks, dark startup/loading surfaces and the dashboard/header/profile glass polish. Earlier milestones are recorded in Git history: `b0b4386`, `46c6def`, `1d300f2`, `dcce9c4`, `f139c26`, `706f33d` and `8fe8d7e`.
 
 ## Not run or not proven
 
@@ -19,6 +19,7 @@ The latest verified changes include the dashboard Withdraw action and alignment 
 - No Android emulator/device, `adb`, Android SDK, Gradle or EAS native build was available and no APK/AAB was built, installed or verified.
 - No live provider or real-money transaction was tested.
 - No claim is made that provider credentials, payout fulfillment, OS push delivery, biometric step-up or rewards/referrals are enabled.
+- The custom PIN keypad, native share sheet and responsive layout still require physical Android verification; no APK/AAB was available in this sandbox.
 
 ## Security and integrity notes
 

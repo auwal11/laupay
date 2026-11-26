@@ -2,7 +2,7 @@
 
 **Last updated:** 26 November 2026
 **Branch:** `main`
-**Current commit:** `8fe8d7e`
+**Current commit:** `19c02d6`
 
 This document records what is currently implemented in the repository and what remains incomplete. It replaces the earlier initial-build status that described `apps/mobile` as an empty placeholder.
 
@@ -14,16 +14,17 @@ This document records what is currently implemented in the repository and what r
   - login/register and auth validation foundation;
   - dashboard, wallet, transaction history and recent activity;
   - Add funds and the missing dashboard Withdraw action;
-  - airtime/data purchase flow with catalog, review, PIN, idempotency, processing and result;
+  - airtime/data purchase flow with catalog, review, custom numeric PIN keypad, idempotency, processing and result;
   - transaction detail/receipt with real status, amount, reference, balance before/after and provider fields;
   - notifications inbox with unread/read actions;
-  - withdrawal bank selection, review, PIN, processing and backend status polling.
+  - withdrawal bank selection with backend-only popular ordering, review, custom numeric PIN keypad, processing and backend status polling;
+  - shared spinner-plus-text loading states, receipt sharing and Done navigation on transaction results.
 - Mobile dashboard/header/tab bar aligned with the current web LAUPAY Glass V4 palette.
 - Documentation synchronized through the current implementation milestone.
 
 ## Fresh current checks
 
-The latest mobile UI changes passed:
+The latest mobile UI and transaction-flow changes passed:
 
 ```text
 cd apps/mobile
@@ -33,7 +34,7 @@ cd ../..
 git diff --check  PASS
 ```
 
-These are source checks only. No Android emulator/device test or native APK/AAB build was completed in the current sandbox session. The historical `SANDBOX-TEST-REPORT.md` is not a fresh result for this milestone.
+These are source checks only. No Android emulator/device test or native APK/AAB build was completed in the current sandbox session. The custom PIN keypad and receipt share actions have not been verified on a physical Android device in this sandbox. The historical `SANDBOX-TEST-REPORT.md` is not a fresh result for this milestone.
 
 ## Still incomplete or not proven
 

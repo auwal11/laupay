@@ -6,7 +6,7 @@ This repository contains the existing web application, an Expo/React Native mobi
 
 ## Current status — 26 November 2026
 
-The mobile client is implemented far enough to exercise the main authenticated customer flows against the existing API. The latest mobile work aligns the native dashboard with the web application's current dark glass visual system and adds the missing dashboard **Withdraw** action.
+The mobile client is implemented far enough to exercise the main authenticated customer flows against the existing API. The latest mobile work aligns the native dashboard with the web application's current dark glass visual system and adds professional transaction-flow polish, including shared loading states and a custom PIN keypad.
 
 Completed and backend-connected mobile areas include:
 
@@ -17,6 +17,7 @@ Completed and backend-connected mobile areas include:
 - Transaction detail/receipt data from authorized ledger/order endpoints, balance before/after, reference copy, share, dispute/report action and backend status handling.
 - Professional in-app notifications inbox with all/unread filters and read/read-all actions.
 - Withdrawals through the existing bank-selection, review, PIN, processing and backend status-polling flow; no client-side payout or fake success is used.
+- Shared spinner-plus-text loading states with duplicate-submit protection, custom numeric PIN keypad for money-moving/VTU authorization, backend-only popular bank ordering, native receipt sharing and explicit Done navigation from result screens.
 - Web customer dashboard and receipt remain the visual and workflow source of truth. Mobile uses the same brand tokens and backend contracts without copying DOM components.
 
 The next implementation areas are profile/security/support-disputes, email verification and password-reset screens where still missing or incomplete, and verified Android build output. No APK/AAB is claimed until an actual native build produces and verifies the artifact.
@@ -79,7 +80,7 @@ The implementation preserves semantic success, error, pending and processing sta
 
 ## Verification and limitations
 
-Fresh checks on the current mobile source pass:
+Fresh checks on the current mobile source pass at commit `19c02d6`:
 
 ```text
 npm run typecheck  PASS

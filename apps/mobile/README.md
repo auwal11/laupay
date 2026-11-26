@@ -10,10 +10,12 @@ Implemented and connected to backend services:
 - Dashboard with greeting, wallet status/balance, hide/show balance, Add funds, Withdraw, transaction history, quick actions and recent activity.
 - Dark LAUPAY Glass dashboard styling aligned with the current web shell: navy background, translucent panels, teal accents, amber balance action and semantic status colors.
 - Wallet screen with funding entry points, transactions and withdrawal history.
-- Airtime/data purchase flow with live catalog endpoints, phone/amount or plan selection, review, PIN, idempotency key, processing and backend result/status handling.
+- Airtime/data purchase flow with live catalog endpoints, phone/amount or plan selection, review, custom numeric PIN keypad, idempotency key, processing and backend result/status handling.
 - Transaction detail/receipt view with reference copy, amount direction, status, balance before/after, service/provider details, share and dispute/report action.
 - Notifications inbox with all/unread filters, unread count, mark read and mark all read.
-- Withdrawal flow with bank list, backend limits/eligibility, review, PIN, processing and polling for final backend states.
+- Withdrawal flow with backend-provided bank list, popular-bank-first ordering when returned by the API, backend limits/eligibility, review, custom numeric PIN keypad, processing and polling for final backend states.
+- Shared loading behavior: in-flight primary actions show a spinner plus action text and are disabled to prevent duplicate requests. Completed purchase/withdrawal results provide native receipt sharing and a Done action back to Home.
+- Premium native UX polish: dark glass dashboard/header/profile surfaces, resilient profile-photo initials fallback, unread notification badge, dark startup surface, balance skeleton state and an unavailable-service badge that does not invent service data.
 
 The following are not claimed as complete in the current mobile milestone: profile/security/support-disputes completion, email verification/password reset coverage where routes still need final parity work, push notifications, biometric money authorization, secure PIN reset, rewards/referrals, transfers, electricity/cable services and a verified native Android artifact.
 
@@ -53,7 +55,7 @@ Expo configuration uses display name `LAUPAY`, Android package `com.laupay.app`,
 
 ## Current verification
 
-As of commit `8fe8d7e`:
+As of commit `19c02d6`:
 
 - `npm run typecheck` — passed
 - `npm run lint` — passed with no warnings
