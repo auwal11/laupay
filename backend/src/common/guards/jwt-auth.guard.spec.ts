@@ -31,6 +31,11 @@ describe('JwtAuthGuard account/session enforcement', () => {
     await expect(guard.canActivate(context({}))).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it('rejects an access token whose integer iat equals the revocation second', async () => {
+    const { guard } = makeGuard({ id: 'user-1', role: UserRole.CUSTOMER, status: UserStatus.ACTIVE, sessionsRevokedAt: new Date(100_999) });
+    await expect(guard.canActivate(context({}))).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('uses the current database role instead of a stale token role', async () => {
     const request: Record<string, unknown> = {};
     const { guard } = makeGuard({ id: 'user-1', role: UserRole.CUSTOMER, status: UserStatus.ACTIVE, sessionsRevokedAt: null }, { sub: 'user-1', role: UserRole.ADMIN, iat: 100 });

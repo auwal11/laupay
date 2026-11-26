@@ -38,7 +38,7 @@ export class JwtAuthGuard implements CanActivate {
       }
       if (
         user.sessionsRevokedAt &&
-        payload.iat < Math.floor(user.sessionsRevokedAt.getTime() / 1000)
+        payload.iat <= Math.floor(user.sessionsRevokedAt.getTime() / 1000)
       ) {
         throw new UnauthorizedException('Session has been revoked');
       }

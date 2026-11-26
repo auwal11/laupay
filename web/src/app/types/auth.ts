@@ -29,7 +29,6 @@ export interface RegisterPayload {
   password: string;
   /** Confirmation only — never sent to the backend (stripped in the adapter). */
   confirmPassword?: string;
-  profilePhotoData?: string;
   termsAccepted: boolean;
   termsVersion: string;
 }

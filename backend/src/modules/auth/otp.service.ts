@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { createHash, randomInt } from 'crypto';
+import { createHmac, randomInt } from 'crypto';
 import { AppConfigService } from '../../config/app-config.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MAIL_PROVIDER, MailProvider } from '../../common/mail/mail-provider.interface';
@@ -33,8 +33,8 @@ export class OtpService {
     @Inject(MAIL_PROVIDER) private readonly mail: MailProvider,
   ) {}
 
-  private static hash(code: string): string {
-    return createHash('sha256').update(`laupay-otp:${code}`).digest('hex');
+  private hash(code: string): string {
+    return createHmac('sha256', this.config.otpPepper).update(`laupay-otp:${code}`).digest('hex');
   }
 
   /** Issues a fresh code for a user, invalidating any prior outstanding one. */
@@ -49,7 +49,7 @@ export class OtpService {
 
     const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
     await this.prisma.emailOtp.create({
-      data: { userId, purpose, codeHash: OtpService.hash(code), expiresAt },
+      data: { userId, purpose, codeHash: this.hash(code), expiresAt },
     });
 
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
@@ -83,7 +83,7 @@ export class OtpService {
     if (updated.count === 0) throw new HttpException('Code no longer valid. Request a new one.', HttpStatus.TOO_MANY_REQUESTS);
 
     if (otp.expiresAt.getTime() < Date.now()) throw invalid;
-    if (OtpService.hash(code) !== otp.codeHash) {
+    if (this.hash(code) !== otp.codeHash) {
       const nextAttempts = otp.attempts + 1;
       await this.prisma.auditLog.create({ data: { actorId: userId, action: 'LOGIN_FAILED', entityType: 'EmailOtp', entityId: otp.id, metadata: { reason: 'invalid_otp' } } });
       if (nextAttempts >= otp.maxAttempts) {

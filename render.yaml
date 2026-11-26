@@ -21,9 +21,7 @@ services:
       - key: VTU_PROVIDER
         value: vtpass
       - key: FULFILLMENT_MODE
-        value: provider_test
-      - key: VTPASS_TEST_OUTCOME
-        value: success
+        value: live
       - key: MONNIFY_BASE_URL
         value: https://sandbox.monnify.com
       - key: ADMIN_EMAIL
@@ -64,7 +62,12 @@ services:
         sync: false
       - key: VTPASS_SECRET_KEY
         sync: false
+      # Must be set in Render to https://vtpass.com before production startup; the boot guard fails closed otherwise.
+      - key: VTPASS_BASE_URL
+        sync: false
       - key: VTPASS_WEBHOOK_SECRET
+        sync: false
+      - key: OTP_PEPPER
         sync: false
       - key: BREVO_API_KEY
         sync: false

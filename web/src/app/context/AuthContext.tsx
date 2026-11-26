@@ -11,7 +11,7 @@ interface AuthContextValue {
   status: SessionStatus;
   login: (payload: LoginPayload) => Promise<ApiError | null>;
   register: (payload: RegisterPayload) => Promise<ApiError | null>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<ApiError | null>;
   verifyOtp: (payload: OtpPayload) => Promise<ApiError | null>;
   pinReady: boolean | null;
@@ -97,11 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result.error;
   }, []);
 
-  const logout = useCallback(() => {
-    auth.logout();
+  const logout = useCallback(async () => {
     setUser(null);
     setStatus("anonymous");
     setPinReady(null);
+    await auth.logout();
   }, []);
 
   const verifyOtp = useCallback(async (payload: OtpPayload) => {

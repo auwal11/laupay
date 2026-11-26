@@ -126,6 +126,21 @@ describe('Registration → Email OTP → Login (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects profile-photo data on pre-verification registration', async () => {
+    await request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({
+        email: `photo-pending-${Date.now()}@test.local`,
+        password: 'Password123!',
+        fullName: 'Pending Photo User',
+        phone: phone('4'),
+        profilePhotoData: 'data:image/png;base64,AA==',
+        termsAccepted: true,
+        termsVersion: 'e2e',
+      })
+      .expect(400);
+  });
+
   it('rejects a malformed (non-6-digit) code at the DTO layer', async () => {
     await request(app.getHttpServer())
       .post('/api/auth/verify-otp')

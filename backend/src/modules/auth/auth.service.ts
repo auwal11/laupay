@@ -19,7 +19,6 @@ import { OtpService } from './otp.service';
 import { LoginThrottleService } from './login-throttle.service';
 import { Inject } from '@nestjs/common';
 import { MAIL_PROVIDER, MailProvider } from '../../common/mail/mail-provider.interface';
-import { ProfileStorageService } from '../../common/storage/profile-storage.service';
 import { normalizeFullName } from '../../common/utils/name.util';
 import { ADMIN_ROLES, permissionsForRole } from '../../common/permissions';
 import { assertEmailAllowed, normalizeEmail } from '../../common/security/email-policy';
@@ -41,7 +40,6 @@ export class AuthService {
     private readonly otp: OtpService,
     private readonly loginThrottle: LoginThrottleService,
     @Inject(MAIL_PROVIDER) private readonly mail: MailProvider,
-    private readonly profileStorage: ProfileStorageService,
   ) {}
 
   /**
@@ -95,32 +93,16 @@ export class AuthService {
     await this.otp.assertRegisterAllowed(ipAddress ?? 'unknown');
     if (dto.termsAccepted !== true) throw new ForbiddenException('Terms acceptance is required');
     const email = assertEmailAllowed(dto.email);
-    const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      throw new ConflictException('An account with this email already exists');
-    }
-    if (dto.phone) {
-      // phone is @unique in the schema; check up-front for a friendly error
-      // rather than letting the insert fail with a raw constraint error.
-      const existingPhone = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
-      if (existingPhone) {
-        throw new ConflictException('An account with this phone number already exists');
-      }
-    }
+    const [existing, existingPhone] = await Promise.all([
+      this.prisma.user.findUnique({ where: { email } }),
+      dto.phone ? this.prisma.user.findUnique({ where: { phone: dto.phone } }) : Promise.resolve(null),
+    ]);
+    // Do not reveal whether either identity is registered. A duplicate gets
+    // the same public response as a new pending registration, without issuing
+    // another OTP or changing the existing account.
+    if (existing || existingPhone) return this.registrationPendingResponse(email);
 
     const passwordHash = await this.passwordHasher.hash(dto.password);
-
-    // A profile photo is optional. Storage being unavailable (misconfigured
-    // bucket, outage) must never block account creation — log it and continue
-    // without the photo rather than failing the whole registration.
-    let profilePhotoUrl: string | undefined;
-    if (dto.profilePhotoData) {
-      try {
-        profilePhotoUrl = await this.profileStorage.save(dto.profilePhotoData);
-      } catch (err) {
-        this.logger.warn(`Profile photo upload skipped during registration: ${String(err)}`);
-      }
-    }
 
     // User creation + wallet provisioning happen in one transaction: a user
     // must never exist without a corresponding wallet account, and vice versa.
@@ -134,10 +116,9 @@ export class AuthService {
               phone: dto.phone,
               passwordHash,
               fullName: normalizeFullName(dto.fullName),
-            role: UserRole.CUSTOMER,
-            profilePhotoUrl,
-            termsAcceptedAt: dto.termsAccepted ? new Date() : undefined,
-            termsVersion: dto.termsAccepted ? (dto.termsVersion ?? '2026-10-15') : undefined,
+              role: UserRole.CUSTOMER,
+              termsAcceptedAt: dto.termsAccepted ? new Date() : undefined,
+              termsVersion: dto.termsAccepted ? (dto.termsVersion ?? '2026-10-15') : undefined,
             },
           });
           await tx.walletAccount.create({
@@ -164,13 +145,10 @@ export class AuthService {
       );
     } catch (err) {
       // A race between the pre-checks above and the insert still surfaces as a
-      // raw unique-constraint (P2002); map it to a 409 instead of a 500.
+      // raw unique-constraint (P2002); preserve the same non-enumerating
+      // response instead of exposing which identity collided.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        throw new ConflictException(
-          String(err.meta?.target ?? '').includes('phone')
-            ? 'An account with this phone number already exists'
-            : 'An account with this email already exists',
-        );
+        return this.registrationPendingResponse(email);
       }
       throw err;
     }
@@ -182,10 +160,14 @@ export class AuthService {
     // at PENDING_VERIFICATION until OtpService.consume() succeeds.
     await this.otp.issue(user.id);
 
+    return this.registrationPendingResponse(user.email);
+  }
+
+  private registrationPendingResponse(email: string) {
     return {
       requiresVerification: true,
-      email: user.email,
-      message: 'A verification code has been sent to your email.',
+      email,
+      message: 'If an account can be created with these details, verification instructions will be sent.',
     };
   }
 
@@ -389,33 +371,60 @@ export class AuthService {
     if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
-
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: stored.userId } });
-    if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Account is not active');
-    }
+    if (user.status !== UserStatus.ACTIVE) throw new UnauthorizedException('Account is not active');
 
-    // Rotate atomically. A plain findUnique followed by update is vulnerable
-    // to two concurrent refresh requests both observing the token as live and
-    // both minting a new session. The conditional update is the single-use
-    // claim; exactly one request may win it.
-    const claimed = await this.prisma.refreshToken.updateMany({
-      where: { id: stored.id, tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
-      data: { revokedAt: new Date() },
-    });
-    if (claimed.count !== 1) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
-    }
+    const accessToken = await this.jwt.signAsync(
+      { sub: user.id, role: user.role },
+      { secret: this.config.jwtAccessSecret, expiresIn: this.config.jwtAccessExpiresIn },
+    );
+    const nextRefreshToken = randomUUID() + randomBytes(32).toString('hex');
+    const nextTokenHash = this.hashToken(nextRefreshToken);
+    const expiresAt = new Date(Date.now() + this.config.jwtRefreshExpiresInDays * 24 * 60 * 60 * 1000);
 
-    return this.issueTokens(user.id, user.role);
+    // The user row is the shared mutex for refresh and logout. The old token
+    // claim and descendant creation commit together, so logout cannot miss a
+    // just-rotated token between revoking the parent and inserting the child.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE
+      `;
+      const currentUser = await tx.user.findUnique({ where: { id: user.id } });
+      if (!currentUser || currentUser.status !== UserStatus.ACTIVE) {
+        throw new UnauthorizedException('Account is not active');
+      }
+      const claimed = await tx.refreshToken.updateMany({
+        where: { id: stored.id, tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
+        data: { revokedAt: new Date() },
+      });
+      if (claimed.count !== 1) throw new UnauthorizedException('Invalid or expired refresh token');
+      await tx.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: nextTokenHash,
+          sessionFamilyId: stored.sessionFamilyId,
+          expiresAt,
+        },
+      });
+    }, PrismaService.txOptions());
+
+    return { accessToken, refreshToken: nextRefreshToken };
   }
 
-  async logout(refreshToken: string): Promise<void> {
+  async logout(refreshToken: string): Promise<{ revoked: boolean }> {
     const tokenHash = this.hashToken(refreshToken);
-    await this.prisma.refreshToken.updateMany({
-      where: { tokenHash, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+    if (!stored) return { revoked: false };
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "User" WHERE "id" = ${stored.userId} FOR UPDATE
+      `;
+      const result = await tx.refreshToken.updateMany({
+        where: { userId: stored.userId, sessionFamilyId: stored.sessionFamilyId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return { revoked: result.count > 0 };
+    }, PrismaService.txOptions());
   }
 
   private async issueTokens(userId: string, role: UserRole): Promise<AuthTokens> {
@@ -431,7 +440,7 @@ export class AuthService {
     );
 
     await this.prisma.refreshToken.create({
-      data: { userId, tokenHash, expiresAt },
+      data: { userId, tokenHash, sessionFamilyId: randomUUID(), expiresAt },
     });
 
     return { accessToken, refreshToken: refreshTokenPlain };

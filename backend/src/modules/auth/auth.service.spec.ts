@@ -24,11 +24,10 @@ function makeService(status: UserStatus) {
     jwt as never,
     {} as never,
     {} as never,
-    otp as never,
-    {} as never,
-    {} as never,
-    {} as never,
-  );
+      otp as never,
+      {} as never,
+      {} as never,
+    );
   return { service, otp, jwt, prisma };
 }
 
@@ -89,7 +88,6 @@ describe('AuthService password reset verification boundary', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
     );
 
     await expect(service.resetPassword('reset-token', 'NewPassword123!')).resolves.toEqual({ reset: true });
@@ -129,7 +127,6 @@ describe('AuthService password reset verification boundary', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
     );
 
     await expect(service.resetPassword('reset-token', 'NewPassword123!')).rejects.toBeInstanceOf(UnauthorizedException);
@@ -142,6 +139,13 @@ describe('AuthService password reset verification boundary', () => {
 describe('AuthService refresh-token rotation', () => {
   it('rejects a refresh replay that loses the atomic single-use claim', async () => {
     const refreshToken = 'refresh-token';
+    const claim = jest.fn().mockResolvedValue({ count: 0 });
+    const create = jest.fn();
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      user: { findUnique: jest.fn().mockResolvedValue({ id: 'user-1', status: 'ACTIVE' }) },
+      refreshToken: { updateMany: claim, create },
+    };
     const prisma = {
       refreshToken: {
         findUnique: jest.fn().mockResolvedValue({
@@ -150,13 +154,13 @@ describe('AuthService refresh-token rotation', () => {
           revokedAt: null,
           expiresAt: new Date(Date.now() + 60_000),
           userId: 'user-1',
+          sessionFamilyId: 'family-1',
         }),
-        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-        create: jest.fn(),
       },
       user: {
         findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'user-1', role: 'CUSTOMER', status: 'ACTIVE' }),
       },
+      $transaction: jest.fn(async (callback: (database: any) => Promise<unknown>) => callback(tx)),
     };
     const jwt = { signAsync: jest.fn() };
     const service = new AuthService(
@@ -167,17 +171,24 @@ describe('AuthService refresh-token rotation', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
     );
 
     await expect(service.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+    expect(claim).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ id: 'refresh-1', revokedAt: null }),
     }));
-    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it('mints a new token pair only after the refresh token is claimed', async () => {
+    const claim = jest.fn().mockResolvedValue({ count: 1 });
+    const create = jest.fn().mockResolvedValue({ id: 'refresh-2' });
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      user: { findUnique: jest.fn().mockResolvedValue({ id: 'user-1', status: 'ACTIVE' }) },
+      refreshToken: { updateMany: claim, create },
+    };
     const prisma = {
       refreshToken: {
         findUnique: jest.fn().mockResolvedValue({
@@ -186,13 +197,13 @@ describe('AuthService refresh-token rotation', () => {
           revokedAt: null,
           expiresAt: new Date(Date.now() + 60_000),
           userId: 'user-1',
+          sessionFamilyId: 'family-1',
         }),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        create: jest.fn().mockResolvedValue({ id: 'refresh-2' }),
       },
       user: {
         findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'user-1', role: 'CUSTOMER', status: 'ACTIVE' }),
       },
+      $transaction: jest.fn(async (callback: (database: any) => Promise<unknown>) => callback(tx)),
     };
     const jwt = { signAsync: jest.fn().mockResolvedValue('access-token') };
     const service = new AuthService(
@@ -203,12 +214,35 @@ describe('AuthService refresh-token rotation', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
     );
 
     const tokens = await service.refresh('refresh-token');
     expect(tokens.accessToken).toBe('access-token');
     expect(tokens.refreshToken).toEqual(expect.any(String));
-    expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ userId: 'user-1', sessionFamilyId: 'family-1', tokenHash: expect.any(String) }),
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('revokes all rotated descendants in one session family on logout', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 2 });
+    const transaction = jest.fn(async (callback: (tx: any) => Promise<unknown>) => callback({
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      refreshToken: { updateMany },
+    }));
+    const prisma = {
+      refreshToken: {
+        findUnique: jest.fn().mockResolvedValue({ userId: 'user-1', sessionFamilyId: 'family-1' }),
+      },
+      $transaction: transaction,
+    };
+    const service = new AuthService(prisma as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+
+    await expect(service.logout('refresh-token')).resolves.toEqual({ revoked: true });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', sessionFamilyId: 'family-1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
   });
 });

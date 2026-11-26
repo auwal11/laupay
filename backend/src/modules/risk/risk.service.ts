@@ -62,8 +62,11 @@ export class RiskService {
    * Throws ForbiddenException when a transaction must not proceed, and writes
    * a RiskEvent explaining which rule fired.
    */
-  async assertCanTransact(ctx: RiskContext): Promise<void> {
-    const user = await this.prisma.user.findUnique({
+  async assertCanTransact(
+    ctx: RiskContext,
+    database: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const user = await database.user.findUnique({
       where: { id: ctx.userId },
       include: { walletAccount: true },
     });
@@ -110,10 +113,11 @@ export class RiskService {
     const maxAmount = await this.settings.getNumber('risk_max_amount_per_day');
     const maxFailures = await this.settings.getNumber('risk_max_failed_tx_per_hour');
 
+    const dayStart = startOfDay();
     const [todayCount, todayAgg] = await Promise.all([
-      this.prisma.order.count({ where: { userId: user.id, createdAt: { gte: startOfDay() } } }),
-      this.prisma.order.aggregate({
-        where: { userId: user.id, createdAt: { gte: startOfDay() }, status: { not: OrderStatus.CANCELLED } },
+      database.order.count({ where: { userId: user.id, createdAt: { gte: dayStart } } }),
+      database.order.aggregate({
+        where: { userId: user.id, createdAt: { gte: dayStart }, status: { not: OrderStatus.CANCELLED } },
         _sum: { amount: true },
       }),
     ]);
@@ -143,7 +147,7 @@ export class RiskService {
     }
 
     if (maxFailures > 0) {
-      const failed = await this.prisma.order.count({
+      const failed = await database.order.count({
         where: {
           userId: user.id,
           createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },

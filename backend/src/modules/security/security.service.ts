@@ -44,12 +44,7 @@ export class SecurityService {
   }
 
   async changePin(userId: string, currentPin: string, newPin: string) {
-    await this.assertPinCorrect(userId, currentPin); // enforces lockout + increments on failure
-    const pinHash = await this.passwordHasher.hash(newPin);
-    await this.prisma.userSecurity.update({
-      where: { userId },
-      data: { pinHash, pinSetAt: new Date(), failedPinAttempts: 0, pinLockedUntil: null },
-    });
+    await this.assertPinCorrect(userId, currentPin, newPin);
     return { hasPin: true };
   }
 
@@ -78,35 +73,51 @@ export class SecurityService {
     return logs.map((log) => ({ id: log.id, category: log.action === 'LOGIN_FAILED' ? 'security' : 'account', message: log.action.replace('_', ' ').toLowerCase(), createdAt: log.createdAt, read: true }));
   }
 
-  private async assertPinCorrect(userId: string, pin: string): Promise<void> {
-    const record = await this.prisma.userSecurity.findUnique({ where: { userId } });
-    if (!record?.pinHash) {
-      throw new BadRequestException('No PIN has been set for this account');
-    }
-    if (record.pinLockedUntil && record.pinLockedUntil > new Date()) {
-      throw new ForbiddenException('PIN is temporarily locked due to too many failed attempts');
-    }
+  private async assertPinCorrect(userId: string, pin: string, replacementPin?: string): Promise<void> {
+    // A read/modify/write counter loses concurrent failures. Lock the one
+    // per-user row before reading it so every failed attempt is serialized and
+    // exactly the fifth concurrent/normal failure locks the account.
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ userId: string }>>`
+        SELECT "userId" FROM "UserSecurity" WHERE "userId" = ${userId} FOR UPDATE
+      `;
+      const record = await tx.userSecurity.findUnique({ where: { userId } });
+      if (!record?.pinHash) return 'missing';
+      if (record.pinLockedUntil && record.pinLockedUntil > new Date()) return 'locked';
 
-    const correct = await this.passwordHasher.verify(record.pinHash, pin);
-    if (!correct) {
-      const attempts = record.failedPinAttempts + 1;
-      const lockedUntil = attempts >= MAX_FAILED_ATTEMPTS ? new Date(Date.now() + LOCKOUT_DURATION_MS) : null;
-      await this.prisma.userSecurity.update({
-        where: { userId },
-        data: { failedPinAttempts: attempts, pinLockedUntil: lockedUntil },
-      });
-      // 403, not 401: the session is valid, the step-up credential was
-      // wrong. Returning 401 would make clients (rightly) treat it as an
-      // expired/revoked session and sign the user out.
+      const correct = await this.passwordHasher.verify(record.pinHash, pin);
+      if (!correct) {
+        const attempts = record.failedPinAttempts + 1;
+        const lockedUntil = attempts >= MAX_FAILED_ATTEMPTS
+          ? new Date(Date.now() + LOCKOUT_DURATION_MS)
+          : null;
+        await tx.userSecurity.update({
+          where: { userId },
+          data: { failedPinAttempts: attempts, pinLockedUntil: lockedUntil },
+        });
+        return attempts >= MAX_FAILED_ATTEMPTS ? 'locked' : 'incorrect';
+      }
+
+      if (replacementPin !== undefined) {
+        const replacementHash = await this.passwordHasher.hash(replacementPin);
+        await tx.userSecurity.update({
+          where: { userId },
+          data: { pinHash: replacementHash, pinSetAt: new Date(), failedPinAttempts: 0, pinLockedUntil: null },
+        });
+      } else if (record.failedPinAttempts > 0) {
+        await tx.userSecurity.update({
+          where: { userId },
+          data: { failedPinAttempts: 0, pinLockedUntil: null },
+        });
+      }
+      return 'ok';
+    }, PrismaService.txOptions());
+
+    if (outcome === 'missing') throw new BadRequestException('No PIN has been set for this account');
+    if (outcome === 'locked') throw new ForbiddenException('PIN is temporarily locked due to too many failed attempts');
+    if (outcome === 'incorrect') {
+      // 403, not 401: the session is valid; only the step-up credential failed.
       throw new ForbiddenException('Incorrect PIN');
-    }
-
-    // Correct PIN — reset the failure counter.
-    if (record.failedPinAttempts > 0) {
-      await this.prisma.userSecurity.update({
-        where: { userId },
-        data: { failedPinAttempts: 0, pinLockedUntil: null },
-      });
     }
   }
 

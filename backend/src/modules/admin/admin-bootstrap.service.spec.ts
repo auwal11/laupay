@@ -44,6 +44,26 @@ function makeService(options: {
 }
 
 describe('AdminBootstrapService', () => {
+  it('does not promote, reactivate, or modify an existing account from ADMIN_EMAIL configuration', async () => {
+    const existingCustomer = {
+      id: 'user-1', email: 'person@example.com', role: UserRole.CUSTOMER, status: UserStatus.FROZEN,
+    };
+    const { service, prisma, passwordHasher, auth } = makeService({
+      adminEmail: ' Person@Example.com ',
+      adminPassword: 'long-password',
+      existingUsers: { 'person@example.com': existingCustomer },
+    });
+
+    await service.onApplicationBootstrap();
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'person@example.com' } });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.walletAccount.create).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(passwordHasher.hash).not.toHaveBeenCalled();
+    expect(auth.forgotPassword).not.toHaveBeenCalled();
+  });
+
   it('creates a separate Super Admin account and sends its reset email, not the regular admin email', async () => {
     const existingAdmin = {
       id: 'existing-admin-id',

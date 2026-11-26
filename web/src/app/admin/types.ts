@@ -11,7 +11,7 @@ export interface AdminSession {
 
 export interface AdminLoginResponse {
   accessToken: string;
-  refreshToken?: string;
+  refreshToken: string;
   role: AdminRole;
   permissions?: string[];
   mustChangePassword?: boolean;

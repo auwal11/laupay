@@ -58,8 +58,10 @@ export const authService = {
     });
   },
 
-  logout(): void {
+  async logout(): Promise<void> {
+    const refreshToken = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("laupay_refresh_token") : null;
     setAccessToken(null);
-    sessionStorage.removeItem("laupay_refresh_token");
+    if (typeof sessionStorage !== "undefined") sessionStorage.removeItem("laupay_refresh_token");
+    if (refreshToken) await request<{ revoked: boolean }>("/api/auth/logout", { method: "POST", body: { refreshToken } });
   },
 };

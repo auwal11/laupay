@@ -11,6 +11,7 @@ const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 const activeApiBaseUrl = configuredApiBaseUrl && configuredApiBaseUrl !== "https://laupay-production.up.railway.app/api" ? configuredApiBaseUrl : DEFAULT_API_BASE_URL;
 const BASE_URL = activeApiBaseUrl.replace(/\/$/, "");
 const TOKEN_KEY = "laupay_admin_access_token";
+const REFRESH_KEY = "laupay_admin_refresh_token";
 
 let adminToken: string | null =
   typeof sessionStorage !== "undefined" ? sessionStorage.getItem(TOKEN_KEY) : null;
@@ -26,8 +27,18 @@ export function hasAdminToken(): boolean {
   return !!adminToken;
 }
 
-let onUnauthorized: (() => void) | null = null;
-export function setAdminUnauthorizedHandler(fn: (() => void) | null) {
+export function setAdminRefreshToken(token: string | null) {
+  if (typeof sessionStorage === "undefined") return;
+  if (token) sessionStorage.setItem(REFRESH_KEY, token);
+  else sessionStorage.removeItem(REFRESH_KEY);
+}
+
+export function getAdminRefreshToken(): string | null {
+  return typeof sessionStorage === "undefined" ? null : sessionStorage.getItem(REFRESH_KEY);
+}
+
+let onUnauthorized: (() => void | Promise<void>) | null = null;
+export function setAdminUnauthorizedHandler(fn: (() => void | Promise<void>) | null) {
   onUnauthorized = fn;
 }
 
@@ -64,7 +75,7 @@ export async function adminRequest<T>(
     if (res.status === 401) {
       const error = await safeParseError(res);
       setAdminToken(null);
-      onUnauthorized?.();
+      if (path !== "/auth/logout") await onUnauthorized?.();
       return { ok: false, error };
     }
 

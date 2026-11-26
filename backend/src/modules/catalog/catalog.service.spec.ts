@@ -58,4 +58,16 @@ describe('CatalogService public projections', () => {
     expect(JSON.stringify(result)).not.toContain('agentPriceNaira');
     expect(JSON.stringify(result)).not.toContain('agentDiscountPercent');
   });
+
+  it('rejects unsupported network codes before querying the provider or writing catalog rows', async () => {
+    const provider = { listDataPlans: jest.fn() };
+    const network = { upsert: jest.fn() };
+    const dataPlan = { upsert: jest.fn(), findMany: jest.fn() };
+    const service = new CatalogService({ network, dataPlan } as never, provider as never, { vtuProvider: 'vtpass' } as never);
+
+    await expect(service.listDataPlans('../../admin')).rejects.toMatchObject({ status: 400 });
+    expect(provider.listDataPlans).not.toHaveBeenCalled();
+    expect(network.upsert).not.toHaveBeenCalled();
+    expect(dataPlan.upsert).not.toHaveBeenCalled();
+  });
 });

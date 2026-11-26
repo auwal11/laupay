@@ -43,8 +43,8 @@ export function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const visibleNav = NAV.filter((item) => !("superAdminOnly" in item) || session?.isSuperAdmin);
 
-  const onLogout = () => {
-    logout();
+  const onLogout = async () => {
+    await logout();
     navigate("/admin/login", { replace: true });
   };
 

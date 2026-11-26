@@ -23,11 +23,6 @@ export class RegisterDto {
   @Matches(/^(?:\+234|0)[789]\d{9}$/, { message: 'phone must be a valid Nigerian phone number' })
   phone!: string;
 
-  /** A validated image data URL. It is stored by the application, never sent to email. */
-  @IsOptional()
-  @IsString()
-  profilePhotoData?: string;
-
   @IsBoolean()
   termsAccepted!: boolean;
 

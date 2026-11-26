@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { adminService } from "./services";
-import { hasAdminToken, setAdminToken, setAdminUnauthorizedHandler } from "./api";
+import { getAdminRefreshToken, hasAdminToken, setAdminRefreshToken, setAdminToken, setAdminUnauthorizedHandler } from "./api";
 import type { AdminSession } from "./types";
 import type { ApiError } from "@app/types/common";
 
@@ -13,7 +13,7 @@ interface AdminAuthValue {
   permissions: string[];
   hasPermission: (permission: string) => boolean;
   login: (email: string, password: string) => Promise<{ error: ApiError | null; mustChangePassword: boolean }>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const ADMIN_SESSION_KEY = "laupay_admin_session";
@@ -39,9 +39,13 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AdminStatus>("checking");
 
   useEffect(() => {
-    setAdminUnauthorizedHandler(() => {
+    setAdminUnauthorizedHandler(async () => {
+      const refreshToken = getAdminRefreshToken();
+      const revocation = refreshToken ? adminService.logout(refreshToken) : Promise.resolve(null);
+      setAdminRefreshToken(null);
       setSession(null);
       setStatus("anonymous");
+      await revocation;
     });
     return () => setAdminUnauthorizedHandler(null);
   }, []);
@@ -88,6 +92,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const result = await adminService.login(email, password);
     if (!result.ok) return { error: result.error, mustChangePassword: false };
     setAdminToken(result.data.accessToken);
+    setAdminRefreshToken(result.data.refreshToken);
     const capabilities = await adminService.me();
     const next: AdminSession = {
       email,
@@ -105,11 +110,15 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     return { error: null, mustChangePassword: Boolean(result.data.mustChangePassword) };
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const refreshToken = getAdminRefreshToken();
+    const revocation = refreshToken ? adminService.logout(refreshToken) : Promise.resolve(null);
     setAdminToken(null);
+    setAdminRefreshToken(null);
     if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(ADMIN_SESSION_KEY);
     setSession(null);
     setStatus("anonymous");
+    await revocation;
   }, []);
 
   const permissions = session?.permissions ?? [];

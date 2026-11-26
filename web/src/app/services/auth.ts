@@ -86,8 +86,12 @@ export const authService = {
     return request<{ changed: true }>("/auth/change-password", { method: "POST", body: payload });
   },
 
-  logout(): void {
+  async logout(): Promise<void> {
+    const refreshToken = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(REFRESH_KEY) : null;
+    // Clear the local session immediately, but do not abandon server-side
+    // revocation as a fire-and-forget request.
     setAccessToken(null);
     if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(REFRESH_KEY);
+    if (refreshToken) await request<{ revoked: boolean }>("/auth/logout", { method: "POST", body: { refreshToken } });
   },
 };

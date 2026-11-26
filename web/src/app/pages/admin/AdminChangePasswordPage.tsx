@@ -35,7 +35,7 @@ export function AdminChangePasswordPage() {
       return;
     }
     // Password changes revoke existing sessions, so start a fresh admin login.
-    logout();
+    await logout();
     navigate("/admin/login", { replace: true, state: { notice: "Password changed. Sign in with your new password." } });
   }
 

@@ -20,6 +20,24 @@ function optional(name: string, fallback: string): string {
   return value && value.trim() !== '' ? value : fallback;
 }
 
+function assertProductionProviderUrl(name: string, value: string, allowedHostname: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`[config] Refusing to start: ${name} must be a valid HTTPS URL for ${allowedHostname}.`);
+  }
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.hostname.toLowerCase() !== allowedHostname ||
+    parsed.port !== '' ||
+    parsed.username !== '' ||
+    parsed.password !== ''
+  ) {
+    throw new Error(`[config] Refusing to start: ${name} must be a valid HTTPS URL for ${allowedHostname}.`);
+  }
+}
+
 @Injectable()
 export class AppConfigService {
   readonly nodeEnv = optional('NODE_ENV', 'development');
@@ -35,6 +53,18 @@ export class AppConfigService {
   readonly jwtRefreshExpiresInDays = Number(
     optional('JWT_REFRESH_EXPIRES_IN', '30d').replace(/[^0-9]/g, '') || '30',
   );
+  readonly otpPepper = (() => {
+    const pepper = this.isProduction
+      ? required('OTP_PEPPER')
+      : optional('OTP_PEPPER', 'development-only-otp-pepper-not-for-production');
+    if (
+      this.isProduction &&
+      (pepper.trim().length < 32 || /^replace[-_ ]with\b/i.test(pepper.trim()))
+    ) {
+      throw new Error('[config] OTP_PEPPER must be a non-placeholder secret of at least 32 characters in production.');
+    }
+    return pepper;
+  })();
 
   readonly adminWebOrigin = optional('ADMIN_WEB_ORIGIN', 'http://localhost:5173');
   /** Explicit comma-separated browser origins allowed to call the API. */
@@ -124,7 +154,7 @@ export class AppConfigService {
   readonly vtpassApiKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_API_KEY');
   readonly vtpassSecretKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_SECRET_KEY');
   readonly vtpassBaseUrl = optional('VTPASS_BASE_URL', 'https://sandbox.vtpass.com');
-  /** Explicit QA-only outcome override for provider_test; default calls VTpass. */
+  /** QA-only outcome override for provider_test; production rejects overrides. */
   readonly vtpassTestOutcome = optional('VTPASS_TEST_OUTCOME', 'provider');
 
   readonly mailProvider = optional('MAIL_PROVIDER', 'mock');
@@ -135,20 +165,12 @@ export class AppConfigService {
   /**
    * How VTU orders are fulfilled:
    *   simulated     - debit the wallet, mark SUCCESS, never call a real provider
-   *   provider_test - call the provider's TEST/SANDBOX API, use its status
+   *   provider_test - QA only; call a provider's TEST/SANDBOX API
    *   live          - real fulfillment (requires live keys)
    * Defaults to `simulated` so nothing real can be purchased by accident.
    */
   readonly fulfillmentMode = (() => {
-    const configured = optional('FULFILLMENT_MODE', 'simulated');
-    // Older Railway deployments used the real VTpass sandbox while the
-    // variable was still named `simulated`. Normalize that legacy value to a
-    // real provider mode so auth/support endpoints do not crash during the
-    // migration. No fake fulfillment is enabled by this compatibility path.
-    if (this.isProduction && this.vtuProvider === 'vtpass' && configured === 'simulated') {
-      return 'provider_test';
-    }
-    return configured;
+    return optional('FULFILLMENT_MODE', 'simulated');
   })();
   get isSimulatedFulfillment(): boolean {
     return this.fulfillmentMode === 'simulated';
@@ -261,8 +283,23 @@ export class AppConfigService {
       if (this.fulfillmentMode === 'simulated') {
         throw new Error(
           '[config] Refusing to start: FULFILLMENT_MODE=simulated in production. ' +
-            'Use provider_test or live.',
+            'Use live.',
         );
+      }
+      if (this.fulfillmentMode !== 'live') {
+        throw new Error('[config] Refusing to start: FULFILLMENT_MODE=provider_test is not allowed in production. Use live.');
+      }
+      if (this.vtuProvider === 'vtpass') {
+        assertProductionProviderUrl('VTPASS_BASE_URL', this.vtpassBaseUrl, 'vtpass.com');
+        if (this.vtpassTestOutcome !== 'provider') {
+          throw new Error('[config] Refusing to start: VTPASS_TEST_OUTCOME overrides are not allowed in production.');
+        }
+      }
+      if (this.vtuProvider === 'vtuagent') {
+        assertProductionProviderUrl('VTUAGENT_BASE_URL', this.vtuAgentBaseUrl, 'api.vtuagent.com');
+      }
+      if (this.vtuProvider === 'cheapdatahub') {
+        assertProductionProviderUrl('CHEAPDATAHUB_BASE_URL', this.cheapDataHubBaseUrl, 'www.cheapdatahub.ng');
       }
       if (['vtuagent', 'cheapdatahub'].includes(this.vtuProvider) && this.fulfillmentMode !== 'live') {
         throw new Error(

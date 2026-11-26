@@ -36,14 +36,11 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
     try {
       const existing = await this.prisma.user.findUnique({ where: { email } });
       if (existing) {
-        if (existing.role !== UserRole.ADMIN || existing.status !== UserStatus.ACTIVE) {
-          await this.prisma.user.update({
-            where: { id: existing.id },
-            data: { role: UserRole.ADMIN, status: UserStatus.ACTIVE },
-          });
-          this.logger.log('Admin bootstrap: promoted configured ADMIN account');
-        }
-        await this.ensureWallet(existing.id);
+        // Matching an email from deployment configuration is not proof of
+        // ownership. Bootstrap is create-only and must never promote or
+        // reactivate an existing customer or staff account. Explicit Super
+        // Admin allowlist handling is performed separately below.
+        this.logger.warn('Admin bootstrap skipped: configured email already belongs to an account');
         return;
       }
 

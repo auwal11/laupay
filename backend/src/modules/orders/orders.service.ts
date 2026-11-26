@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { AuditAction, LedgerReason, OrderStatus, OrderType } from '@prisma/client';
+import { AuditAction, LedgerReason, OrderStatus, OrderType, Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { VtuService } from '../vtu/vtu.service';
@@ -9,11 +10,13 @@ import { AppConfigService } from '../../config/app-config.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { RiskService } from '../risk/risk.service';
+import type { RiskContext } from '../risk/risk.service';
 
 /** Orders that have already reached a terminal state — never re-touched by
  * async resolution once here (see reconcileVtuTransaction below). */
 const TERMINAL_STATUSES: OrderStatus[] = [
   OrderStatus.FULFILLED,
+  OrderStatus.FULFILLMENT_FAILED,
   OrderStatus.REFUNDED,
   OrderStatus.CANCELLED,
 ];
@@ -41,6 +44,24 @@ export class OrdersService {
     private readonly risk: RiskService,
   ) {}
 
+  private async reserveQuotaAndCreateOrder(
+    context: RiskContext,
+    data: Prisma.OrderUncheckedCreateInput,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      // The user row is the serialization point for all airtime/data requests
+      // by this account. NO KEY UPDATE still serializes these requests, while
+      // allowing FK key-share locks taken by risk-event inserts to proceed.
+      // The quota query and reservation order become visible atomically, so
+      // parallel requests cannot all pass a stale count.
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "User" WHERE "id" = ${context.userId} FOR NO KEY UPDATE
+      `;
+      await this.risk.assertCanTransact(context, tx);
+      return tx.order.create({ data });
+    }, PrismaService.txOptions());
+  }
+
   /**
    * Airtime purchase, paid from the customer's wallet.
    * Flow: create order -> debit wallet (idempotent) -> fulfill via VTU.
@@ -63,10 +84,9 @@ export class OrdersService {
     }
 
     await this.settings.assertServiceEnabled('airtime', 'Airtime purchases');
-    await this.risk.assertCanTransact({ userId, kind: 'airtime', amount, phoneNumber });
-
-    const order = await this.prisma.order.create({
-      data: {
+    const order = await this.reserveQuotaAndCreateOrder(
+      { userId, kind: 'airtime', amount, phoneNumber },
+      {
         userId,
         type: OrderType.AIRTIME,
         status: OrderStatus.CREATED,
@@ -76,7 +96,7 @@ export class OrdersService {
         mode: this.config.fulfillmentMode,
         idempotencyKey,
       },
-    });
+    );
 
     const debited = await this.debitForOrder(order.id, userId, amount);
     if (!debited) {
@@ -123,10 +143,9 @@ export class OrdersService {
     const amount = Number(plan.priceNaira);
 
     await this.settings.assertServiceEnabled('data', 'Data purchases');
-    await this.risk.assertCanTransact({ userId, kind: 'data', amount, phoneNumber });
-
-    const order = await this.prisma.order.create({
-      data: {
+    const order = await this.reserveQuotaAndCreateOrder(
+      { userId, kind: 'data', amount, phoneNumber },
+      {
         userId,
         type: OrderType.DATA,
         status: OrderStatus.CREATED,
@@ -137,7 +156,7 @@ export class OrdersService {
         mode: this.config.fulfillmentMode,
         idempotencyKey,
       },
-    });
+    );
 
     const debited = await this.debitForOrder(order.id, userId, amount);
     if (!debited) {
@@ -176,7 +195,11 @@ export class OrdersService {
    *   order never double-reverses.
    */
   async reconcileVtuTransaction(vtuTransactionId: string) {
-    const txn = await this.vtu.requeryTransaction(vtuTransactionId);
+    const txn = await this.prisma.vtuTransaction.findUnique({
+      where: { id: vtuTransactionId },
+      select: { id: true, orderId: true, status: true },
+    });
+    if (!txn) return null;
     const order = await this.prisma.order.findUnique({ where: { id: txn.orderId } });
     if (!order) {
       this.logger.warn(`VtuTransaction ${vtuTransactionId} references missing order ${txn.orderId}`);
@@ -187,7 +210,62 @@ export class OrdersService {
       return order; // already resolved by the synchronous path or a prior async pass
     }
 
-    return this.applyVtuOutcome(order.id, txn.status);
+    // A provider outcome already recorded as terminal is authoritative enough
+    // to finish local settlement; never make another external request for it.
+    if (txn.status === 'SUCCESS' || txn.status === 'FAILED') {
+      return this.applyVtuOutcome(order.id, txn.status);
+    }
+
+    const leaseToken = randomUUID();
+    const now = new Date();
+    const claimed = await this.prisma.vtuTransaction.updateMany({
+      where: {
+        id: txn.id,
+        status: { notIn: ['SUCCESS', 'FAILED'] },
+        OR: [
+          { reconcileLeaseExpiresAt: null },
+          { reconcileLeaseExpiresAt: { lt: now } },
+        ],
+      },
+      data: {
+        reconcileLeaseToken: leaseToken,
+        reconcileLeaseExpiresAt: new Date(now.getTime() + 120_000),
+      },
+    });
+    if (claimed.count !== 1) {
+      // Another worker owns the reconciliation lease (or the provider status
+      // changed concurrently). A missing result is an explicit "not resolved
+      // by this worker" signal; callers must not interpret it as provider
+      // failure or refund the order.
+      return null;
+    }
+
+    try {
+      const refreshedOrder = await this.prisma.order.findUnique({ where: { id: order.id } });
+      if (!refreshedOrder) return null;
+      if (TERMINAL_STATUSES.includes(refreshedOrder.status)) return refreshedOrder;
+
+      const result = await this.vtu.requeryTransaction(txn.id);
+      // A slow worker must not settle after its lease expired and another
+      // worker acquired it. Extend only if we still own the lease.
+      const stillOwner = await this.prisma.vtuTransaction.updateMany({
+        where: {
+          id: txn.id,
+          reconcileLeaseToken: leaseToken,
+          reconcileLeaseExpiresAt: { gt: new Date() },
+        },
+        data: { reconcileLeaseExpiresAt: new Date(Date.now() + 120_000) },
+      });
+      if (stillOwner.count !== 1) {
+        return null;
+      }
+      return this.applyVtuOutcome(refreshedOrder.id, result.status);
+    } finally {
+      await this.prisma.vtuTransaction.updateMany({
+        where: { id: txn.id, reconcileLeaseToken: leaseToken },
+        data: { reconcileLeaseToken: null, reconcileLeaseExpiresAt: null },
+      });
+    }
   }
 
   async getOrder(orderId: string, requesterId: string, requesterRole: string) {
@@ -449,6 +527,9 @@ export class OrdersService {
       try {
         if (order.vtuTransaction) {
           const resolved = await this.reconcileVtuTransaction(order.vtuTransaction.id);
+          // null means this worker did not obtain/retain the lease. Leave the
+          // order untouched for the lease owner or a later reconciliation.
+          if (!resolved) continue;
           if (resolved && TERMINAL_STATUSES.includes(resolved.status)) continue;
           if (resolved && resolved.status === OrderStatus.FULFILLMENT_UNKNOWN) {
             // provider still has no definitive answer — fall through and settle

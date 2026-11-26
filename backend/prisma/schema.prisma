@@ -400,8 +400,9 @@ model UserSecurity {
 }
 
 /// Email OTP for registration verification (requirement 4).
-/// Only the SHA-256 hash of the 6-digit code is stored, so a database dump
-/// cannot be replayed to verify an account. `consumedAt` is set exactly once
+/// Only an HMAC-SHA-256 digest of the 6-digit code is stored; the separate
+/// OTP_PEPPER means a database-only dump cannot verify guesses offline.
+/// `consumedAt` is set exactly once
 /// on success (single-use), and `attempts` bounds brute force to `maxAttempts`
 /// tries before the row must be discarded and a fresh code requested.
 model EmailOtp {
@@ -439,15 +440,17 @@ model OtpRateLimit {
 }
 
 model RefreshToken {
-  id        String    @id @default(uuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  tokenHash String    @unique
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  tokenHash       String    @unique
+  sessionFamilyId String
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
 
   @@index([userId])
+  @@index([userId, sessionFamilyId, revokedAt])
 }
 
 model PasswordResetToken {
@@ -717,6 +720,8 @@ model VtuTransaction {
   providerReference String?              @unique
   idempotencyKey    String               @unique
   rawResponse       Json?
+  reconcileLeaseToken      String?
+  reconcileLeaseExpiresAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

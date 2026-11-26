@@ -37,6 +37,10 @@ export const adminService = {
     });
   },
 
+  logout(refreshToken: string): Promise<ApiResult<{ revoked: boolean }>> {
+    return adminRequest("/auth/logout", { method: "POST", body: { refreshToken } });
+  },
+
   me(): Promise<ApiResult<{ userId: string; role: string; permissions: string[]; isSuperAdmin: boolean }>> {
     return adminRequest("/admin/me");
   },

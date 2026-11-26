@@ -1,6 +1,15 @@
 import { OtpService } from './otp.service';
 
 describe('OtpService security controls', () => {
+  it('uses a secret HMAC pepper so a database-only dump cannot verify OTP guesses', () => {
+    const makeService = (otpPepper: string) => new OtpService({} as never, { otpPepper } as never, {} as never);
+    const first = makeService('private-pepper-A'.padEnd(40, 'a')) as any;
+    const second = makeService('private-pepper-B'.padEnd(40, 'b')) as any;
+
+    expect(first.hash('123456')).not.toBe(second.hash('123456'));
+    expect(first.hash('123456')).toBe(first.hash('123456'));
+  });
+
   it('invalidates an OTP after five failed verification attempts', async () => {
     const otp = {
       id: 'otp-1',
@@ -24,7 +33,7 @@ describe('OtpService security controls', () => {
       },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
     };
-    const service = new OtpService(prisma as never, {} as never, {} as never);
+    const service = new OtpService(prisma as never, { otpPepper: 'unit-test-pepper-that-is-long-enough-123456' } as never, {} as never);
 
     await expect(service.consume('user-1', '000000')).rejects.toMatchObject({ status: 401 });
     await expect(service.consume('user-1', '000000')).rejects.toMatchObject({ status: 401 });

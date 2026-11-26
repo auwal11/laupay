@@ -4,6 +4,7 @@ import * as request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { MockMailProvider } from '../src/common/mail/mock-mail.provider';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /** Registers + verifies via the real OTP flow (requirements 3 + 4). */
 async function registerVerified(
@@ -36,6 +37,7 @@ async function registerVerified(
  */
 describe('Security PIN (e2e)', () => {
   let app: INestApplication;
+  let prisma: PrismaService;
 
   const user = { email: `pin-${Date.now()}@test.local`, password: 'Password123!', fullName: 'Pin Test User' };
   let token: string;
@@ -44,6 +46,7 @@ describe('Security PIN (e2e)', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
+    prisma = moduleRef.get(PrismaService);
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
@@ -141,6 +144,29 @@ describe('Security PIN (e2e)', () => {
       .get('/api/security/pin/status')
       .set('Authorization', `Bearer ${lockToken}`);
     expect(status.body.locked).toBe(true);
+  });
+
+  it('serializes concurrent failed attempts so the lockout counter cannot lose updates', async () => {
+    const parallelUser = { email: `pin-parallel-${Date.now()}@test.local`, password: 'Password123!', fullName: 'Parallel PIN Test' };
+    const parallelToken = await registerVerified(app.getHttpServer(), parallelUser);
+    await request(app.getHttpServer())
+      .post('/api/security/pin')
+      .set('Authorization', `Bearer ${parallelToken}`)
+      .send({ pin: '2468' })
+      .expect(201);
+
+    const attempts = await Promise.all(Array.from({ length: 8 }, () =>
+      request(app.getHttpServer())
+        .post('/api/security/pin/verify')
+        .set('Authorization', `Bearer ${parallelToken}`)
+        .send({ pin: '0000' }),
+    ));
+    expect(attempts.every((response) => response.status === 403)).toBe(true);
+
+    const account = await prisma.user.findUniqueOrThrow({ where: { email: parallelUser.email } });
+    const security = await prisma.userSecurity.findUniqueOrThrow({ where: { userId: account.id } });
+    expect(security.failedPinAttempts).toBe(5);
+    expect(security.pinLockedUntil?.getTime()).toBeGreaterThan(Date.now());
   });
 
   it('changes the PIN given the correct current PIN, and the old PIN stops working', async () => {

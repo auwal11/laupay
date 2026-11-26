@@ -21,7 +21,7 @@ export function AppShellLayout() {
           <div className="flex items-center gap-2"><UserAvatar user={user} size="sm" /><span className="font-display text-base font-semibold text-laupay-indigo">LAUPAY</span></div>
           <div className="flex items-center gap-2"><NotificationBell />
           <button
-            onClick={() => { setLoggingOut(true); window.setTimeout(() => { logout(); navigate("/login", { replace: true }); }, 250); }}
+            onClick={async () => { setLoggingOut(true); await logout(); navigate("/login", { replace: true }); }}
             disabled={loggingOut}
             className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-laupay-ink-muted hover:bg-laupay-surface-muted hover:text-laupay-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-laupay-indigo"
           >

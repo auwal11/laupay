@@ -12,7 +12,7 @@ interface AuthContextValue {
   status: SessionStatus;
   login: (payload: LoginPayload) => Promise<ApiError | null>;
   register: (payload: RegisterPayload) => Promise<ApiError | null>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<ApiError | null>;
   verifyOtp: (payload: { email: string; code: string }) => Promise<ApiError | null>;
   pinReady: boolean | null;
@@ -92,10 +92,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result.error;
   }, []);
 
-  const logout = useCallback(() => {
-    auth.logout();
+  const logout = useCallback(async () => {
     setUser(null);
     setStatus("anonymous");
+    await auth.logout();
   }, []);
 
   const refreshUser = useCallback(async () => {

@@ -54,7 +54,7 @@ function PasswordSection() {
       setError(result.error.message);
       return;
     }
-    logout();
+    await logout();
     navigate("/login", {
       replace: true,
       state: { notice: "Password changed. Sign in again with your new password." },

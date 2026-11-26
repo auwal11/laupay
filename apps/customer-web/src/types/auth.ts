@@ -28,7 +28,6 @@ export interface RegisterPayload {
   phone: string;
   password: string;
   confirmPassword: string;
-  profilePhotoData?: string;
   termsAccepted: boolean;
   termsVersion: string;
 }
