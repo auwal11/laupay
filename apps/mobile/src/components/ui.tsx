@@ -35,6 +35,21 @@ export function AppButton({ title, onPress, variant = 'primary', loading = false
   </Pressable>;
 }
 
+export function NumericPinPad({ value, onChange, length = 4, disabled = false }: { value: string; onChange: (value: string) => void; length?: number; disabled?: boolean }) {
+  const addDigit = (digit: string) => {
+    if (disabled || value.length >= length) return;
+    onChange(`${value}${digit}`);
+  };
+  const removeDigit = () => {
+    if (disabled || !value) return;
+    onChange(value.slice(0, -1));
+  };
+  return <View style={styles.pinPad} accessibilityLabel="Transaction PIN keypad">
+    <View style={styles.pinDots}>{Array.from({ length }, (_, index) => <View key={index} style={[styles.pinDot, index < value.length && styles.pinDotFilled]} />)}</View>
+    <View style={styles.pinGrid}>{['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => <Pressable key={digit} accessibilityRole="button" accessibilityLabel={`PIN digit ${digit}`} accessibilityState={{ disabled }} disabled={disabled} onPress={() => addDigit(digit)} style={({ pressed }) => [styles.pinKey, pressed && styles.pinKeyPressed]}><Text style={styles.pinKeyText}>{digit}</Text></Pressable>)}<View style={styles.pinKeySpacer} /><Pressable accessibilityRole="button" accessibilityLabel="PIN digit 0" accessibilityState={{ disabled }} disabled={disabled} onPress={() => addDigit('0')} style={({ pressed }) => [styles.pinKey, pressed && styles.pinKeyPressed]}><Text style={styles.pinKeyText}>0</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Delete last PIN digit" accessibilityState={{ disabled: disabled || !value }} disabled={disabled || !value} onPress={removeDigit} style={({ pressed }) => [styles.pinKey, pressed && styles.pinKeyPressed]}><Text style={styles.pinBackspace}>⌫</Text></Pressable></View>
+  </View>;
+}
+
 export function AppCard({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
   return <View style={[styles.card, shadow.card, style]}>{children}</View>;
 }
@@ -83,6 +98,16 @@ const styles = StyleSheet.create({
   buttonText_secondary: { color: colors.navy },
   buttonText_ghost: { color: colors.navy },
   buttonText_danger: { color: colors.white },
+  pinPad: { alignItems: 'center', gap: spacing.xl, paddingVertical: spacing.md },
+  pinDots: { flexDirection: 'row', gap: spacing.md },
+  pinDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.white },
+  pinDotFilled: { backgroundColor: colors.midnight, borderColor: colors.midnight },
+  pinGrid: { width: '100%', maxWidth: 320, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.md },
+  pinKey: { width: 78, height: 58, borderRadius: radius.md, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  pinKeyPressed: { backgroundColor: colors.softBlue, transform: [{ scale: 0.97 }] },
+  pinKeySpacer: { width: 78, height: 58 },
+  pinKeyText: { color: colors.midnight, fontSize: 22, fontWeight: '800' },
+  pinBackspace: { color: colors.navy2, fontSize: 25, fontWeight: '700' },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: '#E8EDF3' },
   glassCard: { backgroundColor: colors.glassSurface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.glassBorder },
   avatar: { backgroundColor: colors.midnight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.glassBorder },

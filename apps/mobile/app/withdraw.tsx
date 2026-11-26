@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View } from 'rea
 import { router } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { useQuery } from '@tanstack/react-query';
-import { AppButton, AppCard, FormField, InlineNotice, Screen, StatusBadge } from '../src/components/ui';
+import { AppButton, AppCard, FormField, InlineNotice, NumericPinPad, Screen, StatusBadge } from '../src/components/ui';
 import { Bank, Withdrawal, withdrawalsApi } from '../src/api/services';
 import { colors, spacing } from '../src/theme';
 
@@ -66,7 +66,7 @@ export default function Withdraw() {
 
   if (step === 'pin') return <Shell title="Authorize withdrawal" step="3 of 4" onBack={() => setStep('review')}>
     <Text style={s.body}>Enter your 4-digit transaction PIN. This is the final authorization step before sending the request to LAUPAY.</Text>
-    <FormField label="Transaction PIN" value={pin} onChangeText={(v) => setPin(v.replace(/\D/g, '').slice(0, 4))} secureTextEntry keyboardType="number-pad" maxLength={4} autoFocus placeholder="4 digits" />
+    <NumericPinPad value={pin} onChange={setPin} disabled={busy} />
     {error ? <InlineNotice title="Withdrawal not submitted" body={error} tone="error" /> : null}
     <AppButton title="Authorize and submit" loading={busy} disabled={busy || !/^\d{4}$/.test(pin)} onPress={() => void submit()} />
   </Shell>;
