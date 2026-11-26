@@ -8,7 +8,7 @@ import { Bank, Withdrawal, withdrawalsApi } from '../src/api/services';
 import { colors, spacing } from '../src/theme';
 
 type Step = 'details' | 'review' | 'pin' | 'processing' | 'result';
-const FINAL = new Set(['success', 'completed', 'failed', 'rejected', 'cancelled', 'paid']);
+const FINAL = new Set(['success', 'successful', 'completed', 'failed', 'rejected', 'cancelled', 'paid', 'refunded', 'reversed', 'refund_failed']);
 const statusKey = (value: string) => value.toLowerCase().replace(/[-\s]/g, '_');
 const money = (value: string | number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(value));
 
