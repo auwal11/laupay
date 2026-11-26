@@ -31,7 +31,7 @@ export function BrandLockup({ dark = false, subtitle }: { dark?: boolean; subtit
 export function AppButton({ title, onPress, variant = 'primary', loading = false, disabled = false, icon, style, ...props }: Omit<PressableProps, 'style'> & { title: string; variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; loading?: boolean; icon?: ReactNode; style?: ViewStyle }) {
   const muted = disabled || loading;
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled: muted, busy: loading }} onPress={onPress} disabled={muted} style={({ pressed }) => [styles.button, styles[`button_${variant}`], muted && styles.buttonDisabled, pressed && !muted && styles.buttonPressed, style]} {...props}>
-    {loading ? <ActivityIndicator color={variant === 'primary' ? colors.midnight : colors.navy} /> : <>{icon}{<Text style={[styles.buttonText, styles[`buttonText_${variant}`]]}>{title}</Text>}</>}
+    {loading ? <><ActivityIndicator color={variant === 'primary' ? colors.midnight : colors.navy} /><Text style={[styles.buttonText, styles[`buttonText_${variant}`]]}>{title}</Text></> : <>{icon}{<Text style={[styles.buttonText, styles[`buttonText_${variant}`]]}>{title}</Text>}</>}
   </Pressable>;
 }
 
