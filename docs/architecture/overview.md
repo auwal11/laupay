@@ -1,7 +1,7 @@
 # LAUPAY — Architecture Overview
 
-Status: **Phase 1 — Foundation** (see `docs/decisions/00-project-status.md` for
-what is and is not implemented yet)
+Status: **Backend foundation + Expo mobile implementation in progress** (see
+`docs/decisions/00-project-status.md` for what is and is not implemented yet).
 
 ## 1. What LAUPAY Is
 
@@ -20,7 +20,7 @@ rewriting the wallet, ledger, or order engine.
 ## 2. High-Level Architecture
 
 ```
-Flutter Mobile App (customers + agents)
+    Expo/React Native Mobile App (customer flows)
 Admin Web Dashboard
         |
         v
@@ -51,8 +51,8 @@ no change to wallet, ledger, or order logic.
 ## 3. Core Design Principles
 
 1. **The client is never trusted.** Balance, price, transaction status, and
-   authorization are always recomputed/verified server-side. The Flutter app
-   and admin dashboard only render what the API tells them.
+   authorization are always recomputed/verified server-side. The mobile app
+   and web/admin clients only render what the API tells them.
 2. **The ledger is the source of truth, not the balance column.** A wallet's
    balance is a *derived/cached* value that must always equal the sum of its
    ledger entries. See `docs/architecture/wallet-ledger-model.md`.
@@ -83,13 +83,13 @@ no change to wallet, ledger, or order logic.
 ```
 laupay/
   apps/
-    mobile/            # Flutter app (customers + agents) — Phase 2+
+    mobile/            # Expo/React Native app (customer flows) — active
     admin/              # Web admin dashboard — Phase 3+
   backend/              # NestJS API — Phase 1 (this phase)
   packages/
     shared/              # Types/DTOs shared between backend and clients
-  brand/
-    logo/                # Placeholder structure — see brand/README.md
+    brand/
+    logo/                # Source-package structure — see brand/README.md
   docs/
     architecture/
     api/

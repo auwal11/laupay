@@ -1,90 +1,58 @@
-# LAUPAY Backend
+# LAUPAY backend
 
-NestJS + TypeScript + PostgreSQL (via Prisma). See `../docs/` for full
-architecture, database, security, and decision documentation —
-**`../docs/decisions/00-project-status.md` is the most important file to
-read before touching this code**: it lists exactly what is and isn't
-implemented yet.
+NestJS + TypeScript + PostgreSQL via Prisma. This backend is the authoritative source for authentication, wallet balances, ledger entries, catalog pricing, orders, payment settlement, provider status, withdrawals, notifications, PIN/security, support and disputes. The web and mobile clients must not replace these rules with local state or mock financial outcomes.
+
+See [`../docs/decisions/00-project-status.md`](../docs/decisions/00-project-status.md) for the current repository status and [`../docs/architecture/`](../docs/architecture/) for the financial and provider models.
 
 ## Setup
 
 ```bash
 cd backend
 cp .env.example .env
-# edit .env — set DATABASE_URL (runtime queries) and DIRECT_URL
-# (Prisma migrations) to point at your Postgres instance. On Supabase,
-# DATABASE_URL uses the transaction pooler (port 6543) and DIRECT_URL must
-# use the session pooler (port 5432) or the direct connection — see
-# backend/.env.example for why.
-
+# set DATABASE_URL for runtime queries and DIRECT_URL for Prisma migrations
 npm install
 npx prisma generate
-npx prisma migrate dev --name init
+npx prisma migrate dev
 npx prisma db seed
-
 npm run start:dev
 ```
 
-The API will be available at `http://localhost:3000/api`.
+The API is available at `http://localhost:3000/api` by default. Keep secrets in local environment configuration only.
 
-> If you're picking this up in an environment with restricted internet
-> access, note that `npx prisma generate` needs to reach
-> `binaries.prisma.sh` to download its query engine. This was not reachable
-> from the sandbox this project was originally scaffolded in — see
-> `docs/decisions/00-project-status.md` for details. It should work
-> normally on a developer machine or in GitHub Actions (see
-> `.github/workflows/backend-ci.yml`).
-
-## Running Tests
+## Tests and checks
 
 ```bash
-npm test              # unit tests (mocked Prisma — fast, no DB needed)
-npm run test:e2e      # integration tests against a real Postgres (DATABASE_URL required)
-node test/ledger-concurrency-proof.js   # standalone raw-SQL proof of the locking strategy
+npm run lint
+npm run build
+npm test
+npm run test:e2e             # requires an authorized PostgreSQL environment
+node test/ledger-concurrency-proof.js
 ```
 
-**Start with `LedgerService`** (`src/modules/ledger/`) — it's the financial
-core of the whole system, and its test files
-(`ledger.service.spec.ts`, `ledger.e2e-spec.ts`) are the most important in
-the repository.
+Use fresh command output for release evidence; the historical `SANDBOX-TEST-REPORT.md` must not be described as a current run.
 
-## Project Layout
+## Modules
 
-```
+```text
 backend/
-  prisma/
-    schema.prisma       # full database schema
-    seed.ts              # starter catalog data (networks, data plans)
-  src/
-    config/               # env-driven config, fails fast on missing vars
-    common/                # guards, decorators, exception filter
-    prisma/                 # PrismaService (DB connection)
-    modules/
-      ledger/                # THE core financial primitive — read this first
-      wallet/                 # read-only wallet queries
-      auth/                    # register/login/refresh, argon2id + JWT
-      users/
-      catalog/                  # networks / data plans
-      orders/                    # order lifecycle, ties ledger + vtu together
-      payments/                   # wallet funding, agent cash, mock provider
-      vtu/                          # airtime/data fulfillment, mock provider
-      webhooks/                      # signature-verified inbound provider events
-      admin/                          # minimal admin slice (dashboard stats only so far)
-  test/
-    jest-e2e.json
-    ledger-concurrency-proof.js     # raw-SQL proof test (no Prisma needed)
+  prisma/                 # schema, migrations and seed catalog
+  src/modules/
+    auth/                 # register/login/refresh/logout and verification contracts
+    users/                # profile and role-aware user operations
+    ledger/               # atomic credit/debit, locking and idempotency
+    wallet/               # authoritative balance/history reads
+    catalog/              # networks and data plans
+    orders/               # airtime/data order lifecycle
+    payments/             # funding and payment state machine
+    vtu/                  # airtime/data provider abstraction
+    withdrawals/          # bank payout request/review/status lifecycle
+    security/             # PIN, sessions and security notifications
+    notifications/        # in-app notification records/read state
+    support/              # tickets and replies
+    disputes/             # transaction dispute ownership/eligibility
+    webhooks/             # verified provider events and reconciliation
 ```
 
-## Switching From Mock to Real Providers
+## Provider and release constraints
 
-Nothing outside `modules/payments/providers/` or `modules/vtu/providers/`
-needs to change. Implement `PaymentProvider` / `VTUProvider` for the real
-provider (e.g. `PaystackProvider`, `VTPassProvider`), then change the DI
-binding in `payments.module.ts` / `vtu.module.ts`:
-
-```ts
-{ provide: PAYMENT_PROVIDER, useClass: PaystackProvider } // was MockPaymentProvider
-```
-
-That's the entire migration for business logic — `LedgerService`,
-`OrdersService`, and every controller are provider-agnostic by design.
+Provider adapters and mock/sandbox behavior must remain explicit. Provider keys stay on the backend and are never bundled into mobile/web clients. A client checkout return does not settle a wallet; trusted server verification/webhooks do. Withdrawal bank options do not prove that a payout provider is configured. The current order-risk assessment is a placeholder and must not be described as production fraud protection.

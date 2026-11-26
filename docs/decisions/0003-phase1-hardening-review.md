@@ -1,5 +1,10 @@
 # Phase 1 Hardening Pass — Review Findings
 
+> **Historical ADR.** This review predates the current Expo/React Native mobile
+> client. References below to an empty Flutter/mobile directory describe the
+> repository at the time of this review; use `docs/decisions/00-project-status.md`
+> for the current state.
+
 Performed after Phase 1 core functionality was confirmed working end-to-end
 against a real PostgreSQL instance (see
 `docs/decisions/00-project-status.md §4a`). This document records the

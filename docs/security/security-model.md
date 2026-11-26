@@ -11,12 +11,15 @@
   in the database, long-lived, revocable individually (`revokedAt`) and
   rotated on every use (a used refresh token is revoked and a new one issued
   — detects token theft/replay).
-- Prepared, not yet implemented: phone OTP, PIN, biometric, device/session
-  management (see `docs/decisions/00-project-status.md`).
+- The current auth contract uses email verification; phone OTP is not claimed.
+  Backend PIN and refresh-token session operations exist, while biometric
+  step-up authorization and hardware device fingerprinting are not claimed
+  (see `docs/decisions/00-project-status.md`).
 
 No secret (JWT signing key, DB credentials, provider API keys) is ever
-embedded in the Flutter app. The mobile app only ever holds short-lived
-access/refresh tokens obtained after authentication.
+embedded in the Expo/React Native app. The mobile app keeps access credentials
+transient where practical and stores refresh credentials through native secure
+storage after authentication.
 
 ## 2. Authorization
 

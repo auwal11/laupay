@@ -1,37 +1,23 @@
-# Brand Assets — Placeholder Structure
+# LAUPAY brand assets
 
-The final LAUPAY logo package (LAU FLOW BRIDGE direction — Deep Indigo /
-Midnight Blue primary, Warm Amber accent) is still being finalized and has
-**not** been created or invented here, per the project brief.
+The web and mobile implementations now use the existing LAUPAY visual language: midnight/deep navy, amber action accent, current dark glass dashboard surfaces, white/muted text and the LAUPAY flow mark. The web source remains the branding reference.
 
-This folder only defines the structure the application references, so the
-approved assets can be dropped in later without any application code
-changes:
+## Repository status
 
-```
+This `brand/` directory is still a source-package placeholder. The native mobile runtime assets currently used by Expo live in `apps/mobile/assets/images/` and are wired through the mobile Expo configuration. Do not assume that an empty folder here means the mobile app has no identity assets.
+
+When an approved central brand package is available, it can be organized as:
+
+```text
 brand/
-  logo/
-    primary/       # main lockup, for light backgrounds
-    dark/           # for dark backgrounds
-    light/           # reversed/white version
-    monochrome/       # single-color version
-    symbol/            # the LAU/L-U flow-bridge mark alone, no wordmark
-    app-icon/           # square icon assets (various sizes) for mobile/app-icon use
-  icons/            # in-app iconography (not logo)
-  guidelines/       # brand guideline documents, once available
+  logo/primary/      # main lockup for light backgrounds
+  logo/dark/         # dark-background lockup
+  logo/light/        # reversed mark/wordmark
+  logo/monochrome/   # one-colour versions
+  logo/symbol/       # mark without wordmark
+  logo/app-icon/     # source app-icon assets
+  icons/             # in-app iconography, not logo artwork
+  guidelines/        # approved brand guidance
 ```
 
-Each subfolder is currently empty. When the approved package arrives, place
-files using a consistent naming convention, e.g.:
-
-```
-brand/logo/primary/laupay-logo-primary.svg
-brand/logo/primary/laupay-logo-primary@2x.png
-brand/logo/app-icon/laupay-icon-512.png
-```
-
-Application code (Flutter `apps/mobile`, admin `apps/admin`) should
-reference these paths via a single shared constants file (to be created in
-`packages/shared` once the mobile/admin apps exist) rather than being
-hard-coded in multiple places — so a future asset swap is a file-replacement
-operation, not a code change.
+Changes to brand assets should preserve the web source-of-truth and update mobile/web references deliberately. Do not introduce unrelated external branding or replace the LAUPAY mark with emoji/system symbols.

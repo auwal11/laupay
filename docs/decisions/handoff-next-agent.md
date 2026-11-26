@@ -1,5 +1,11 @@
 # Handoff — next agent (2026-10-04)
 
+> **Historical handoff.** This document describes the state on 4 October 2026
+> and is retained for provenance. The current implementation is recorded in
+> `docs/decisions/00-project-status.md`, `TODO.md` and `apps/mobile/README.md`.
+> The Expo mobile client now exists and the latest work is on `main` at
+> commit `8fe8d7e`; do not treat the unfinished tasks below as a current list.
+
 ## Done & live
 - laupay.vercel.app serves the unified web/ app (landing + /login + /register + /app), Vercel rootDirectory = web.
 - fix-vtu-async-reversal merged (VtuTransaction.orderId @unique, PIN, agent pricing migration). Unit 6/6, e2e 42/42.

@@ -1,34 +1,27 @@
 # LAUPAY mobile validation record
 
-**Run date:** 2026-11-25. **Scope:** `apps/mobile/` source and Expo export in the sandbox. No backend services were mutated; no production payment, migration, deploy or Git push was performed.
+**Updated:** 26 November 2026. **Current commit:** `8fe8d7e` (`Match mobile dashboard colors to web shell`). Scope is the `apps/mobile/` source and its API-connected implementation. No backend migration, production setting, live provider or real-money operation was performed.
 
 ## Fresh checks
 
-| Check | Result | Scope/notes |
+| Check | Result | Notes |
 |---|---|---|
-| `npm run typecheck` | Passed | TypeScript `tsc --noEmit`; includes Expo Router sources. |
-| `npm run lint` | Passed | Expo ESLint config; no remaining reported errors/warnings on the final run. |
-| `npx expo install --check` | Passed | Expo reported dependencies up to date for SDK 58. |
-| `npx expo export --platform web --output-dir /tmp/laupay-mobile-web-export-final` | Passed | Expo Router server-rendered/Web bundle only; **not** proof of Android-native runtime/build. |
-| `git diff --check` | Passed for tracked diff | New mobile files were separately inspected; the app tree is currently untracked in Git. |
-| Secret pattern scan in `apps/mobile/` | No matches | No production/provider credentials were found in source. This is a scoped pattern scan, not a formal secret-management certification. |
+| `npm run typecheck` | PASS | TypeScript `tsc --noEmit`. |
+| `npm run lint` | PASS | Expo ESLint; no errors or warnings on the final run. |
+| `git diff --check` | PASS | No whitespace errors in the current tracked diff. |
 
-## Not run / not proven
+The latest verified changes include the dashboard Withdraw action and alignment of the mobile dashboard/header/tab bar with the web dark glass palette. Earlier milestones are recorded in Git history: `b0b4386`, `46c6def`, `1d300f2`, `dcce9c4`, `f139c26`, `706f33d` and `8fe8d7e`.
 
-- No unit or integration test suite exists/configured for this mobile app; no mobile tests were run.
-- Backend unit/e2e tests were not rerun; the repository's older `SANDBOX-TEST-REPORT.md` is historical evidence only.
-- No Android emulator/device test, `adb`, Android SDK, `sdkmanager`, Gradle or EAS CLI was available in the sandbox. No native `android/gradlew` project was generated.
-- **No APK or AAB was built, inspected, installed or verified.** A native artifact requires an authorized Expo/EAS or Android Studio build route and applicable signing choices.
-- No live provider or real-money transaction was tested. Existing provider sandbox failures and account restrictions in the historical report remain relevant.
+## Not run or not proven
 
-## Dependency security
+- No dedicated mobile unit or integration test suite is configured.
+- Backend unit/e2e tests were not rerun in this mobile UI pass; `SANDBOX-TEST-REPORT.md` is historical evidence and must not be presented as a fresh result.
+- No Android emulator/device, `adb`, Android SDK, Gradle or EAS native build was available and no APK/AAB was built, installed or verified.
+- No live provider or real-money transaction was tested.
+- No claim is made that provider credentials, payout fulfillment, OS push delivery, biometric step-up or rewards/referrals are enabled.
 
-`npm audit --omit=dev` reported three moderate advisories affecting `expo`, `@expo/fingerprint` and `minimatch`; zero high/critical advisories were reported in that scan. npm suggested a breaking Expo downgrade to 52.0.49 as the available fix. No `--force` or downgrade was applied; revisit compatible SDK-58 patch versions before release.
+## Security and integrity notes
 
-## Review limitations
+Backend responses remain authoritative for wallet balance, price, transaction status, withdrawal eligibility and dispute ownership. The mobile client does not fabricate financial data, credit a wallet after a checkout return, bypass PIN/eligibility controls or convert pending/unknown into success. The server-side order-risk assessment remains an always-allow placeholder, not fraud protection.
 
-- Backend is authoritative for all wallet values, transaction pricing/status, funding settlement, withdrawal eligibility and dispute ownership/eligibility.
-- The server-side order-risk assessment is an always-allow placeholder, not fraud protection. The security UI labels this accurately.
-- Rewards/referrals, transfers, electricity/cable purchase APIs, push delivery, biometric step-up authorization, secure PIN reset and persistent notification preferences remain unavailable/not enabled.
-- Withdrawal creation is rejected by the current backend in live fulfillment mode until a verified payout provider is configured; returned bank options do not imply payout capability.
-- The repository currently lacks authoritative customer-facing Terms/Privacy document URLs for registration.
+Before release, run a supported Android build route, install and verify the artifact, rerun the relevant backend test suites, review dependency advisories against the Expo SDK version, and test only against authorized non-production environments.
