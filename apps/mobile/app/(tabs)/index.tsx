@@ -31,8 +31,8 @@ export default function DashboardScreen() {
     <View style={styles.services}>
       <Service icon="phone-portrait-outline" title="Airtime" enabled onPress={() => router.push('/services/airtime')} />
       <Service icon="wifi-outline" title="Data" enabled onPress={() => router.push('/services/data')} />
-      <Service icon="flash-outline" title="Electricity" onPress={() => router.push('/services/unavailable?service=electricity')} />
-      <Service icon="tv-outline" title="Cable TV" onPress={() => router.push('/services/unavailable?service=cable')} />
+      <Service icon="flash-outline" title="Electricity" />
+      <Service icon="tv-outline" title="Cable TV" />
     </View>
     <View style={styles.activityHeader}><SectionHeading title="Recent activity" action="View all" onAction={() => router.push('/(tabs)/history')} /></View>
     {transactions.isPending ? <AppCard style={styles.activityState}><ActivityIndicator color={colors.navy2} /><Text style={styles.dim}>Loading wallet activity…</Text></AppCard> : transactions.isError ? <InlineNotice title="Activity unavailable" body="We couldn’t load the latest ledger records. Your balance has not been changed by this screen." tone="error" action={<AppButton title="Retry" variant="secondary" onPress={() => void transactions.refetch()} />} /> : transactions.data?.length ? transactions.data.slice(0, 4).map((item) => <TransactionLine key={item.id} item={item} />) : <AppCard><Text style={styles.emptyTitle}>No wallet activity yet</Text><Text style={styles.dim}>When the backend records a wallet transaction, it will appear here.</Text></AppCard>}
@@ -40,8 +40,8 @@ export default function DashboardScreen() {
   </ScrollView>;
 }
 
-function Service({ icon, title, enabled = false, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; enabled?: boolean; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: !enabled }} onPress={onPress} style={[styles.service, !enabled && styles.serviceDisabled]}><View style={[styles.serviceIcon, !enabled && styles.serviceIconOff]}><Ionicons name={icon} size={23} color={enabled ? colors.navy2 : colors.muted} /></View><Text style={[styles.serviceTitle, !enabled && styles.disabledTitle]}>{title}</Text><Text style={styles.serviceMeta}>{enabled ? 'Available' : 'Not enabled'}</Text></Pressable>;
+function Service({ icon, title, enabled = false, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; enabled?: boolean; onPress?: () => void }) {
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: !enabled }} disabled={!enabled} onPress={onPress} style={[styles.service, !enabled && styles.serviceDisabled]}><View style={[styles.serviceIcon, !enabled && styles.serviceIconOff]}><Ionicons name={icon} size={23} color={enabled ? colors.navy2 : colors.muted} /></View><Text style={[styles.serviceTitle, !enabled && styles.disabledTitle]}>{title}</Text><Text style={styles.serviceMeta}>{enabled ? 'Available' : 'Not enabled'}</Text></Pressable>;
 }
 
 function TransactionLine({ item }: { item: LedgerEntry }) {
