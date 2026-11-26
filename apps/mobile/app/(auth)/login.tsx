@@ -23,12 +23,12 @@ export default function LoginScreen() {
   };
   return <Screen scroll style={styles.safe}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.content}>
     <View style={styles.brand}><AppMark size={58} /><Text style={styles.wordmark}>LAUPAY</Text><Text style={styles.tagline}>Your money. Your control.</Text></View>
-    <View style={styles.heading}><Text style={styles.title}>Good to see you</Text><Text style={styles.subtitle}>Sign in to your LAUPAY account.</Text></View>
+    <View style={styles.heading}><Text style={styles.title}>Log in</Text><Text style={styles.subtitle}>Welcome back to your LAUPAY account.</Text></View>
     <FormField label="Email address" value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" returnKeyType="next" />
     <FormField label="Password" value={password} onChangeText={setPassword} placeholder="Enter your password" secureTextEntry autoCapitalize="none" autoComplete="current-password" textContentType="password" onSubmitEditing={() => void submit()} />
     <View style={styles.forgotRow}><Link href="/(auth)/forgot-password" asChild><Pressable><Text style={styles.link}>Forgot password?</Text></Pressable></Link></View>
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-    <AppButton title="Sign in securely" loading={loading} onPress={() => void submit()} />
+    <AppButton title={loading ? 'Logging in…' : 'Log in'} loading={loading} onPress={() => void submit()} />
     <View style={styles.footer}><Text style={styles.subtitle}>New to LAUPAY?</Text><Link href="/(auth)/register" asChild><Pressable><Text style={styles.link}>Create an account</Text></Pressable></Link></View>
   </KeyboardAvoidingView></Screen>;
 }
