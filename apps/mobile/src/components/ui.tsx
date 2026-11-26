@@ -1,13 +1,14 @@
 import { PropsWithChildren, ReactNode } from 'react';
 import { ActivityIndicator, Image, ImageSourcePropType, Pressable, PressableProps, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '../theme';
 
 export function Screen({ children, scroll = false, style }: PropsWithChildren<{ scroll?: boolean; style?: ViewStyle }>) {
+  const insets = useSafeAreaInsets();
   if (scroll) {
-    return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={[styles.scroll, style]} keyboardShouldPersistTaps="handled">{children}</ScrollView></SafeAreaView>;
+    return <SafeAreaView style={styles.safe} edges={['top', 'bottom']}><ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: spacing.xxxl + insets.bottom }, style]} keyboardShouldPersistTaps="handled">{children}</ScrollView></SafeAreaView>;
   }
-  return <SafeAreaView style={[styles.safe, style]} edges={['top']}>{children}</SafeAreaView>;
+  return <SafeAreaView style={[styles.safe, style]} edges={['top', 'bottom']}>{children}</SafeAreaView>;
 }
 
 export function AppMark({ size = 54 }: { size?: number }) {

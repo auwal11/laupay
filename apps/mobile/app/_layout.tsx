@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '../src/features/auth/AuthProvider';
 import { colors } from '../src/theme';
@@ -14,7 +15,7 @@ function AppStack() {
     if (state !== 'loading') void SplashScreen.hideAsync().catch(() => undefined);
   }, [state]);
 
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background }, animation: 'fade_from_bottom' }} />;
+  return <><StatusBar style="dark" /><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background }, animation: 'fade_from_bottom' }} /></>;
 }
 
 export default function RootLayout() {
