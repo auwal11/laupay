@@ -18,6 +18,14 @@ export const colors = {
   softGreen: '#DDF2E7',
   softRed: '#FDECEF',
   softBlue: '#EEF0FF',
+  glassNavy: '#0B1220',
+  glassNavyRaised: '#111B2D',
+  glassSurface: 'rgba(255,255,255,0.075)',
+  glassBorder: 'rgba(255,255,255,0.14)',
+  glassText: '#F5F7FF',
+  glassMuted: '#B7C0D3',
+  glassTeal: '#58D6B3',
+  glassBalance: '#17304D',
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, xxxl: 36 } as const;

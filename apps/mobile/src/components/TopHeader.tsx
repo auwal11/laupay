@@ -32,12 +32,12 @@ export function TopHeader() {
 }
 
 const styles = StyleSheet.create({
-  header: { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  header: { backgroundColor: colors.glassNavy, borderBottomWidth: 1, borderBottomColor: colors.glassBorder },
   row: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg },
   brand: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  wordmark: { color: colors.midnight, fontSize: 16, fontWeight: '900', letterSpacing: 1.2 },
+  wordmark: { color: colors.glassText, fontSize: 16, fontWeight: '900', letterSpacing: 1.2 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  iconButton: { width: 38, height: 38, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  iconButton: { width: 38, height: 38, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.glassSurface },
   profileButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.midnight, overflow: 'hidden' },
   profileImage: { width: 34, height: 34 },
   initials: { color: colors.white, fontSize: 11, fontWeight: '900' },
