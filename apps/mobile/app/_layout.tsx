@@ -15,7 +15,7 @@ function AppStack() {
     if (state !== 'loading') void SplashScreen.hideAsync().catch(() => undefined);
   }, [state]);
 
-  return <><StatusBar style="dark" /><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background }, animation: 'fade_from_bottom' }} /></>;
+  return <><StatusBar style="light" /><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.glassNavy }, animation: 'fade_from_bottom' }} /></>;
 }
 
 export default function RootLayout() {
