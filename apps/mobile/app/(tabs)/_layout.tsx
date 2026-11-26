@@ -1,13 +1,43 @@
-import { Stack } from 'expo-router';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../src/theme';
 import { TopHeader } from '../../src/components/TopHeader';
 
 export default function TabLayout() {
-  return <Stack screenOptions={{ headerShown: true, header: () => <TopHeader />, headerShadowVisible: false, contentStyle: { backgroundColor: colors.background }, animation: 'fade_from_bottom' }}>
-    <Stack.Screen name="index" options={{ title: 'Home' }} />
-    <Stack.Screen name="history" options={{ title: 'History' }} />
-    <Stack.Screen name="rewards" options={{ title: 'Rewards' }} />
-    <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-    <Stack.Screen name="two" options={{ title: 'LAUPAY' }} />
-  </Stack>;
+  return (
+    <Tabs
+      screenOptions={({ route }) => ({
+        headerShown: true,
+        header: () => <TopHeader />,
+        headerShadowVisible: false,
+        sceneStyle: { backgroundColor: colors.background },
+        tabBarActiveTintColor: colors.midnight,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarStyle: {
+          backgroundColor: colors.white,
+          borderTopColor: colors.border,
+          height: 66,
+          paddingTop: 8,
+          paddingBottom: 9,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarIcon: ({ color, size, focused }) => {
+          const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
+            index: focused ? 'home' : 'home-outline',
+            history: focused ? 'receipt' : 'receipt-outline',
+            wallet: focused ? 'wallet' : 'wallet-outline',
+            profile: focused ? 'person' : 'person-outline',
+          };
+          return <Ionicons name={icons[route.name] ?? 'ellipse-outline'} size={size} color={typeof color === 'string' ? color : colors.muted} />;
+        },
+      })}
+    >
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="history" options={{ title: 'History' }} />
+      <Tabs.Screen name="wallet" options={{ title: 'Wallet' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      <Tabs.Screen name="rewards" options={{ href: null }} />
+      <Tabs.Screen name="two" options={{ href: null }} />
+    </Tabs>
+  );
 }
