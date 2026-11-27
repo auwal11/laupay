@@ -106,7 +106,9 @@ describe('AppConfigService.assertStagingSafety', () => {
     process.env.VTU_PROVIDER = 'vtpass';
     process.env.VTPASS_API_KEY = 'a';
     process.env.VTPASS_SECRET_KEY = 's';
-    process.env.VTPASS_BASE_URL = 'https://sandbox.vtpass.com';
+    // Render may retain an older VTPASS_BASE_URL environment value. The
+    // deterministic provider_test path must not call or validate that URL.
+    process.env.VTPASS_BASE_URL = 'https://vtpass.com';
     process.env.FULFILLMENT_MODE = 'provider_test';
     process.env.VTPASS_TEST_OUTCOME = 'success';
     const instance = config();

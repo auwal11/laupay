@@ -38,24 +38,6 @@ function assertProductionProviderUrl(name: string, value: string, allowedHostnam
   }
 }
 
-function assertSandboxProviderUrl(name: string, value: string, allowedHostname: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    throw new Error(`[config] Refusing to start: ${name} must be a valid HTTPS sandbox URL for ${allowedHostname}.`);
-  }
-  if (
-    parsed.protocol !== 'https:' ||
-    parsed.hostname.toLowerCase() !== allowedHostname ||
-    parsed.port !== '' ||
-    parsed.username !== '' ||
-    parsed.password !== ''
-  ) {
-    throw new Error(`[config] Refusing to start: ${name} must be a valid HTTPS sandbox URL for ${allowedHostname}.`);
-  }
-}
-
 @Injectable()
 export class AppConfigService {
   readonly nodeEnv = optional('NODE_ENV', 'development');
@@ -271,8 +253,8 @@ export class AppConfigService {
    * Guard evaluated at boot (see main.ts).
    *
    *  - In PRODUCTION: refuses to start with mock/simulated providers. An
-   *    explicit VTpass provider_test mode is allowed only against the sandbox
-   *    configuration and never calls a live provider.
+   *    explicit VTpass provider_test mode is allowed only with a deterministic
+   *    success/failed outcome and never calls a live provider.
    *  - In every other environment (staging/dev): refuses to start if a LIVE
    *    provider credential is present, so staging can never touch real money.
    */
@@ -310,7 +292,9 @@ export class AppConfigService {
         if (this.vtuProvider !== 'vtpass') {
           throw new Error('[config] Refusing to start: FULFILLMENT_MODE=provider_test requires VTU_PROVIDER=vtpass.');
         }
-        assertSandboxProviderUrl('VTPASS_BASE_URL', this.vtpassBaseUrl, 'sandbox.vtpass.com');
+        // VtuService resolves success/failed locally in provider_test and
+        // never calls the VTpass client. A stale Render VTPASS_BASE_URL must
+        // therefore not block this explicitly non-live deployment.
         if (!['success', 'failed'].includes(this.vtpassTestOutcome)) {
           throw new Error('[config] Refusing to start: VTPASS_TEST_OUTCOME must be success or failed in provider_test mode.');
         }
