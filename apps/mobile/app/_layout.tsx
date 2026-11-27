@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '../src/features/auth/AuthProvider';
 import { colors } from '../src/theme';
+import NotificationMonitor from '../src/components/NotificationMonitor';
+import PushTokenLifecycle from '../src/components/PushTokenLifecycle';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 20_000, refetchOnReconnect: true } } });
@@ -15,7 +17,7 @@ function AppStack() {
     if (state !== 'loading') void SplashScreen.hideAsync().catch(() => undefined);
   }, [state]);
 
-  return <><StatusBar style="light" /><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.glassNavy }, animation: 'fade_from_bottom' }} /></>;
+  return <><StatusBar style="light" /><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.glassNavy }, animation: 'fade_from_bottom' }} /><NotificationMonitor /><PushTokenLifecycle /></>;
 }
 
 export default function RootLayout() {

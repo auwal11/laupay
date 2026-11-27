@@ -196,6 +196,7 @@ model User {
   auditLogs             AuditLog[]             @relation("AuditActor")
   security              UserSecurity?
   notifications         Notification[]
+  transactionAlertOutbox TransactionAlertOutbox[]
   disputes              TransactionDispute[]
   adminNotes            AdminNote[]            @relation("AdminNotesAboutUser")
   authoredNotes         AdminNote[]            @relation("AdminNotesByAdmin")
@@ -763,6 +764,8 @@ model Notification {
   id        String    @id @default(uuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Stable business-event key; null for legacy/non-transaction notifications.
+  eventKey  String?   @unique
   category  String    @default("account") // account | wallet | order | security | system
   title     String
   body      String
@@ -772,6 +775,30 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+/// Durable email work, inserted in the same transaction as the financial or
+/// order event and its in-app notification. Ambiguous provider sends are retried
+/// only inside Brevo's idempotency window; older rows move to manual review.
+model TransactionAlertOutbox {
+  id              String   @id @default(uuid())
+  eventKey        String   @unique
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientEmail  String
+  payload         Json
+  status          String   @default("PENDING") // PENDING | PROCESSING | SENT | REVIEW
+  attempts        Int      @default(0)
+  firstAttemptAt  DateTime?
+  nextAttemptAt   DateTime @default(now())
+  lockedAt        DateTime?
+  sentAt          DateTime?
+  lastError       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([userId, createdAt])
 }
 
 // ============================================================

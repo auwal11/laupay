@@ -158,9 +158,10 @@ export class AppConfigService {
   readonly vtpassTestOutcome = optional('VTPASS_TEST_OUTCOME', 'provider');
 
   readonly mailProvider = optional('MAIL_PROVIDER', 'mock');
-  readonly brevoApiKey = optional('BREVO_API_KEY', '');
+  readonly brevoApiKey = this.requiredIf(this.mailProvider === 'brevo', 'BREVO_API_KEY');
   readonly brevoSenderEmail = optional('BREVO_SENDER_EMAIL', 'no-reply@laupay.app');
   readonly brevoSenderName = optional('BREVO_SENDER_NAME', 'LAUPAY');
+  readonly supportEmail = optional('SUPPORT_EMAIL', 'support.laupay@gmail.com');
 
   /**
    * How VTU orders are fulfilled:

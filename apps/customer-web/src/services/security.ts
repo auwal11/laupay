@@ -36,12 +36,18 @@ export const securityService = {
   },
 
   async getNotifications(): Promise<ApiResult<SecurityNotification[]>> {
-    return request<BackendNotification[]>("/api/notifications").then((result) => result.ok ? { ok: true, data: result.data.map((item) => ({ id: item.id, category: item.category as SecurityNotification["category"], message: `${item.title}: ${item.body}`, createdAt: item.createdAt, read: Boolean(item.readAt) })) } : result);
+    return request<SecurityNotification[]>("/api/notifications");
+  },
+
+  async getUnreadNotificationCount(): Promise<ApiResult<{ count: number }>> {
+    return request<{ count: number }>("/api/notifications/unread-count");
   },
 
   async markNotificationRead(id: string): Promise<ApiResult<{ read: true }>> {
-    return request<{ read: true }>(`/api/notifications/${id}/read`, { method: "POST" });
+    return request<{ read: true }>(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "POST" });
+  },
+
+  async markAllNotificationsRead(): Promise<ApiResult<{ read: true }>> {
+    return request<{ read: true }>("/api/notifications/read-all", { method: "POST" });
   },
 };
-
-interface BackendNotification { id: string; category: string; title: string; body: string; createdAt: string; readAt: string | null; }

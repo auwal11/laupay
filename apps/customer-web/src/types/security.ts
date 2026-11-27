@@ -28,20 +28,41 @@ export type PinStatus = "not_set" | "active" | "locked";
 
 export interface DeviceInfo {
   id: string;
-  label: string; // e.g. "Chrome on Windows — Lagos"
+  label: string;
   lastActiveAt: string;
   isCurrent: boolean;
   trusted: boolean;
 }
 
 export type NotificationCategory = "account" | "transaction" | "payment" | "device" | "verification";
+export type TransactionAlertType = "CREDIT" | "DEBIT" | "REVERSAL" | "REFUND" | "PURCHASE_SUCCESS" | "PURCHASE_FAILED";
+
+export interface NotificationMetadata {
+  alertType?: TransactionAlertType | string;
+  transactionReference?: string;
+  transactionId?: string;
+  amount?: number | string;
+  currency?: string;
+  narrative?: string;
+  status?: string;
+  date?: string;
+  availableBalance?: number | string;
+  originalTransactionId?: string;
+  originalReference?: string;
+  orderId?: string;
+  recipient?: string;
+  service?: string;
+  [key: string]: unknown;
+}
 
 export interface SecurityNotification {
   id: string;
   category: NotificationCategory;
-  message: string;
+  title: string;
+  body: string;
   createdAt: string;
-  read: boolean;
+  readAt: string | null;
+  metadata?: NotificationMetadata | null;
 }
 
 /** Session lifecycle, distinct from "no session yet" (anonymous). */

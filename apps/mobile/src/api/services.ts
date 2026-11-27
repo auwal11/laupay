@@ -43,7 +43,14 @@ export type Order = {
   idempotencyKey?: string;
 };
 export type VirtualAccount = { accountNumber: string; bankName: string; accountName: string; providerReference?: string | null };
-export type Notification = { id: string; category: string; title: string; body: string; readAt?: string | null; createdAt: string; metadata?: Record<string, unknown> };
+export type NotificationMetadata = {
+  alertType?: 'CREDIT' | 'DEBIT' | 'REVERSAL' | 'REFUND' | 'PURCHASE_SUCCESS' | 'PURCHASE_FAILED' | string;
+  transactionReference?: string; transactionId?: string; amount?: string | number; currency?: string;
+  narrative?: string; status?: string; date?: string; availableBalance?: string | number;
+  originalTransactionId?: string; originalReference?: string; orderId?: string;
+  recipient?: string; service?: string;
+};
+export type Notification = { id: string; category: string; title: string; body: string; readAt?: string | null; createdAt: string; metadata?: NotificationMetadata };
 export type PinStatus = { hasPin: boolean; locked: boolean; lockedUntil: string | null };
 export type Bank = { code: string; name: string };
 export type Withdrawal = { id: string; reference: string; amount: string | number; bankName: string; accountName: string; accountNumber: string; status: string; createdAt: string; failureReason?: string | null };
@@ -118,6 +125,10 @@ export const notificationsApi = {
   unreadCount: () => request<{ count: number }>('/notifications/unread-count'),
   markRead: (id: string) => request<{ read: boolean }>(`/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),
   markAllRead: () => request<{ read: number }>('/notifications/read-all', { method: 'POST' }),
+  registerPushToken: (token: string, platform: 'android' | 'ios') =>
+    request<{ registered: boolean }>('/notifications/push-token', { method: 'PUT', body: { token, platform } }),
+  unregisterPushToken: (token: string) =>
+    request<{ removed: boolean }>('/notifications/push-token', { method: 'DELETE', body: { token }, timeoutMs: 5_000 }),
 };
 
 export const supportApi = {

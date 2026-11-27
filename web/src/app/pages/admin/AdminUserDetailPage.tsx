@@ -33,6 +33,12 @@ export function AdminUserDetailPage() {
   const state = useAsync(() => adminService.user(id), [id]);
   const [amount, setAmount] = useState("5000");
   const [creditReason, setCreditReason] = useState("");
+  const [creditNote, setCreditNote] = useState("");
+  const [creditReview, setCreditReview] = useState<{ amount: number; reason: string; note: string; idempotencyKey: string } | null>(null);
+  const [fullDebitNote, setFullDebitNote] = useState("");
+  const [fullDebitReason, setFullDebitReason] = useState("");
+  const [fullDebitToken, setFullDebitToken] = useState("");
+  const [fullDebitReference, setFullDebitReference] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,18 +55,27 @@ export function AdminUserDetailPage() {
 
   async function credit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    flash(null, null);
     const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) { flash(null, "Enter an amount greater than zero."); return; }
     if (creditReason.trim().length < 5) {
       flash(null, "Enter a reason of at least 5 characters.");
       return;
     }
+    if (creditNote.trim().length < 1 || creditNote.trim().length > 160) { flash(null, "Narration must be 1–160 characters."); return; }
+    setCreditReview({ amount: value, reason: creditReason.trim(), note: creditNote.trim(), idempotencyKey: crypto.randomUUID() });
+    flash(null, null);
+  }
+
+  async function confirmCredit() {
+    if (!creditReview || busy) return;
+    setBusy(true);
+    flash(null, null);
     const result = await adminService.creditWallet({
       userId: id,
-      amount: value,
-      reason: creditReason.trim(),
-      idempotencyKey: crypto.randomUUID(),
+      amount: creditReview.amount,
+      reason: creditReview.reason,
+      note: creditReview.note,
+      idempotencyKey: creditReview.idempotencyKey,
     });
     setBusy(false);
     if (!result.ok) {
@@ -70,10 +85,22 @@ export function AdminUserDetailPage() {
     flash(
       result.data.wasAlreadyApplied
         ? "This credit was already applied."
-        : `Credited ${formatNaira(String(value))}. New balance: ${formatNaira(result.data.balanceAfter)}.`,
+        : `Credited ${formatNaira(String(creditReview.amount))}. Entry: ${result.data.entryId}. New balance: ${formatNaira(result.data.balanceAfter)}.`,
       null,
     );
+    setCreditReview(null);
+    setCreditReason(""); setCreditNote("");
     state.reload();
+  }
+
+  async function confirmFullDebit() {
+    if (busy || !fullDebitReference || fullDebitToken !== "DEBIT ALL" || fullDebitReason.trim().length < 5 || !fullDebitNote.trim()) return;
+    setBusy(true); flash(null, null);
+    const result = await adminService.debitWalletBalance({ userId: id, reason: fullDebitReason.trim(), note: fullDebitNote.trim(), idempotencyKey: fullDebitReference });
+    setBusy(false);
+    if (!result.ok) { flash(null, result.error.message); return; }
+    flash(`Debited entire wallet balance. Entry: ${result.data.entryId}. New balance: ${formatNaira(result.data.balanceAfter)}.`, null);
+    setFullDebitReference(null); setFullDebitNote(""); setFullDebitReason(""); setFullDebitToken(""); state.reload();
   }
 
   async function walletStatus(action: "freeze" | "unfreeze", walletId: string) {
@@ -355,25 +382,22 @@ export function AdminUserDetailPage() {
                   className="mt-2"
                   variant="danger"
                   disabled={busy}
-                  onClick={() =>
-                    setPending({
-                      title: "Debit entire wallet balance",
-                      description: `This will debit the current available balance of ${formatNaira(user.walletAccount!.balance)} through the ledger. The balance is re-read and verified on the server. This cannot be undone except through a separately authorized ledger reversal.`,
-                      confirmLabel: "Debit entire balance",
-                      danger: true,
-                      requireToken: "DEBIT ALL",
-                      run: (reason) =>
-                        adminService.debitWalletBalance({
-                          userId: id,
-                          reason,
-                          idempotencyKey: crypto.randomUUID(),
-                        }),
-                    })
-                  }
+                  onClick={() => setFullDebitReference(crypto.randomUUID())}
                 >
-                  Debit entire balance
-                </Button>
-              )}
+                Debit entire balance
+              </Button>
+            )}
+              {fullDebitReference && <div className="mt-3 rounded-md border border-red-200 bg-red-50/50 p-3">
+                <p className="text-sm font-semibold text-laupay-danger">Review full-balance debit</p>
+                <p className="mt-1 text-xs text-laupay-ink-muted">Current balance: {formatNaira(user.walletAccount.balance)}. The server re-reads and verifies the balance. This cannot be undone except through an authorized ledger reversal.</p>
+                <div className="mt-3 flex flex-col gap-2">
+                  <Input label="Reason (required, audited)" value={fullDebitReason} onChange={(e) => setFullDebitReason(e.target.value)} />
+                  <Input label="Customer-visible narration (1–160 characters)" value={fullDebitNote} maxLength={160} onChange={(e) => setFullDebitNote(e.target.value)} />
+                  <Input label="Type DEBIT ALL to confirm" value={fullDebitToken} onChange={(e) => setFullDebitToken(e.target.value)} />
+                  <p className="break-all text-xs text-laupay-ink-muted">Request reference: {fullDebitReference}</p>
+                  <div className="flex gap-2"><Button variant="danger" loading={busy} disabled={busy || fullDebitToken !== "DEBIT ALL" || fullDebitReason.trim().length < 5 || fullDebitNote.trim().length < 1 || fullDebitNote.trim().length > 160} onClick={() => void confirmFullDebit()}>Confirm full debit</Button><Button variant="secondary" disabled={busy} onClick={() => setFullDebitReference(null)}>Cancel</Button></div>
+                </div>
+              </div>}
             </div>
           )}
         </Card>
@@ -448,10 +472,16 @@ export function AdminUserDetailPage() {
               onChange={(e) => setCreditReason(e.target.value)}
               required
             />
-            <Button type="submit" loading={busy} disabled={creditReason.trim().length < 5}>
-              Credit wallet
+            <Input label="Customer-visible narration (1–160 characters)" value={creditNote} maxLength={160} onChange={(e) => setCreditNote(e.target.value)} required />
+            <Button type="submit" disabled={creditReason.trim().length < 5 || !creditNote.trim() || Number(amount) <= 0}>
+              Review credit
             </Button>
           </form>
+          {creditReview && <div className="mt-4 rounded-md border border-laupay-border bg-laupay-surface-muted p-3 text-sm">
+            <h3 className="font-semibold">Review before execution</h3>
+            <dl className="mt-2 grid gap-1"><div>Action: Credit wallet</div><div>Recipient: {user.fullName} ({user.email})</div><div>Amount: {formatNaira(String(creditReview.amount))}</div><div>Reason: {creditReview.reason}</div><div>Narration: {creditReview.note}</div><div className="break-all">Request reference: {creditReview.idempotencyKey}</div></dl>
+            <div className="mt-3 flex gap-2"><Button loading={busy} disabled={busy} onClick={() => void confirmCredit()}>Confirm and execute</Button><Button variant="secondary" disabled={busy} onClick={() => setCreditReview(null)}>Cancel</Button></div>
+          </div>}
         </Card>
       </div>
 

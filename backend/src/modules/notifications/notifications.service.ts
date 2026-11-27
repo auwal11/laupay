@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { enqueueNotificationPushDeliveries } from './push-delivery-queue';
 
 export interface CreateNotificationInput {
   userId: string;
@@ -21,15 +22,47 @@ export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: CreateNotificationInput) {
-    return this.prisma.notification.create({
-      data: {
-        userId: input.userId,
-        category: input.category ?? 'account',
-        title: input.title,
-        body: input.body,
-        metadata: (input.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const notification = await tx.notification.create({
+        data: {
+          userId: input.userId,
+          category: input.category ?? 'account',
+          title: input.title,
+          body: input.body,
+          metadata: (input.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
+        },
+      });
+      await enqueueNotificationPushDeliveries(tx, input.userId, notification.id);
+      return notification;
     });
+  }
+
+  async registerPushToken(userId: string, token: string, platform: 'android' | 'ios') {
+    const current = await this.prisma.notificationPushToken.findUnique({
+      where: { expoPushToken: token },
+      select: { id: true, userId: true, isActive: true },
+    });
+    if (current?.isActive && current.userId !== userId) {
+      throw new ConflictException('This push token is already registered to another account.');
+    }
+    if (current) {
+      await this.prisma.notificationPushToken.update({
+        where: { id: current.id },
+        data: { userId, platform, isActive: true, revokedAt: null, lastRegisteredAt: new Date() },
+      });
+    } else {
+      await this.prisma.notificationPushToken.create({ data: { userId, expoPushToken: token, platform } });
+    }
+    return { registered: true };
+  }
+
+  async unregisterPushToken(userId: string, token: string) {
+    await this.prisma.notificationPushToken.updateMany({
+      where: { userId, expoPushToken: token, isActive: true },
+      data: { isActive: false, revokedAt: new Date() },
+    });
+    // Do not disclose whether this token belonged to this account.
+    return { removed: true };
   }
 
   /** Fan-out a notification to every admin-console user (ops alerts). */

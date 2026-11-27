@@ -451,6 +451,7 @@ export class AdminOpsService {
   async creditWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
     this.requireIdempotencyKey(idempotencyKey);
+    const narration = this.walletNarration(note) ?? `Admin credit — ${reason.trim()}`.slice(0, 160);
     await this.rejectSelfFinancialAction(userId, actor);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
@@ -459,26 +460,14 @@ export class AdminOpsService {
       walletAccountId: wallet.id,
       amount,
       reason: LedgerReason.ADMIN_ADJUSTMENT,
-      narrative: note?.trim() || `Admin credit — ${reason.trim()}`,
+      narrative: narration,
       source: mode === 'live' ? 'admin_credit' : 'admin_test_credit',
       mode: mode === 'live' ? 'live' : 'test',
       adminId: actor.adminId,
       referenceType: 'AdminAdjustment',
-      referenceId: actor.adminId,
+      referenceId: idempotencyKey,
       idempotencyKey: `ledger:admin-credit:${idempotencyKey}`,
     });
-    await this.notifications
-      .create({
-        userId,
-        category: 'wallet',
-        title: mode === 'live' ? 'Wallet credited' : 'Test credit added',
-        body:
-          mode === 'live'
-            ? `Your wallet was credited with ₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}.`
-            : `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} test credit was added by Ibrahim Lau Provision Shop.`,
-        metadata: { entryId: entry.entryId, reason },
-      })
-      .catch(() => undefined);
     await this.writeAudit(actor, {
       action: AuditAction.WALLET_ADJUSTMENT,
       entityType: 'WalletAccount',
@@ -486,7 +475,7 @@ export class AdminOpsService {
       reason,
       before: { balance: wallet.balance.toString() },
       after: { balance: entry.balanceAfter },
-      metadata: { action: 'wallet.credit', amount, userId, entryId: entry.entryId, test: mode !== 'live' },
+      metadata: { action: 'wallet.credit', amount, userId, entryId: entry.entryId, narration, idempotencyKey, test: mode !== 'live' },
     });
     return entry;
   }
@@ -494,6 +483,7 @@ export class AdminOpsService {
   async debitWallet(userId: string, amount: number, reason: string, note: string | undefined, actor: AdminActor, idempotencyKey: string) {
     this.requireReason(reason);
     this.requireIdempotencyKey(idempotencyKey);
+    const narration = this.walletNarration(note) ?? `Admin debit — ${reason.trim()}`.slice(0, 160);
     await this.rejectSelfFinancialAction(userId, actor);
     if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
     const wallet = await this.walletFor(userId);
@@ -501,22 +491,14 @@ export class AdminOpsService {
       walletAccountId: wallet.id,
       amount,
       reason: LedgerReason.ADMIN_ADJUSTMENT,
-      narrative: note?.trim() || `Admin debit — ${reason.trim()}`,
+      narrative: narration,
       source: 'admin_debit',
+      mode: 'live',
       adminId: actor.adminId,
       referenceType: 'AdminAdjustment',
-      referenceId: actor.adminId,
+      referenceId: idempotencyKey,
       idempotencyKey: `ledger:admin-debit:${idempotencyKey}`,
     });
-    await this.notifications
-      .create({
-        userId,
-        category: 'wallet',
-        title: 'Wallet adjusted',
-        body: `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })} was debited from your wallet by support.`,
-        metadata: { entryId: entry.entryId, reason },
-      })
-      .catch(() => undefined);
     await this.writeAudit(actor, {
       action: AuditAction.WALLET_ADJUSTMENT,
       entityType: 'WalletAccount',
@@ -524,7 +506,7 @@ export class AdminOpsService {
       reason,
       before: { balance: wallet.balance.toString() },
       after: { balance: entry.balanceAfter },
-      metadata: { action: 'wallet.debit', amount, userId, entryId: entry.entryId },
+      metadata: { action: 'wallet.debit', amount, userId, entryId: entry.entryId, narration, idempotencyKey },
     });
     return entry;
   }
@@ -599,14 +581,6 @@ export class AdminOpsService {
       totalRemoved = totalRemoved.add(entry.amount);
       entries.push({ walletId: wallet.id, userId: wallet.user.id, amount: entry.amount, entryId: entry.entryId, alreadyApplied: entry.wasAlreadyApplied });
 
-      await this.notifications.create({
-        userId: wallet.user.id,
-        category: 'wallet',
-        title: 'Test balance removed',
-        body: `₦${Number(entry.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })} test balance was removed from your wallet by Ibrahim Lau Provision Shop.`,
-        metadata: { entryId: entry.entryId, kind: 'test_balance_clear' },
-      }).catch(() => undefined);
-
       await this.prisma.auditLog.create({
         data: {
           actorId: actor.adminId,
@@ -639,6 +613,15 @@ export class AdminOpsService {
     if (!value || value.trim().length < 16 || value.length > 128) {
       throw new BadRequestException('A unique idempotency key is required for wallet adjustments');
     }
+  }
+
+  private walletNarration(note?: string): string | undefined {
+    if (note === undefined) return undefined;
+    const narration = note.trim();
+    if (!narration || narration.length > 160) {
+      throw new BadRequestException('Narration must contain 1 to 160 characters');
+    }
+    return narration;
   }
 
   private async rejectSelfFinancialAction(userId: string, actor: AdminActor) {
@@ -697,7 +680,10 @@ export class AdminOpsService {
       });
       if (disputeRefund) throw new ConflictException('This transaction has already been refunded through a dispute');
     }
-    const result = await this.ledger.reverse(original.id, `ledger:reversal:${original.id}:admin`);
+    const result = await this.ledger.reverse(original.id, `ledger:reversal:${original.id}:admin`, {
+      adminId: actor.adminId,
+      narrative: `Reversal: ${reason.trim()}`.slice(0, 160),
+    });
     await this.writeAudit(actor, {
       action: AuditAction.WALLET_ADJUSTMENT,
       entityType: 'LedgerEntry',
@@ -956,15 +942,6 @@ export class AdminOpsService {
     });
     if (completed.count !== 1) throw new ConflictException('This dispute was already resolved or refunded');
     const updated = await this.prisma.transactionDispute.findUniqueOrThrow({ where: { id } });
-    await this.notifications
-      .create({
-        userId: dispute.userId,
-        category: 'wallet',
-        title: 'Dispute resolved — refund issued',
-        body: `Your dispute ${dispute.caseReference} was approved. ₦${amount.toString()} has been returned to your wallet.`,
-        metadata: { disputeId: dispute.id, entryId: entry.entryId },
-      })
-      .catch(() => undefined);
     await this.writeAudit(actor, {
       action: AuditAction.WALLET_ADJUSTMENT,
       entityType: 'TransactionDispute',
@@ -972,7 +949,7 @@ export class AdminOpsService {
       reason,
       before: { status: dispute.status },
       after: { status: updated.status, refundEntryId: entry.entryId },
-      metadata: { action: 'dispute.refund', amount: amount.toString(), caseReference: dispute.caseReference },
+      metadata: { action: 'dispute.refund', amount: amount.toString(), caseReference: dispute.caseReference, narration: note?.trim() ?? undefined, refundEntryId: entry.entryId },
     });
     return { dispute: updated, refund: entry };
   }

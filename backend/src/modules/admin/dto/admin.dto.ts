@@ -171,7 +171,8 @@ export class WalletCreditDto extends ReasonDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MinLength(1)
+  @MaxLength(160)
   note?: string;
 
   @IsString()
@@ -196,7 +197,8 @@ export class WalletDebitBalanceDto extends ReasonDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MinLength(1)
+  @MaxLength(160)
   note?: string;
 
   @IsString()

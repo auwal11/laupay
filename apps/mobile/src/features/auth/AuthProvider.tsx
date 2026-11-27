@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { authApi, AuthTokens, UserProfile } from '../../api/services';
 import { clearSession, restoreSession, saveSession, setSessionInvalidHandler } from '../../api/http';
+import { unregisterPushNotifications } from '../../api/push-notifications';
 
 export type AuthState = 'loading' | 'signedOut' | 'signedIn' | 'offline';
 type AuthContextValue = {
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signOut = useCallback(async () => {
     const refreshToken = await SecureStore.getItemAsync('laupay_refresh_token');
+    await unregisterPushNotifications().catch(() => undefined);
     try {
       if (refreshToken) await authApi.logout(refreshToken);
     } catch {

@@ -1,10 +1,11 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { AppConfigService } from '../../config/app-config.service';
-import { MailProvider, VerificationMessage } from './mail-provider.interface';
+import { MailProvider, TransactionAlertMessage, VerificationMessage } from './mail-provider.interface';
 import {
   passwordResetEmail,
   verificationEmail,
   welcomeEmail,
+  transactionAlertEmail,
   type RenderedEmail,
 } from './email-templates';
 
@@ -45,6 +46,16 @@ export class BrevoMailProvider implements MailProvider {
     await this.send(to, 'LAUPAY Support', { subject, html }, 'support notification');
   }
 
+  async sendTransactionAlert(message: TransactionAlertMessage): Promise<void> {
+    await this.send(
+      message.to,
+      message.fullName,
+      transactionAlertEmail(message),
+      'transaction alert',
+      message.idempotencyKey,
+    );
+  }
+
   /**
    * Single send path for every message: one place for the sender identity,
    * the allow-list handling and the "never leak a raw provider error" rule.
@@ -54,6 +65,7 @@ export class BrevoMailProvider implements MailProvider {
     fullName: string,
     { subject, html }: RenderedEmail,
     kind: string,
+    idempotencyKey?: string,
   ): Promise<void> {
     let response: Response;
     try {
@@ -65,6 +77,7 @@ export class BrevoMailProvider implements MailProvider {
           to: [{ email: to, name: fullName }],
           subject,
           htmlContent: html,
+          ...(idempotencyKey ? { headers: { idempotencyKey } } : {}),
         }),
       });
     } catch (err) {

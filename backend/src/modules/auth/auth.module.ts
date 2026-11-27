@@ -20,8 +20,16 @@ import { ProfileStorageService } from '../../common/storage/profile-storage.serv
 const mailProviderFactory = {
   provide: MAIL_PROVIDER,
   inject: [AppConfigService],
-  useFactory: (config: AppConfigService) =>
-    config.mailProvider === 'brevo' ? new BrevoMailProvider(config) : new MockMailProvider(),
+  useFactory: (config: AppConfigService) => {
+    if (config.mailProvider === 'brevo') return new BrevoMailProvider(config);
+    if (config.mailProvider !== 'mock') {
+      throw new Error(`[config] Unsupported MAIL_PROVIDER=${config.mailProvider}.`);
+    }
+    if (config.isProduction) {
+      throw new Error('[config] Refusing to start with MAIL_PROVIDER=mock in production.');
+    }
+    return new MockMailProvider();
+  },
 };
 
 @Module({

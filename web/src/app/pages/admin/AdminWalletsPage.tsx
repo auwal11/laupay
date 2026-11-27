@@ -36,6 +36,8 @@ export function AdminWalletsPage() {
   const [adjustAmount, setAdjustAmount] = useState("1000");
   const [adjustReason, setAdjustReason] = useState("");
   const [adjustBusy, setAdjustBusy] = useState(false);
+  const [adjustNote, setAdjustNote] = useState("");
+  const [adjustReview, setAdjustReview] = useState<{ amount: number; reason: string; note: string; idempotencyKey: string } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [clearTestPending, setClearTestPending] = useState(false);
   const [clearTestBusy, setClearTestBusy] = useState(false);
@@ -73,31 +75,27 @@ export function AdminWalletsPage() {
   async function submitAdjust(e: FormEvent) {
     e.preventDefault();
     if (!adjust) return;
+    const value = Number(adjustAmount);
+    const narration = adjustNote.trim();
+    if (!Number.isFinite(value) || value <= 0) { setError("Enter an amount greater than zero."); return; }
+    if (narration.length < 1 || narration.length > 160) { setError("Narration must be 1–160 characters."); return; }
+    if (adjustReason.trim().length < 5) return;
+    setError(null);
+    setAdjustReview({ amount: value, reason: adjustReason.trim(), note: narration, idempotencyKey: crypto.randomUUID() });
+  }
+
+  async function confirmAdjust() {
+    if (!adjust || !adjustReview || adjustBusy) return;
     setAdjustBusy(true);
     setError(null);
     setNotice(null);
-    const body = {
-      userId: adjust.id,
-      amount: Number(adjustAmount),
-      reason: adjustReason.trim(),
-      idempotencyKey: crypto.randomUUID(),
-    };
-    const result =
-      adjustAction === "credit"
-        ? await adminService.creditWallet(body)
-        : await adminService.debitWallet(body);
+    const body = { userId: adjust.id, amount: adjustReview.amount, reason: adjustReview.reason, note: adjustReview.note, idempotencyKey: adjustReview.idempotencyKey };
+    const result = adjustAction === "credit" ? await adminService.creditWallet(body) : await adminService.debitWallet(body);
     setAdjustBusy(false);
-    if (!result.ok) {
-      setError(result.error.message);
-      return;
-    }
-    setNotice(
-      `${adjustAction === "credit" ? "Credited" : "Debited"} ${formatNaira(adjustAmount)} ${adjustAction === "credit" ? "to" : "from"} ${adjust.name}. New balance: ${formatNaira(result.data.balanceAfter)}.`,
-    );
-    setAdjust(null);
-    setAdjustReason("");
-    state.reload();
-    float.reload();
+    if (!result.ok) { setError(result.error.message); return; }
+    setNotice(`${adjustAction === "credit" ? "Credited" : "Debited"} ${formatNaira(String(adjustReview.amount))} ${adjustAction === "credit" ? "to" : "from"} ${adjust.name}. Entry: ${result.data.entryId}. New balance: ${formatNaira(result.data.balanceAfter)}.`);
+    setAdjust(null); setAdjustReview(null); setAdjustReason(""); setAdjustNote("");
+    state.reload(); float.reload();
   }
 
   async function exportCsv() {
@@ -179,7 +177,7 @@ export function AdminWalletsPage() {
             <h2 className="text-sm font-semibold text-laupay-ink">
               {adjustAction === "credit" ? "Credit" : "Debit"} {adjust.name}
             </h2>
-            <button type="button" onClick={() => setAdjust(null)} className="text-xs font-medium text-laupay-ink-muted hover:underline">
+            <button type="button" onClick={() => { setAdjust(null); setAdjustReview(null); }} className="text-xs font-medium text-laupay-ink-muted hover:underline">
               Close
             </button>
           </div>
@@ -215,10 +213,18 @@ export function AdminWalletsPage() {
                 required
               />
             </div>
-            <Button type="submit" loading={adjustBusy} disabled={adjustReason.trim().length < 5}>
-              {adjustAction === "credit" ? "Credit wallet" : "Debit wallet"}
+            <div className="min-w-[220px] flex-1">
+              <Input label="Customer-visible narration (1–160 characters)" value={adjustNote} maxLength={160} onChange={(e) => setAdjustNote(e.target.value)} required />
+            </div>
+            <Button type="submit" disabled={adjustReason.trim().length < 5 || !adjustNote.trim() || Number(adjustAmount) <= 0}>
+              Review adjustment
             </Button>
           </form>
+          {adjustReview && <div className="mt-4 rounded-md border border-laupay-border bg-laupay-surface-muted p-3 text-sm">
+            <h3 className="font-semibold">Review before execution</h3>
+            <dl className="mt-2 grid gap-1"><div>Action: {adjustAction}</div><div>Recipient: {adjust.name}</div><div>Amount: {formatNaira(String(adjustReview.amount))}</div><div>Reason: {adjustReview.reason}</div><div>Narration: {adjustReview.note}</div><div className="break-all">Request reference: {adjustReview.idempotencyKey}</div></dl>
+            <div className="mt-3 flex gap-2"><Button loading={adjustBusy} disabled={adjustBusy} onClick={() => void confirmAdjust()}>Confirm and execute</Button><Button variant="secondary" disabled={adjustBusy} onClick={() => setAdjustReview(null)}>Cancel</Button></div>
+          </div>}
         </Card>
       )}
 

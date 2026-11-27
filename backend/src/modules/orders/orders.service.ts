@@ -7,7 +7,7 @@ import { VtuService } from '../vtu/vtu.service';
 import { SecurityService } from '../security/security.service';
 import { InsufficientBalanceError } from '../ledger/ledger.errors';
 import { AppConfigService } from '../../config/app-config.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { persistTransactionAlert, TransactionAlertType } from '../notifications/transaction-alerts';
 import { SettingsService } from '../settings/settings.service';
 import { RiskService } from '../risk/risk.service';
 import type { RiskContext } from '../risk/risk.service';
@@ -39,7 +39,6 @@ export class OrdersService {
     private readonly vtu: VtuService,
     private readonly security: SecurityService,
     private readonly config: AppConfigService,
-    private readonly notifications: NotificationsService,
     private readonly settings: SettingsService,
     private readonly risk: RiskService,
   ) {}
@@ -291,9 +290,14 @@ export class OrdersService {
    * generic cancellation.
    */
   private async cancelledForInsufficientFunds(orderId: string) {
-    const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-    await this.createOrderNotification(order.userId, 'Purchase not completed', 'Your wallet balance was not enough for this purchase.', order.id, order.status);
-    return { ...order, failureReason: INSUFFICIENT_FUNDS };
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.CANCELLED, failureReason: INSUFFICIENT_FUNDS },
+      });
+      await this.persistOrderAlert(tx, order, 'PURCHASE_FAILED');
+      return { ...order, failureReason: INSUFFICIENT_FUNDS };
+    });
   }
 
   /**
@@ -316,7 +320,6 @@ export class OrdersService {
       return true;
     } catch (err) {
       if (err instanceof InsufficientBalanceError) {
-        await this.prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.CANCELLED } });
         return false;
       }
       throw err;
@@ -344,31 +347,55 @@ export class OrdersService {
 
     try {
       if (finalStatus === OrderStatus.FULFILLMENT_FAILED) {
-      // Reverse the debit — the customer was charged but the network never
-      // delivered the airtime/data. See wallet-ledger-model.md §6.
-      const ledgerIdempotencyKey = `ledger:order:${orderId}`;
-      const originalEntry = await this.prisma.ledgerEntry.findUnique({
-        where: { idempotencyKey: ledgerIdempotencyKey },
-      });
-      if (originalEntry) {
-        await this.ledger.reverse(originalEntry.id, `${ledgerIdempotencyKey}:reversal`);
-      } else {
-        // Should not happen (an order only reaches fulfillment after a
-        // successful debit), but never silently skip a status update if it
-        // somehow does — log loudly rather than leaving the order stuck.
-        this.logger.error(
-          `Order ${orderId} resolved FULFILLMENT_FAILED but no original debit ledger entry was found — wallet was never reversed`,
-        );
-      }
-      const updated = await this.prisma.order.update({ where: { id: orderId, status: FULFILLMENT_RESOLVING }, data: { status: OrderStatus.REFUNDED } });
-      await this.createOrderNotification(updated.userId, 'Purchase failed', 'Your purchase could not be fulfilled and the debit was reversed.', updated.id, updated.status);
-      return updated;
+        // The order-status alert below is written atomically with the
+        // committed REFUNDED transition and contains both ledger references;
+        // the ledger suppresses a second alert for this order-specific reversal.
+        const ledgerIdempotencyKey = `ledger:order:${orderId}`;
+        const originalEntry = await this.prisma.ledgerEntry.findUnique({
+          where: { idempotencyKey: ledgerIdempotencyKey },
+        });
+        let reversalReference: string | undefined;
+        let balanceAfter: string | undefined;
+        if (originalEntry) {
+          const reversal = await this.ledger.reverse(originalEntry.id, `${ledgerIdempotencyKey}:reversal`);
+          reversalReference = reversal.entryId;
+          balanceAfter = reversal.balanceAfter;
+        } else {
+          this.logger.error(`Order ${orderId} failed without its original debit ledger entry.`);
+        }
+        return await this.prisma.$transaction(async (tx) => {
+          const updated = await tx.order.update({
+            where: { id: orderId, status: FULFILLMENT_RESOLVING },
+            data: { status: OrderStatus.REFUNDED, failureReason: 'PROVIDER_FAILED' },
+          });
+          await this.persistOrderAlert(tx, updated, 'PURCHASE_FAILED', {
+            originalReference: originalEntry?.referenceId ?? originalEntry?.id,
+            originalTransactionId: originalEntry?.id,
+            reversalReference,
+          }, balanceAfter);
+          return updated;
+        });
       }
 
-      const updated = await this.prisma.order.update({ where: { id: orderId, status: FULFILLMENT_RESOLVING }, data: { status: finalStatus } });
-      if (finalStatus === OrderStatus.FULFILLED) {
-        await this.createOrderNotification(updated.userId, 'Purchase successful', 'Your digital service purchase was completed successfully.', updated.id, updated.status);
-      }
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const order = await tx.order.update({
+          where: { id: orderId, status: FULFILLMENT_RESOLVING },
+          data: { status: finalStatus },
+        });
+        const alertType: TransactionAlertType | undefined = finalStatus === OrderStatus.FULFILLED
+          ? 'PURCHASE_SUCCESS'
+          : (finalStatus === OrderStatus.FULFILLING || finalStatus === OrderStatus.FULFILLMENT_UNKNOWN)
+            ? 'PURCHASE_PENDING'
+            : undefined;
+        if (alertType) {
+          const debit = await tx.ledgerEntry.findUnique({
+            where: { idempotencyKey: `ledger:order:${orderId}` },
+            select: { balanceAfter: true },
+          });
+          await this.persistOrderAlert(tx, order, alertType, {}, debit?.balanceAfter.toFixed(2));
+        }
+        return order;
+      });
       return updated;
     } catch (error) {
       await this.prisma.order.updateMany({ where: { id: orderId, status: FULFILLMENT_RESOLVING }, data: { status: OrderStatus.FULFILLMENT_UNKNOWN } }).catch(() => undefined);
@@ -376,14 +403,83 @@ export class OrdersService {
     }
   }
 
-  private async createOrderNotification(userId: string, title: string, body: string, orderId: string, status: OrderStatus): Promise<void> {
-    try {
-      await this.notifications.create({ userId, category: 'order', title, body, metadata: { orderId, status } });
-    } catch (error) {
-      // Notification delivery must never turn an already-booked order into a
-      // client-visible failure. The order/ledger remains authoritative.
-      this.logger.warn(`Could not create notification for order ${orderId}: ${String(error)}`);
-    }
+  private async persistOrderAlert(
+    tx: Prisma.TransactionClient,
+    order: {
+      id: string;
+      userId: string;
+      type: OrderType;
+      status: OrderStatus;
+      amount: Prisma.Decimal;
+      network: string | null;
+      phoneNumber: string | null;
+      mode: string | null;
+      failureReason: string | null;
+      updatedAt: Date;
+    },
+    alertType: TransactionAlertType,
+    references: Record<string, unknown> = {},
+    balanceAfter?: string,
+  ): Promise<void> {
+    if (order.mode !== 'live') return;
+    const amount = order.amount.toFixed(2);
+    const currency = 'NGN';
+    const service = `${order.network ?? 'Mobile'} ${order.type.toLowerCase()}`;
+    const title = alertType === 'PURCHASE_SUCCESS'
+      ? 'Purchase successful'
+      : alertType === 'PURCHASE_PENDING'
+        ? 'Purchase processing'
+        : 'Purchase not completed';
+    const body = alertType === 'PURCHASE_SUCCESS'
+      ? `${service} purchase of ${currency} ${amount}${order.phoneNumber ? ` for ${order.phoneNumber}` : ''} was successful.`
+      : alertType === 'PURCHASE_PENDING'
+        ? `${service} purchase of ${currency} ${amount} is still being confirmed.`
+        : order.failureReason === INSUFFICIENT_FUNDS
+          ? `${service} purchase of ${currency} ${amount} could not be completed because the wallet balance was insufficient.`
+          : `${service} purchase of ${currency} ${amount} could not be fulfilled; the original debit was reversed where applicable.`;
+    const date = order.updatedAt.toISOString();
+    const narrative = `${service} purchase${order.phoneNumber ? ` for ${order.phoneNumber}` : ''}`;
+    const metadata = {
+      alertType,
+      transactionId: order.id,
+      transactionReference: order.id,
+      orderId: order.id,
+      amount,
+      currency,
+      narrative,
+      status: order.status,
+      date,
+      recipient: order.phoneNumber ?? undefined,
+      service,
+      availableBalance: balanceAfter,
+      failureReason: order.failureReason ?? undefined,
+      ...references,
+    };
+    await persistTransactionAlert(tx, {
+      eventKey: `order:${order.id}:${order.status}`,
+      userId: order.userId,
+      title,
+      body,
+      category: 'order',
+      metadata,
+      email: {
+        alertType,
+        title,
+        body,
+        amount,
+        currency,
+        transactionReference: order.id,
+        status: order.status,
+        date,
+        narrative,
+        availableBalance: balanceAfter,
+        originalReference: typeof references.originalReference === 'string' ? references.originalReference : undefined,
+        originalTransactionId: typeof references.originalTransactionId === 'string' ? references.originalTransactionId : undefined,
+        recipient: order.phoneNumber ?? undefined,
+        service,
+        supportEmail: this.config.supportEmail,
+      },
+    });
   }
 
 
@@ -465,14 +561,18 @@ export class OrdersService {
 
     let updated;
     try {
-      updated = await this.prisma.order.update({
-        where: { id: orderId, status: FULFILLMENT_RESOLVING },
-        data: {
-          status: OrderStatus.FULFILLED,
-          failureReason: null,
-          settledBy: adminId,
-          settledAt: new Date(),
-        },
+      updated = await this.prisma.$transaction(async (tx) => {
+        const settled = await tx.order.update({
+          where: { id: orderId, status: FULFILLMENT_RESOLVING },
+          data: {
+            status: OrderStatus.FULFILLED,
+            failureReason: null,
+            settledBy: adminId,
+            settledAt: new Date(),
+          },
+        });
+        await this.persistOrderAlert(tx, settled, 'PURCHASE_SUCCESS', { settledBy: adminId }, debit.balanceAfter.toFixed(2));
+        return settled;
       });
     } catch (error) {
       await this.prisma.order.updateMany({ where: { id: orderId, status: FULFILLMENT_RESOLVING }, data: { status: OrderStatus.FULFILLMENT_UNKNOWN } }).catch(() => undefined);
@@ -484,7 +584,6 @@ export class OrdersService {
         data: { status: 'SUCCESS' },
       }).catch(() => undefined);
     }
-    await this.createOrderNotification(updated.userId, 'Purchase successful', 'Your purchase was confirmed as completed successfully.', updated.id, updated.status);
     await this.audit(adminId, 'Order', orderId, ipAddress, 'order.mark_successful', order.status, updated.status, reason);
     return updated;
   }
@@ -572,19 +671,32 @@ export class OrdersService {
       where: { idempotencyKey: ledgerIdempotencyKey },
     });
     let reversed = false;
+    let reversalReference: string | undefined;
+    let balanceAfter: string | undefined;
     if (originalEntry) {
-      await this.ledger.reverse(originalEntry.id, `${ledgerIdempotencyKey}:reversal`);
+      const reversal = await this.ledger.reverse(originalEntry.id, `${ledgerIdempotencyKey}:reversal`);
+      reversalReference = reversal.entryId;
+      balanceAfter = reversal.balanceAfter;
       reversed = true;
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: order.id, status: FULFILLMENT_RESOLVING },
-      data: {
-        status: reversed ? OrderStatus.REFUNDED : OrderStatus.FULFILLMENT_FAILED,
-        failureReason,
-        settledBy: adminId,
-        settledAt: new Date(),
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const settled = await tx.order.update({
+        where: { id: order.id, status: FULFILLMENT_RESOLVING },
+        data: {
+          status: reversed ? OrderStatus.REFUNDED : OrderStatus.FULFILLMENT_FAILED,
+          failureReason,
+          settledBy: adminId,
+          settledAt: new Date(),
+        },
+      });
+      await this.persistOrderAlert(tx, settled, 'PURCHASE_FAILED', {
+        originalReference: originalEntry?.referenceId ?? originalEntry?.id,
+        originalTransactionId: originalEntry?.id,
+        reversalReference,
+        settledBy: adminId ?? undefined,
+      }, balanceAfter);
+      return settled;
     });
 
     if (order.vtuTransaction) {
@@ -594,15 +706,6 @@ export class OrdersService {
       }).catch(() => undefined);
     }
 
-    await this.createOrderNotification(
-      updated.userId,
-      reversed ? 'Purchase failed — refunded' : 'Purchase failed',
-      reversed
-        ? 'Your purchase could not be completed. The amount debited has been returned to your wallet.'
-        : 'Your purchase could not be completed.',
-      updated.id,
-      updated.status,
-    );
     await this.audit(adminId, 'Order', order.id, ipAddress, 'order.mark_failed', order.status, updated.status, reason, {
       reversed,
     });

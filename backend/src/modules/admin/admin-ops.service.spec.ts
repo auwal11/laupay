@@ -1,5 +1,5 @@
 import { AdminOpsService, toCsv } from './admin-ops.service';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 
 describe('admin CSV exports', () => {
@@ -216,5 +216,50 @@ describe('AdminOpsService Super Admin protections', () => {
     await expect(closedService.revokeStaffAccess(closed.id, actor, 'staff access removal'))
       .rejects.toThrow('A closed staff account cannot be revoked from this screen');
     expect(closedPrisma.user.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('AdminOpsService wallet narration and audit', () => {
+  function makeAdjustmentService() {
+    const prisma = {
+      walletAccount: { findUnique: jest.fn().mockResolvedValue({ id: 'wallet-1', balance: '1000.00' }) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const ledger = { credit: jest.fn().mockResolvedValue({ entryId: 'entry-1', balanceAfter: '1100.00' }) };
+    const settings = { effectiveFulfillmentMode: jest.fn().mockResolvedValue('live') };
+    const service = new AdminOpsService(
+      prisma as never, ledger as never, {} as never, {} as never, settings as never, {} as never,
+      { isConfiguredSuperAdmin: () => false } as never,
+    );
+    return { service, prisma, ledger };
+  }
+
+  it('uses the reviewed customer narration as immutable ledger and audit data', async () => {
+    const { service, prisma, ledger } = makeAdjustmentService();
+    const idempotencyKey = 'wallet-adjustment-123456';
+    await service.creditWallet(
+      'customer-1', 100, 'Approved customer goodwill credit', '  Goodwill adjustment  ',
+      { adminId: 'admin-1', ipAddress: '127.0.0.1' }, idempotencyKey,
+    );
+    expect(ledger.credit).toHaveBeenCalledWith(expect.objectContaining({
+      narrative: 'Goodwill adjustment', referenceId: idempotencyKey, adminId: 'admin-1',
+    }));
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        actorId: 'admin-1', reason: 'Approved customer goodwill credit',
+        metadata: expect.objectContaining({ narration: 'Goodwill adjustment', idempotencyKey, entryId: 'entry-1' }),
+      }),
+    }));
+  });
+
+  it('rejects empty and overlong narration before any financial ledger operation', async () => {
+    const { service, prisma, ledger } = makeAdjustmentService();
+    const actor = { adminId: 'admin-1' };
+    await expect(service.creditWallet('customer-1', 100, 'Approved adjustment', '  ', actor, 'wallet-adjustment-123456'))
+      .rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.creditWallet('customer-1', 100, 'Approved adjustment', 'x'.repeat(161), actor, 'wallet-adjustment-123456'))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(ledger.credit).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
 });

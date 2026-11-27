@@ -24,7 +24,6 @@ function serviceWith(overrides: Record<string, any> = {}) {
     {} as never,
     { fulfillmentMode: 'live' } as never,
     {} as never,
-    {} as never,
     risk as never,
   );
   return { service, prisma, vtu, risk };

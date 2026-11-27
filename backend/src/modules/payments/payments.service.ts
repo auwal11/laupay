@@ -302,19 +302,8 @@ export class PaymentsService {
       referenceId: paymentId,
       idempotencyKey: `ledger:payment:${paymentId}`,
     });
-    // Re-queries/webhooks can re-confirm the same payment; the ledger already
-    // deduplicates, and the notification must not stack duplicates either.
-    if (!entry.wasAlreadyApplied) {
-      await this.notifications
-        .create({
-          userId,
-          category: 'wallet',
-          title: 'Wallet funded',
-          body: `${formatNaira(amount)} was added to your LAUPAY wallet.`,
-          metadata: { paymentId, entryId: entry.entryId, amount },
-        })
-        .catch(() => undefined);
-    }
+    // The ledger transaction inserts the deduplicated in-app alert and email
+    // outbox row atomically with this credit; do not send a second notification here.
   }
 
   private mapProviderStatus(status: string): PaymentStatus {

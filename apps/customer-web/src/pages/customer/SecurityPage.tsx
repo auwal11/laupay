@@ -200,7 +200,7 @@ function NotificationsSection() {
 
   return (
     <Card>
-      <h2 className="text-sm font-semibold text-laupay-ink">Security notifications</h2>
+        <h2 className="text-sm font-semibold text-laupay-ink">Recent notifications</h2>
 
       {notifications === null ? (
         <div className="mt-4 flex flex-col gap-2">
@@ -208,13 +208,13 @@ function NotificationsSection() {
           <Skeleton className="h-10 w-full" />
         </div>
       ) : notifications.length === 0 ? (
-        <p className="mt-3 text-sm text-laupay-ink-muted">No security notifications yet.</p>
+        <p className="mt-3 text-sm text-laupay-ink-muted">No notifications yet.</p>
       ) : (
         <ul className="mt-4 flex flex-col divide-y divide-laupay-border">
           {notifications.map((n) => (
             <li key={n.id} className="py-3">
-              <p className={"text-sm " + (n.read ? "text-laupay-ink-muted" : "font-medium text-laupay-ink")}>
-                {n.message}
+              <p className={"text-sm " + (n.readAt ? "text-laupay-ink-muted" : "font-medium text-laupay-ink")}>
+                {n.title}: {n.body}
               </p>
               <p className="text-xs text-laupay-ink-muted">{formatDateTime(n.createdAt)}</p>
             </li>

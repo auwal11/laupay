@@ -11,12 +11,35 @@ export interface VerificationMessage {
   code: string;
 }
 
+export interface TransactionAlertMessage {
+  to: string;
+  fullName: string;
+  alertType: string;
+  title: string;
+  body: string;
+  amount: string;
+  currency: string;
+  transactionReference: string;
+  status: string;
+  date: string;
+  supportEmail: string;
+  idempotencyKey: string;
+  narrative?: string;
+  availableBalance?: string;
+  balanceBefore?: string;
+  originalReference?: string;
+  originalTransactionId?: string;
+  recipient?: string;
+  service?: string;
+}
+
 export interface MailProvider {
   sendVerificationCode(message: VerificationMessage): Promise<void>;
   sendPasswordReset(message: { to: string; fullName: string; resetUrl: string }): Promise<void>;
   /** Optional, best-effort: sent once the account is activated. */
   sendWelcome(message: { to: string; fullName: string }): Promise<void>;
   sendSupportNotification(message: { to: string; subject: string; html: string }): Promise<void>;
+  sendTransactionAlert(message: TransactionAlertMessage): Promise<void>;
 }
 
 export const MAIL_PROVIDER = Symbol('MAIL_PROVIDER');

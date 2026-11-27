@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { LedgerDirection, LedgerReason, Prisma, WalletStatus } from '@prisma/client';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { LedgerDirection, LedgerReason, Prisma, WalletStatus, WithdrawalStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   InsufficientBalanceError,
@@ -8,6 +8,8 @@ import {
   WalletNotActiveError,
 } from './ledger.errors';
 import { calculateWithdrawableBalance } from './withdrawal-provenance';
+import { AppConfigService } from '../../config/app-config.service';
+import { persistTransactionAlert, TransactionAlertType } from '../notifications/transaction-alerts';
 
 export interface LedgerEntryRequest {
   walletAccountId: string;
@@ -62,7 +64,10 @@ const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 export class LedgerService {
   private readonly logger = new Logger(LedgerService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly config?: AppConfigService,
+  ) {}
 
   async credit(req: LedgerEntryRequest): Promise<LedgerEntryResult> {
     return this.applyEntry({ ...req, direction: LedgerDirection.CREDIT });
@@ -90,7 +95,11 @@ export class LedgerService {
    * entry. The original entry is never modified or deleted — see
    * docs/architecture/wallet-ledger-model.md §6.
    */
-  async reverse(originalEntryId: string, idempotencyKey: string): Promise<LedgerEntryResult> {
+  async reverse(
+    originalEntryId: string,
+    idempotencyKey: string,
+    details: { adminId?: string; narrative?: string } = {},
+  ): Promise<LedgerEntryResult> {
     const original = await this.prisma.ledgerEntry.findUniqueOrThrow({
       where: { id: originalEntryId },
     });
@@ -105,6 +114,10 @@ export class LedgerService {
       reason: LedgerReason.REVERSAL,
       referenceType: 'LedgerEntry',
       referenceId: original.id,
+      narrative: details.narrative ?? `Reversal of transaction ${original.id}`,
+      source: original.referenceType === 'Order' ? 'order_reversal' : 'ledger_reversal',
+      mode: original.mode ?? 'live',
+      adminId: details.adminId,
       idempotencyKey,
       direction: oppositeDirection,
     });
@@ -126,9 +139,9 @@ export class LedgerService {
         // 1. Row-level lock on the wallet — blocks concurrent mutations to
         //    the same wallet until this transaction commits/rolls back.
         const rows = await tx.$queryRaw<
-          { id: string; balance: Prisma.Decimal; status: WalletStatus; version: number }[]
+          { id: string; ownerId: string; ownerType: string; currency: string; balance: Prisma.Decimal; status: WalletStatus; version: number }[]
         >(Prisma.sql`
-          SELECT "id", "balance", "status", "version"
+          SELECT "id", "ownerId", "ownerType", "currency", "balance", "status", "version"
           FROM "WalletAccount"
           WHERE "id" = ${req.walletAccountId}
           FOR UPDATE
@@ -204,6 +217,8 @@ export class LedgerService {
           data: { balance: balanceAfter, version: { increment: 1 } },
         });
 
+        await this.persistLedgerAlert(tx, entry, wallet, req, balanceAfter);
+
         return {
           entryId: entry.id,
           walletAccountId: wallet.id,
@@ -235,6 +250,130 @@ export class LedgerService {
       }
       throw err;
     }
+  }
+
+  private async persistLedgerAlert(
+    tx: Prisma.TransactionClient,
+    entry: {
+      id: string;
+      amount: Prisma.Decimal;
+      createdAt: Date;
+      direction: LedgerDirection;
+      referenceType: string | null;
+      referenceId: string | null;
+      adminId: string | null;
+    },
+    wallet: { ownerId: string; ownerType: string; currency: string; balance: Prisma.Decimal },
+    req: LedgerEntryRequest & { direction: LedgerDirection; enforceWithdrawableBalance?: boolean },
+    balanceAfter: Prisma.Decimal,
+  ): Promise<void> {
+    if ((wallet.ownerType !== 'USER' && wallet.ownerType !== 'AGENT') || req.reason === LedgerReason.ORDER_PAYMENT || req.source === 'order_reversal') return;
+    if (req.mode && req.mode !== 'live') return;
+    if (req.source?.startsWith('test') || req.source === 'admin_test_credit') return;
+
+    let alertType: TransactionAlertType;
+    if (req.reason === LedgerReason.REVERSAL) alertType = 'REVERSAL';
+    else if (req.reason === LedgerReason.ORDER_REFUND) alertType = 'REFUND';
+    else alertType = req.direction === LedgerDirection.CREDIT ? 'CREDIT' : 'DEBIT';
+
+    let originalEntry: { id: string; referenceId: string | null } | null = null;
+    if (alertType === 'REVERSAL' && req.referenceType === 'LedgerEntry' && req.referenceId) {
+      originalEntry = await tx.ledgerEntry.findUnique({
+        where: { id: req.referenceId },
+        select: { id: true, referenceId: true },
+      });
+    } else if (alertType === 'REVERSAL' && req.referenceType === 'Withdrawal' && req.referenceId) {
+      originalEntry = await tx.ledgerEntry.findFirst({
+        where: { referenceType: 'Withdrawal', referenceId: req.referenceId, direction: LedgerDirection.DEBIT },
+        select: { id: true, referenceId: true },
+      });
+    } else if (alertType === 'REFUND' && req.referenceType === 'TransactionDispute' && req.referenceId) {
+      const dispute = await tx.transactionDispute.findUnique({
+        where: { id: req.referenceId },
+        select: { ledgerEntry: { select: { id: true, referenceId: true } } },
+      });
+      originalEntry = dispute?.ledgerEntry ?? null;
+    }
+    const withdrawal = req.referenceType === 'Withdrawal' && req.referenceId
+      ? await tx.withdrawal.findUnique({ where: { id: req.referenceId }, select: { id: true, reference: true, status: true } })
+      : null;
+
+    const amount = entry.amount.toFixed(2);
+    const currency = wallet.currency || 'NGN';
+    const narrative = req.narrative?.trim() || req.reason.replaceAll('_', ' ');
+    const isWithdrawalRequest = req.reason === LedgerReason.WITHDRAWAL && withdrawal;
+    const isWithdrawalRefund = req.reason === LedgerReason.REVERSAL && withdrawal;
+    const transactionReference = isWithdrawalRefund
+      ? `${withdrawal.reference}-RF`
+      : withdrawal?.reference ?? entry.referenceId ?? entry.id;
+    const transactionStatus = isWithdrawalRefund ? WithdrawalStatus.REFUNDED : withdrawal?.status ?? 'POSTED';
+    const title = isWithdrawalRequest
+      ? 'Withdrawal request received'
+      : isWithdrawalRefund
+        ? 'Withdrawal funds refunded'
+        : alertType === 'REVERSAL'
+      ? 'Transaction reversed'
+      : alertType === 'REFUND'
+        ? 'Refund received'
+        : alertType === 'CREDIT'
+          ? 'Wallet credited'
+          : 'Wallet debited';
+    const body = isWithdrawalRequest
+      ? `${currency} ${amount} is held pending review for withdrawal ${transactionReference}.`
+      : isWithdrawalRefund
+        ? `${currency} ${amount} has been returned to your wallet for withdrawal ${transactionReference}.`
+        : alertType === 'REVERSAL'
+      ? `${currency} ${amount} was posted as a reversal linked to the original transaction.`
+      : alertType === 'REFUND'
+        ? `${currency} ${amount} was refunded to your wallet.`
+        : `${currency} ${amount} was ${req.direction === LedgerDirection.CREDIT ? 'credited to' : 'debited from'} your wallet.`;
+    const date = entry.createdAt.toISOString();
+    const metadata = {
+      alertType,
+      transactionId: entry.id,
+      transactionReference,
+      referenceType: entry.referenceType,
+      referenceId: entry.referenceId,
+      amount,
+      currency,
+      narrative,
+      status: transactionStatus,
+      date,
+      balanceBefore: wallet.balance.toFixed(2),
+      availableBalance: balanceAfter.toFixed(2),
+      adminId: entry.adminId,
+      originalTransactionId: originalEntry?.id,
+      originalReference: withdrawal?.reference ?? originalEntry?.referenceId ?? originalEntry?.id,
+      reversalReference: isWithdrawalRefund ? transactionReference : undefined,
+      orderId: entry.referenceType === 'Order' ? entry.referenceId : undefined,
+      withdrawalId: withdrawal?.id,
+      withdrawalReference: withdrawal?.reference,
+    };
+
+    await persistTransactionAlert(tx, {
+      eventKey: `ledger:${entry.id}`,
+      userId: wallet.ownerId,
+      title,
+      body,
+      category: 'wallet',
+      metadata,
+      email: {
+        alertType,
+        title,
+        body,
+        amount,
+        currency,
+        transactionReference,
+        status: transactionStatus,
+        date,
+        narrative,
+        balanceBefore: wallet.balance.toFixed(2),
+        availableBalance: balanceAfter.toFixed(2),
+        originalReference: withdrawal?.reference ?? originalEntry?.referenceId ?? originalEntry?.id ?? undefined,
+        originalTransactionId: originalEntry?.id,
+        supportEmail: this.config?.supportEmail ?? process.env.SUPPORT_EMAIL ?? 'support.laupay@gmail.com',
+      },
+    });
   }
 
   private isUniqueConstraintViolation(err: unknown, target?: string): boolean {

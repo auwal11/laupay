@@ -6,16 +6,16 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { InsufficientBalanceError, InsufficientWithdrawableBalanceError } from '../ledger/ledger.errors';
 import { calculateWithdrawableBalance } from '../ledger/withdrawal-provenance';
-import { NotificationsService } from '../notifications/notifications.service';
 import { SecurityService } from '../security/security.service';
 import { RequestWithdrawalDto } from './dto/withdrawals.dto';
+import { persistTransactionAlert } from '../notifications/transaction-alerts';
 
 function naira(value: number | string) { return `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
 function mask(value: string) { return value.length > 4 ? `••••${value.slice(-4)}` : value; }
 
 @Injectable()
 export class WithdrawalsService {
-  constructor(private readonly prisma: PrismaService, private readonly ledger: LedgerService, private readonly security: SecurityService, private readonly notifications: NotificationsService, private readonly config: AppConfigService) {}
+  constructor(private readonly prisma: PrismaService, private readonly ledger: LedgerService, private readonly security: SecurityService, private readonly config: AppConfigService) {}
 
   private cachedBanks?: { banks: Array<{ code: string; name: string }>; expiresAt: number };
   private cachedToken?: { token: string; expiresAt: number };
@@ -100,7 +100,6 @@ export class WithdrawalsService {
       if (error instanceof InsufficientBalanceError) throw new BadRequestException('Insufficient balance for this withdrawal');
       throw error;
     }
-    await this.notifications.create({ userId, category: 'wallet', title: 'Withdrawal request received', body: `${naira(amount.toString())} is held pending review.`, metadata: { withdrawalId: withdrawal.id, reference, status: 'PENDING' } }).catch(() => undefined);
     await this.audit(userId, withdrawal.id, { kind: 'withdrawal_request', reference, amount: amount.toString() });
     return this.toView(await this.prisma.withdrawal.findUniqueOrThrow({ where: { id: withdrawal.id } }));
   }
@@ -135,12 +134,58 @@ export class WithdrawalsService {
     const existing = await this.prisma.withdrawal.findUnique({ where: { id }, select: { userId: true } });
     if (!existing) throw new NotFoundException('Withdrawal not found');
     if (existing.userId === adminId) throw new ForbiddenException('An administrator cannot approve their own withdrawal');
-    const result = await this.prisma.withdrawal.updateMany({ where: { id, status: from }, data: { ...data, status: to } });
-    if (result.count !== 1) throw new ConflictException(`Withdrawal cannot move from ${from}`);
-    await this.event(id, from, to, action, adminId, reason); await this.audit(adminId, id, { action, from, to, reason });
-    const row = await this.prisma.withdrawal.findUniqueOrThrow({ where: { id } });
-    await this.notifications.create({ userId: row.userId, category: 'wallet', title: `Withdrawal ${to.toLowerCase()}`, body: `${naira(row.amount.toString())} withdrawal is now ${to.toLowerCase()}.`, metadata: { withdrawalId: id, reference: row.reference, status: to } }).catch(() => undefined);
+    const row = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.withdrawal.updateMany({ where: { id, status: from }, data: { ...data, status: to } });
+      if (result.count !== 1) throw new ConflictException(`Withdrawal cannot move from ${from}`);
+      const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } });
+      await tx.withdrawalEvent.create({ data: { withdrawalId: id, fromStatus: from, toStatus: to, action, actorId: adminId, reason } });
+      await this.persistStatusAlert(tx, updated, to, adminId, reason);
+      return updated;
+    });
+    await this.audit(adminId, id, { action, from, to, reason });
     return this.toView(row);
+  }
+
+  private async persistStatusAlert(
+    tx: Prisma.TransactionClient,
+    withdrawal: { id: string; userId: string; reference: string; amount: Prisma.Decimal; updatedAt: Date },
+    status: WithdrawalStatus,
+    actorId: string,
+    reason: string,
+  ): Promise<void> {
+    const title = `Withdrawal ${status.toLowerCase()}`;
+    const body = `${naira(withdrawal.amount.toFixed(2))} withdrawal ${withdrawal.reference} is now ${status.toLowerCase()}.`;
+    await persistTransactionAlert(tx, {
+      eventKey: `withdrawal:${withdrawal.id}:status:${status}`,
+      userId: withdrawal.userId,
+      title,
+      body,
+      category: 'wallet',
+      metadata: {
+        alertType: 'STATUS_UPDATE',
+        eventType: 'WITHDRAWAL_STATUS',
+        withdrawalId: withdrawal.id,
+        transactionReference: withdrawal.reference,
+        amount: withdrawal.amount.toFixed(2),
+        currency: 'NGN',
+        status,
+        date: withdrawal.updatedAt.toISOString(),
+        actorId,
+        narration: reason,
+      },
+      email: {
+        alertType: 'STATUS_UPDATE',
+        title,
+        body,
+        amount: withdrawal.amount.toFixed(2),
+        currency: 'NGN',
+        transactionReference: withdrawal.reference,
+        status,
+        date: withdrawal.updatedAt.toISOString(),
+        narrative: reason,
+        supportEmail: this.config.supportEmail,
+      },
+    });
   }
 
   private async refundAndTransition(adminId: string, id: string, allowed: WithdrawalStatus[], finalStatus: WithdrawalStatus, reason: string, action: string) {
@@ -157,7 +202,6 @@ export class WithdrawalsService {
       await this.prisma.withdrawalRefund.upsert({ where: { ledgerEntryId: entry.entryId }, create: { withdrawalId: id, ledgerEntryId: entry.entryId, amount: row.amount, status: WithdrawalRefundStatus.REFUNDED, reason, actorId: adminId, completedAt: new Date() }, update: { status: WithdrawalRefundStatus.REFUNDED, completedAt: new Date() } });
       const updated = await this.prisma.withdrawal.update({ where: { id }, data: { status: finalStatus, refundLedgerEntryId: entry.entryId, refundedAmount: row.amount, refundStatus: WithdrawalRefundStatus.REFUNDED, refundedAt: new Date() } });
       await this.event(id, WithdrawalStatus.REFUND_PENDING, finalStatus, action, adminId, reason); await this.audit(adminId, id, { action, to: finalStatus, reason, refundEntryId: entry.entryId });
-      await this.notifications.create({ userId: row.userId, category: 'wallet', title: 'Withdrawal funds refunded', body: `${naira(row.amount.toString())} has been returned to your wallet.`, metadata: { withdrawalId: id, reference: row.reference, status: finalStatus, refundEntryId: entry.entryId } }).catch(() => undefined);
       return this.toView(updated);
     } catch (error) {
       await this.prisma.withdrawal.update({ where: { id }, data: { status: WithdrawalStatus.REFUND_FAILED, refundStatus: WithdrawalRefundStatus.FAILED } }).catch(() => undefined); throw error;
