@@ -268,8 +268,6 @@ export class LedgerService {
     balanceAfter: Prisma.Decimal,
   ): Promise<void> {
     if ((wallet.ownerType !== 'USER' && wallet.ownerType !== 'AGENT') || req.reason === LedgerReason.ORDER_PAYMENT || req.source === 'order_reversal') return;
-    if (req.mode && req.mode !== 'live') return;
-    if (req.source?.startsWith('test') || req.source === 'admin_test_credit') return;
 
     let alertType: TransactionAlertType;
     if (req.reason === LedgerReason.REVERSAL) alertType = 'REVERSAL';

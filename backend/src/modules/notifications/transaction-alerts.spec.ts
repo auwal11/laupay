@@ -197,6 +197,40 @@ describe('withdrawal status notifications', () => {
 });
 
 describe('ledger/order alert deduplication', () => {
+  it('creates a credit alert and email intent for an admin test credit', async () => {
+    const tx = makeTx();
+    const service = new LedgerService({} as never);
+    await (service as any).persistLedgerAlert(
+      tx as never,
+      {
+        id: 'ledger-credit-1',
+        amount: { toFixed: () => '100.00' },
+        createdAt: new Date('2026-11-27T00:00:00.000Z'),
+        direction: 'CREDIT',
+        referenceType: 'AdminAdjustment',
+        referenceId: 'admin-credit-1',
+        adminId: 'admin-1',
+      },
+      { ownerId: 'user-1', ownerType: 'USER', currency: 'NGN', balance: { toFixed: () => '0.00' } },
+      {
+        reason: 'ADMIN_ADJUSTMENT',
+        direction: 'CREDIT',
+        source: 'admin_test_credit',
+        mode: 'test',
+        narrative: 'Test credit — Ibrahim Lau Provision Shop',
+        referenceType: 'AdminAdjustment',
+        referenceId: 'admin-credit-1',
+      },
+      { toFixed: () => '100.00' },
+    );
+    expect(tx.notification.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({ eventKey: 'ledger:ledger-credit-1', title: 'Wallet credited' })],
+    }));
+    expect(tx.transactionAlertOutbox.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ eventKey: 'ledger:ledger-credit-1', recipientEmail: 'user@example.test' }),
+    }));
+  });
+
   it('suppresses the duplicate ledger notification for order reversals handled by the order-status alert', async () => {
     const tx = makeTx();
     const service = new LedgerService({} as never);
