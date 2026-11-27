@@ -197,6 +197,7 @@ model User {
   security              UserSecurity?
   notifications         Notification[]
   transactionAlertOutbox TransactionAlertOutbox[]
+  pushTokens            NotificationPushToken[]
   disputes              TransactionDispute[]
   adminNotes            AdminNote[]            @relation("AdminNotesAboutUser")
   authoredNotes         AdminNote[]            @relation("AdminNotesByAdmin")
@@ -773,6 +774,8 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime  @default(now())
 
+  pushDeliveries NotificationPushDelivery[]
+
   @@index([userId, createdAt])
   @@index([userId, readAt])
 }
@@ -799,6 +802,45 @@ model TransactionAlertOutbox {
 
   @@index([status, nextAttemptAt, createdAt])
   @@index([userId, createdAt])
+}
+
+model NotificationPushToken {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expoPushToken     String   @unique
+  platform          String
+  isActive          Boolean  @default(true)
+  lastRegisteredAt  DateTime @default(now())
+  revokedAt         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deliveries        NotificationPushDelivery[]
+
+  @@index([userId, isActive])
+}
+
+model NotificationPushDelivery {
+  id                String   @id @default(uuid())
+  notificationId    String
+  notification      Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  pushTokenId       String
+  pushToken         NotificationPushToken @relation(fields: [pushTokenId], references: [id], onDelete: Cascade)
+  status            String   @default("PENDING")
+  attempts          Int      @default(0)
+  nextAttemptAt     DateTime @default(now())
+  lockedAt          DateTime?
+  ticketId          String?  @unique
+  ticketedAt        DateTime?
+  receiptDueAt      DateTime?
+  receiptCheckedAt  DateTime?
+  lastError         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([notificationId, pushTokenId])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([status, receiptDueAt])
 }
 
 // ============================================================
