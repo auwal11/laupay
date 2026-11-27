@@ -17,7 +17,7 @@ Implemented and connected to backend services:
 - Shared loading behavior: in-flight primary actions show a spinner plus action text and are disabled to prevent duplicate requests. Completed purchase/withdrawal results provide native receipt sharing and a Done action back to Home.
 - Premium native UX polish: dark glass dashboard/header/profile surfaces, resilient profile-photo initials fallback, unread notification badge, dark startup surface, balance skeleton state and an unavailable-service badge that does not invent service data.
 
-The following are not claimed as complete in the current mobile milestone: profile/security/support-disputes completion, email verification/password reset coverage where routes still need final parity work, biometric money authorization, secure PIN reset, rewards/referrals, transfers, electricity/cable services and a verified native Android artifact. OS push delivery requires a real Expo project ID and configured FCM/APNs credentials; code-level registration is present but no Expo project ID or provider credentials are stored in this repository.
+The following are not claimed as complete in the current mobile milestone: profile/security/support-disputes completion, email verification/password reset coverage where routes still need final parity work, biometric money authorization, secure PIN reset, rewards/referrals, transfers, electricity/cable services and a verified native Android artifact. The EAS project is linked under owner `laupay` in `app.json`; OS push delivery still requires configured FCM/APNs credentials.
 
 ## Local development
 
@@ -51,7 +51,7 @@ The audited backend has no authoritative customer electricity/cable-TV purchase 
 
 ## Expo push provisioning
 
-The mobile app reads the real EAS project ID from Expo config and does not invent one. The current repository has no explicit `extra.eas.projectId`; configure the project's actual ID and FCM v1 credentials in Expo before expecting Android delivery. APNs credentials are additionally required if enabling iOS delivery. The app asks for permission only when the customer chooses **Enable push alerts**, creates the Android channel before token retrieval, re-registers previously authorized devices after sign-in/foregrounding, and best-effort revokes the token at sign-out. Remote delivery is not guaranteed; Expo tickets are reconciled with receipts and the app inbox remains the source of truth.
+The mobile app reads the real EAS project ID from Expo config; `app.json` now links the LAUPAY project under owner `laupay`. Android delivery still requires the Firebase FCM v1 service-account key to be configured securely in Expo/EAS and the Firebase Android app config (`google-services.json`) to be set through `android.googleServicesFile`; neither has been provisioned in this repository. APNs credentials are required for iOS delivery. The app asks for permission only when the customer chooses **Enable push alerts**, creates the Android channel before token retrieval, re-registers previously authorized devices after sign-in/foregrounding, and best-effort revokes the token at sign-out. Remote delivery is not guaranteed; Expo tickets are reconciled with receipts and the app inbox remains the source of truth.
 
 ## Android identity and build
 

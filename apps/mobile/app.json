@@ -2,6 +2,7 @@
   "expo": {
     "name": "LAUPAY",
     "slug": "laupay",
+    "owner": "laupay",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -44,6 +45,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3d975378-0404-479c-bf5f-9654ad716705"
+      }
     }
   }
 }
