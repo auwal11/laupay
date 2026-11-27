@@ -97,7 +97,7 @@ describe('AppConfigService.assertStagingSafety', () => {
     expect(() => config().assertStagingSafety()).not.toThrow();
   });
 
-  it('refuses VTpass provider_test mode in production', () => {
+  it('allows explicit VTpass provider_test mode in production without live fulfillment', () => {
     process.env.NODE_ENV = 'production';
     process.env.JWT_ACCESS_SECRET = 'x';
     process.env.PAYMENT_PROVIDER = 'paystack';
@@ -111,7 +111,19 @@ describe('AppConfigService.assertStagingSafety', () => {
     process.env.VTPASS_TEST_OUTCOME = 'success';
     const instance = config();
     expect(instance.fulfillmentMode).toBe('provider_test');
-    expect(() => instance.assertStagingSafety()).toThrow(/provider_test is not allowed/);
+    expect(() => instance.assertStagingSafety()).not.toThrow();
+  });
+
+  it('refuses provider_test mode for providers without a sandbox contract', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_ACCESS_SECRET = 'x';
+    process.env.PAYMENT_PROVIDER = 'paystack';
+    process.env.PAYSTACK_SECRET_KEY = 'sk_test_x';
+    process.env.PAYSTACK_WEBHOOK_SECRET = 'wh';
+    process.env.VTU_PROVIDER = 'vtuagent';
+    process.env.VTUAGENT_API_KEY = 'a';
+    process.env.FULFILLMENT_MODE = 'provider_test';
+    expect(() => config().assertStagingSafety()).toThrow(/requires VTU_PROVIDER=vtpass/);
   });
 
   it('refuses a sandbox VTpass endpoint in production live mode', () => {

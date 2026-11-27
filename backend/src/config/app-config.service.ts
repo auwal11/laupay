@@ -38,6 +38,24 @@ function assertProductionProviderUrl(name: string, value: string, allowedHostnam
   }
 }
 
+function assertSandboxProviderUrl(name: string, value: string, allowedHostname: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`[config] Refusing to start: ${name} must be a valid HTTPS sandbox URL for ${allowedHostname}.`);
+  }
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.hostname.toLowerCase() !== allowedHostname ||
+    parsed.port !== '' ||
+    parsed.username !== '' ||
+    parsed.password !== ''
+  ) {
+    throw new Error(`[config] Refusing to start: ${name} must be a valid HTTPS sandbox URL for ${allowedHostname}.`);
+  }
+}
+
 @Injectable()
 export class AppConfigService {
   readonly nodeEnv = optional('NODE_ENV', 'development');
@@ -116,7 +134,7 @@ export class AppConfigService {
 
   readonly vtuAgentEnabled = this.vtuProvider === 'vtuagent';
   readonly cheapDataHubEnabled = this.vtuProvider === 'cheapdatahub';
-  readonly vtpassEnabled = this.vtuProvider === 'vtpass'; // legacy rows/config only; not allowed in production
+  readonly vtpassEnabled = this.vtuProvider === 'vtpass'; // legacy rows/config plus explicit sandbox test mode
   readonly vtuAgentApiKey = this.requiredIf(this.vtuAgentEnabled, 'VTUAGENT_API_KEY');
   readonly vtuAgentBaseUrl = optional('VTUAGENT_BASE_URL', 'https://api.vtuagent.com/v1').replace(/\/$/, '');
   readonly cheapDataHubApiKey = this.requiredIf(this.cheapDataHubEnabled, 'CHEAPDATAHUB_API_KEY');
@@ -154,7 +172,7 @@ export class AppConfigService {
   readonly vtpassApiKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_API_KEY');
   readonly vtpassSecretKey = this.requiredIf(this.vtpassEnabled, 'VTPASS_SECRET_KEY');
   readonly vtpassBaseUrl = optional('VTPASS_BASE_URL', 'https://sandbox.vtpass.com');
-  /** QA-only outcome override for provider_test; production rejects overrides. */
+  /** QA-only outcome override for provider_test; never used in live mode. */
   readonly vtpassTestOutcome = optional('VTPASS_TEST_OUTCOME', 'provider');
 
   readonly mailProvider = optional('MAIL_PROVIDER', 'mock');
@@ -252,8 +270,9 @@ export class AppConfigService {
   /**
    * Guard evaluated at boot (see main.ts).
    *
-   *  - In PRODUCTION: refuses to start with any mock/simulated provider, so a
-   *    real deployment can never silently fake a payment or fulfillment.
+   *  - In PRODUCTION: refuses to start with mock/simulated providers. An
+   *    explicit VTpass provider_test mode is allowed only against the sandbox
+   *    configuration and never calls a live provider.
    *  - In every other environment (staging/dev): refuses to start if a LIVE
    *    provider credential is present, so staging can never touch real money.
    */
@@ -284,11 +303,21 @@ export class AppConfigService {
       if (this.fulfillmentMode === 'simulated') {
         throw new Error(
           '[config] Refusing to start: FULFILLMENT_MODE=simulated in production. ' +
-            'Use live.',
+            'Use provider_test or live.',
         );
       }
+      if (this.fulfillmentMode === 'provider_test') {
+        if (this.vtuProvider !== 'vtpass') {
+          throw new Error('[config] Refusing to start: FULFILLMENT_MODE=provider_test requires VTU_PROVIDER=vtpass.');
+        }
+        assertSandboxProviderUrl('VTPASS_BASE_URL', this.vtpassBaseUrl, 'sandbox.vtpass.com');
+        if (!['success', 'failed'].includes(this.vtpassTestOutcome)) {
+          throw new Error('[config] Refusing to start: VTPASS_TEST_OUTCOME must be success or failed in provider_test mode.');
+        }
+        return;
+      }
       if (this.fulfillmentMode !== 'live') {
-        throw new Error('[config] Refusing to start: FULFILLMENT_MODE=provider_test is not allowed in production. Use live.');
+        throw new Error(`[config] Refusing to start: unsupported FULFILLMENT_MODE=${this.fulfillmentMode} in production. Use provider_test or live.`);
       }
       if (this.vtuProvider === 'vtpass') {
         assertProductionProviderUrl('VTPASS_BASE_URL', this.vtpassBaseUrl, 'vtpass.com');

@@ -20,8 +20,14 @@ services:
         value: paystack
       - key: VTU_PROVIDER
         value: vtpass
+      # Keep this deployment non-live: VTpass provider_test uses the local
+      # deterministic success/failure outcome and never calls live fulfillment.
       - key: FULFILLMENT_MODE
-        value: live
+        value: provider_test
+      - key: VTPASS_TEST_OUTCOME
+        value: success
+      - key: VTPASS_BASE_URL
+        value: https://sandbox.vtpass.com
       - key: MONNIFY_BASE_URL
         value: https://sandbox.monnify.com
       - key: ADMIN_EMAIL
@@ -61,9 +67,6 @@ services:
       - key: VTPASS_API_KEY
         sync: false
       - key: VTPASS_SECRET_KEY
-        sync: false
-      # Must be set in Render to https://vtpass.com before production startup; the boot guard fails closed otherwise.
-      - key: VTPASS_BASE_URL
         sync: false
       - key: VTPASS_WEBHOOK_SECRET
         sync: false
